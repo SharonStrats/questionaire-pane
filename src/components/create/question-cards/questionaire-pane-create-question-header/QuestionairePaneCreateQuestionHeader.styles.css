@@ -1,0 +1,87 @@
+:host {
+  display: block;
+}
+
+.questionaire-pane-create-question-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 32px 20px;
+}
+
+.questionaire-pane-create-question-header-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.questionaire-pane-create-question-header-badge-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.questionaire-pane-create-question-header-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #6c5ce7;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.questionaire-pane-create-question-header-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: #ede9fe;
+  color: #7c3aed;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.questionaire-pane-create-question-header-title {
+  margin: 0;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.questionaire-pane-create-question-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.questionaire-pane-create-question-header-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.questionaire-pane-create-question-header-delete:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.questionaire-pane-create-question-header-delete icon-lucide-trash-2 {
+  width: 14px;
+  height: 14px;
+}

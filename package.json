@@ -1,0 +1,85 @@
+{
+  "name": "questionaire-pane",
+  "version": "1.0.0-0",
+  "description": "Questionaire Pane",
+  "main": "dist/index.cjs.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.esm.js",
+      "require": "./dist/index.cjs.js"
+    }
+  },
+  "sideEffects": [
+    "**/*.css",
+    "src/components/**/*.ts"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && npm run typecheck && vite build",
+    "watch": "vite build --watch",
+    "lint": "eslint",
+    "lint-fix": "eslint --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"No tests specified\" && exit 0",
+    "prepublishOnly": "npm run build && npm run lint",
+    "preversion": "npm run typecheck && npm run lint",
+    "postpublish": "git push origin staging",
+    "start": "vite"
+  },
+  "files": [
+    "dist/",
+    "declarations.d.ts"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SharonStrats/questionaire-pane.git"
+  },
+  "keywords": [
+    "solid",
+    "file system explorer",
+    "decentralized",
+    "web",
+    "rdf",
+    "ldp",
+    "linked",
+    "pane",
+    "app",
+    "data"
+  ],
+  "author": "Sharon Stratsianis <sstratsianis@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/SharonStrats/questionaire-pane/issues"
+  },
+  "homepage": "https://github.com/SharonStrats/questionaire-pane",
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.3",
+    "@eslint/js": "^10.0.1",
+    "@iconify-json/lucide": "^1.2.141",
+    "@types/node": "^24.13.3",
+    "@typescript-eslint/parser": "^8.53.1",
+    "@vitest/coverage-v8": "^4.0.18",
+    "eslint": "^10.0.1",
+    "globals": "^17.1.0",
+    "solidos-toolkit": "dev",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "rdflib": "2.4.1",
+    "solid-logic": "6.0.0-2",
+    "solid-ui": "5.0.0-2",
+    "vite": "^8.0.16",
+    "vitest": "^4.0.18",
+    "vitest-axe": "^0.1.0"
+  },
+  "solidosDependencies": [
+    "rdflib",
+    "solid-logic",
+    "solid-ui"
+  ],
+  "allowScripts": {
+    "fsevents@2.3.3": true
+  }
+}

@@ -1,0 +1,123 @@
+:host {
+  display: block;
+}
+
+.questionaire-pane-take-question-multiple-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.questionaire-pane-take-question-multiple-choice-type {
+  display: inline-flex;
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #ede9fe;
+  color: #7c3aed;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.questionaire-pane-take-question-multiple-choice-title {
+  margin: 0;
+  color: #1e293b;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.questionaire-pane-take-question-multiple-choice-hint {
+  margin: 0;
+  color: #64748b;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.questionaire-pane-take-question-multiple-choice-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.questionaire-pane-take-question-multiple-choice-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #e2e5ea;
+  border-radius: 14px;
+  background: white;
+  cursor: pointer;
+}
+
+.questionaire-pane-take-question-multiple-choice-option:hover {
+  border-color: #c4b5fd;
+}
+
+.questionaire-pane-take-question-multiple-choice-option--selected {
+  border-color: #a78bfa;
+  background: #f8f5ff;
+}
+
+.questionaire-pane-take-question-multiple-choice-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.questionaire-pane-take-question-multiple-choice-option-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #cbd5e1;
+  background: white;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.questionaire-pane-take-question-multiple-choice-option-control--radio {
+  border-radius: 999px;
+}
+
+.questionaire-pane-take-question-multiple-choice-option-control--checkbox {
+  border-radius: 5px;
+}
+
+.questionaire-pane-take-question-multiple-choice-option--selected .questionaire-pane-take-question-multiple-choice-option-control {
+  border-color: #7c3aed;
+  background: #7c3aed;
+}
+
+.questionaire-pane-take-question-multiple-choice-option-control--radio.questionaire-pane-take-question-multiple-choice-option-control--selected::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: white;
+}
+
+.questionaire-pane-take-question-multiple-choice-option-control--checkbox.questionaire-pane-take-question-multiple-choice-option-control--selected::after {
+  content: '✓';
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.questionaire-pane-take-question-multiple-choice-option-label {
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.questionaire-pane-take-question-multiple-choice-note {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.5;
+}

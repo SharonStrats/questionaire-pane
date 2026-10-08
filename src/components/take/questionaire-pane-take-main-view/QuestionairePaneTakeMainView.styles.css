@@ -1,0 +1,9 @@
+:host {
+  display: block;
+}
+
+.questionaire-pane-take-main-view {
+  display: block;
+  min-height: calc(100vh - 112px);
+  background: var(--solid-ui-color-slate-50, #F8FAFC);
+}

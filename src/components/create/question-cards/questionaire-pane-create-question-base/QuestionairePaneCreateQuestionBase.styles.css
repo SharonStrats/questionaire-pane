@@ -1,0 +1,42 @@
+:host {
+  display: block;
+}
+
+.questionaire-pane-create-question-base {
+  padding: 20px 24px;
+  border: 1px solid var(--solid-ui-color-slate-200, #E2E8F0);
+  border-radius: 18px;
+  background: var(--solid-ui-color-white, #FFF);
+}
+
+.questionaire-pane-create-question-base-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.questionaire-pane-create-question-base-type {
+  margin: 0 0 4px;
+  color: var(--solid-ui-color-slate-400, #94A3B8);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.questionaire-pane-create-question-base-title {
+  margin: 0;
+  color: var(--solid-ui-color-slate-900, #1E293B);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.questionaire-pane-create-question-base-description {
+  margin: 10px 0 0;
+  color: var(--solid-ui-color-slate-500, #64748B);
+}
+
+.questionaire-pane-create-question-base-body {
+  margin-top: 16px;
+}

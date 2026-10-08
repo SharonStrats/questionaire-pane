@@ -1,0 +1,105 @@
+:host {
+  display: block;
+}
+
+.questionaire-pane-create-question-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #f4f5f7;
+}
+
+.questionaire-pane-create-question-footer-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.questionaire-pane-create-question-footer-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.questionaire-pane-create-question-footer-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+}
+
+.questionaire-pane-create-question-footer-points {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border: 1px solid #e2e5ea;
+  border-radius: 10px;
+  background: white;
+}
+
+.questionaire-pane-create-question-footer-points-label {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.questionaire-pane-create-question-footer-points-input {
+  width: 40px;
+  border: 0;
+  background: transparent;
+  color: #1a2235;
+  font: inherit;
+  font-size: 13px;
+  text-align: center;
+}
+
+.questionaire-pane-create-question-footer-points-input:focus {
+  outline: none;
+}
+
+.questionaire-pane-create-question-footer-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: #6c5ce7;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 1px 1.5px rgba(0, 0, 0, 0.1), 0 1px 1px rgba(0, 0, 0, 0.1);
+}
+
+.questionaire-pane-create-question-footer-save:hover {
+  background: #5b4fd6;
+}
+
+.questionaire-pane-create-question-footer-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.questionaire-pane-create-question-footer-save icon-lucide-check {
+  width: 14px;
+  height: 14px;
+}
+
+.questionaire-pane-create-question-footer-points icon-lucide-star {
+  width: 12px;
+  height: 12px;
+  color: #f59e0b;
+  flex-shrink: 0;
+}

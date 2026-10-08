@@ -1,0 +1,61 @@
+:host {
+  display: block;
+}
+
+.questionaire-pane-take-final-screen {
+  display: flex;
+  justify-content: center;
+  padding: 56px 32px;
+}
+
+.questionaire-pane-take-final-screen-card {
+  width: min(100%, 760px);
+  padding: 36px 32px;
+  border: 1px solid #e2e5ea;
+  border-radius: 20px;
+  background: white;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  text-align: center;
+}
+
+.questionaire-pane-take-final-screen-kicker {
+  margin: 0 0 12px;
+  color: #7c3aed;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.questionaire-pane-take-final-screen-card h2 {
+  margin: 0 0 14px;
+  color: #1e293b;
+  font-size: 32px;
+  font-weight: 600;
+}
+
+.questionaire-pane-take-final-screen-score {
+  margin: 0;
+  color: #334155;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.questionaire-pane-take-final-screen-summary {
+  margin: 10px 0 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.questionaire-pane-take-final-screen-restart {
+  margin-top: 24px;
+  min-height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 12px;
+  background: #6c5ce7;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}

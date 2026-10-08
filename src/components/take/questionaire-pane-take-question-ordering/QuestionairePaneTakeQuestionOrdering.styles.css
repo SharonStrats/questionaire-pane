@@ -1,0 +1,11 @@
+:host { display: block; }
+.questionaire-pane-take-question-ordering { display: flex; flex-direction: column; gap: 16px; }
+.questionaire-pane-take-question-ordering-type { display: inline-flex; width: fit-content; padding: 4px 10px; border-radius: 999px; background: #ede9fe; color: #7c3aed; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.questionaire-pane-take-question-ordering-title { margin: 0; color: #1e293b; font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
+.questionaire-pane-take-question-ordering-hint { margin: 0; color: #64748b; font-size: 15px; line-height: 1.6; }
+.questionaire-pane-take-question-ordering-list { display: flex; flex-direction: column; gap: 10px; }
+.questionaire-pane-take-question-ordering-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #e2e5ea; border-radius: 14px; background: white; }
+.questionaire-pane-take-question-ordering-item-index { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 8px; background: #f8fafc; color: #64748b; font-size: 11px; font-weight: 700; }
+.questionaire-pane-take-question-ordering-item-label { flex: 1; color: #334155; font-size: 14px; }
+.questionaire-pane-take-question-ordering-item-actions { display: inline-flex; gap: 6px; }
+.questionaire-pane-take-question-ordering-item-actions button { min-width: 28px; min-height: 28px; border: 1px solid #e2e8f0; border-radius: 8px; background: white; cursor: pointer; }
