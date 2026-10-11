@@ -1,0 +1,17 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, sans-serif;
+  color: #243447;
+  background: #f7f9fb;
+}
+
+body { margin: 0; }
+#PageHeader {
+  min-height: 64px;
+  padding: 0 1.25rem;
+  background: #fff;
+  border-bottom: 1px solid #dce3e8;
+}
+#app { max-width: 960px; margin: 0 auto; padding: 2rem 1.25rem; }
+.info, .error { padding: 1rem; border-radius: 0.4rem; background: #fff; }
+.error { color: #9b1c1c; border: 1px solid #e6b8b8; }
