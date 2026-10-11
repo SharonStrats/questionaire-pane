@@ -20,6 +20,7 @@ export interface QuestionaireQuestionOptions {
   created?: Date
   questionPredicateUri?: string
   questionTypeUri?: string
+  image?: string
   hint?: string
   points?: number
   options?: string[]
@@ -72,18 +73,6 @@ async function createContainerIfMissing (store: Store, url: string) {
   }
 
   try {
-    const existsResponse = await fetcher._fetch(url, {
-      method: 'HEAD'
-    })
-
-    if (existsResponse.status >= 200 && existsResponse.status < 300) {
-      return false
-    }
-
-    if (existsResponse.status !== 404 && existsResponse.status !== 410) {
-      throw new Error(`Failed to check container at ${url}: HTTP ${existsResponse.status}`)
-    }
-
     const response = await fetcher._fetch(url, {
       method: 'PUT',
       headers: {
@@ -94,6 +83,8 @@ async function createContainerIfMissing (store: Store, url: string) {
       body: ' '
     })
 
+    // The conditional PUT is the existence check. Avoiding a preliminary HEAD
+    // keeps missing containers from producing expected-but-noisy 404 requests.
     if (response.status === 409 || response.status === 412) {
       return false
     }
