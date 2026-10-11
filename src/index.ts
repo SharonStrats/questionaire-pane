@@ -2,10 +2,11 @@
  **
  **  This allows a user to build and publish a questionnaire
  */
-import { Store } from 'rdflib'
+import { literal, Store } from 'rdflib'
 import { icons, ns } from 'solid-ui'
 import { createQuestionaireLogic } from './service/questionaireLogic'
-import { disco, quiz } from './namespaces'
+import { questionairePredicates } from './service/questionairePredicates'
+import { disco } from './namespaces'
 import './components/provider/QuestionaireProvider'
 import './components/create/questionaire-pane-create-main-view/QuestionairePaneCreateMainView'
 import './components/take/questionaire-pane-take-main-view/QuestionairePaneTakeMainView'
@@ -41,8 +42,13 @@ export default {
     if (kb.holds(subject, ns.rdf('type'), disco('Questionnaire'))) {
       return 'Questionnaire'
     }
-    if (kb.holds(subject, ns.rdf('type'), quiz('PublishedQuiz'))) {
+    if (kb.holds(subject, ns.rdf('type'), questionairePredicates.questionnaire.quizType) &&
+        kb.holds(subject, questionairePredicates.questionnaire.status, literal('Published'))) {
       return 'Quiz'
+    }
+    if (kb.holds(subject, ns.rdf('type'), questionairePredicates.questionnaire.surveyType) &&
+        kb.holds(subject, questionairePredicates.questionnaire.status, literal('Published'))) {
+      return 'Survey'
     }
     return null
   },
@@ -57,7 +63,12 @@ export default {
     provider.store = context.session.store as Store
     provider.subject = subject
 
-    const mainView = kb.holds(subject, ns.rdf('type'), quiz('PublishedQuiz'))
+    const isPublished = (
+      kb.holds(subject, ns.rdf('type'), questionairePredicates.questionnaire.quizType) ||
+      kb.holds(subject, ns.rdf('type'), questionairePredicates.questionnaire.surveyType)
+    ) &&
+      kb.holds(subject, questionairePredicates.questionnaire.status, literal('Published'))
+    const mainView = isPublished
       ? dom.createElement('questionaire-pane-take-main-view')
       : dom.createElement('questionaire-pane-create-main-view')
     provider.appendChild(mainView)

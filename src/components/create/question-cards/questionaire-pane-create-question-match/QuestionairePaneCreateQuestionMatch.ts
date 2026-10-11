@@ -1,29 +1,18 @@
 import { html } from 'lit'
-import { consume } from '@lit/context'
-import { property, state } from 'lit/decorators.js'
-import { customElement, WebComponent } from 'solid-ui'
-import { Namespace, type NamedNode } from 'rdflib'
+import { state } from 'lit/decorators.js'
+import { customElement } from 'solid-ui'
 import styles from './QuestionairePaneCreateQuestionMatch.styles.css'
-import { questionaireContext, type QuestionaireContext } from '../../../../context'
-import { createQuestionaireLogic } from '../../../../service/questionaireLogic'
+import QuestionairePaneCreateQuestionCardBase from '../questionaire-pane-create-question-card-base/QuestionairePaneCreateQuestionCardBase'
+import { readQuestionValue, readQuestionValues } from '../../../../service/questionaireQuestionAccessors'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
 import '~icons/lucide/chevron-down'
 import '~icons/lucide/info'
 import '~icons/lucide/plus'
 
-const dct = Namespace('http://purl.org/dc/terms/')
-const quiz = Namespace('http://example.org/ns/quiz#')
-
 @customElement('questionaire-pane-create-question-match')
-export default class QuestionairePaneCreateQuestionMatch extends WebComponent {
+export default class QuestionairePaneCreateQuestionMatch extends QuestionairePaneCreateQuestionCardBase {
   static styles = styles
-
-  @consume({ context: questionaireContext, subscribe: true })
-  accessor questionaire: QuestionaireContext = undefined as unknown as QuestionaireContext
-
-  @property({ attribute: false })
-  accessor question: NamedNode | null = null
 
   @state()
   private accessor draftTitle = ''
@@ -43,29 +32,6 @@ export default class QuestionairePaneCreateQuestionMatch extends WebComponent {
   @state()
   private accessor loadedQuestionUri: string | null = null
 
-  private getBaseUrl () {
-    const questionaire = this.questionaire ?? { subject: null }
-    const subject = questionaire.subject
-    if (!subject) {
-      return null
-    }
-
-    return subject.doc().uri.replace(/index\.ttl$/, '')
-  }
-
-  private getStore () {
-    return this.questionaire?.store ?? null
-  }
-
-  private getQuestionLogic () {
-    const store = this.getStore()
-    if (!store) {
-      return null
-    }
-
-    return createQuestionaireLogic(store)
-  }
-
   protected willUpdate () {
     const question = this.question
     if (!question || this.loadedQuestionUri === question.uri) {
@@ -80,16 +46,6 @@ export default class QuestionairePaneCreateQuestionMatch extends WebComponent {
     this.loadedQuestionUri = question.uri
   }
 
-  private getQuestionNumber () {
-    const question = this.question
-    if (!question) {
-      return 1
-    }
-
-    const match = question.uri.match(/q(\d+)\.ttl$/)
-    return match ? Number(match[1]) : 1
-  }
-
   private getQuestionTitle () {
     const store = this.getStore()
     const question = this.question
@@ -97,7 +53,7 @@ export default class QuestionairePaneCreateQuestionMatch extends WebComponent {
       return ''
     }
 
-    return store.any(question, dct('title'), undefined, question.doc())?.value ?? ''
+    return readQuestionValue(store, question, 'title')
   }
 
   private getQuestionHint () {
@@ -107,7 +63,7 @@ export default class QuestionairePaneCreateQuestionMatch extends WebComponent {
       return ''
     }
 
-    return store.any(question, quiz('hint'), undefined, question.doc())?.value ?? ''
+    return readQuestionValue(store, question, 'hint')
   }
 
   private getQuestionPoints () {
@@ -117,7 +73,7 @@ export default class QuestionairePaneCreateQuestionMatch extends WebComponent {
       return 1
     }
 
-    const raw = store.any(question, quiz('points'), undefined, question.doc())?.value ?? '1'
+    const raw = readQuestionValue(store, question, 'points') || '1'
     const parsed = Number.parseInt(raw, 10)
     return Number.isFinite(parsed) ? parsed : 1
   }
@@ -129,8 +85,7 @@ export default class QuestionairePaneCreateQuestionMatch extends WebComponent {
       return ['Roots', 'Leaves']
     }
 
-    const items = store.statementsMatching(question, quiz('leftItem'), undefined, question.doc())
-      .map((statement) => statement.object.value)
+    const items = readQuestionValues(store, question, 'leftItem')
 
     return items.length > 0 ? items : ['Roots', 'Leaves']
   }
@@ -142,23 +97,9 @@ export default class QuestionairePaneCreateQuestionMatch extends WebComponent {
       return ['Absorb water', 'Make food']
     }
 
-    const items = store.statementsMatching(question, quiz('rightItem'), undefined, question.doc())
-      .map((statement) => statement.object.value)
+    const items = readQuestionValues(store, question, 'rightItem')
 
     return items.length > 0 ? items : ['Absorb water', 'Make food']
-  }
-
-  private emitQuestionChanged () {
-    const question = this.question
-    if (!question) {
-      return
-    }
-
-    this.dispatchEvent(new CustomEvent('questionaire-question-updated', {
-      bubbles: true,
-      composed: true,
-      detail: { questionUri: question.uri }
-    }))
   }
 
   private async persistQuestionCard () {
@@ -180,11 +121,7 @@ export default class QuestionairePaneCreateQuestionMatch extends WebComponent {
     await logic.updateQuestionMatchPairs({ question, leftItems, rightItems })
 
     this.emitQuestionChanged()
-    this.dispatchEvent(new CustomEvent('questionaire-question-saved', {
-      bubbles: true,
-      composed: true,
-      detail: { questionUri: question.uri }
-    }))
+    this.emitQuestionSaved()
   }
 
   private async updateQuestionTitle (value: string) {
@@ -260,26 +197,6 @@ export default class QuestionairePaneCreateQuestionMatch extends WebComponent {
     })
     this.emitQuestionChanged()
     this.requestUpdate()
-  }
-
-  private async deleteQuestion () {
-    const question = this.question
-    const logic = this.getQuestionLogic()
-    const baseUrl = this.getBaseUrl()
-    if (!question || !logic || !baseUrl) {
-      return
-    }
-
-    await logic.deleteQuestionFromQuestionnaire({
-      baseUrl,
-      question
-    })
-
-    this.dispatchEvent(new CustomEvent('questionaire-question-deleted', {
-      bubbles: true,
-      composed: true,
-      detail: { questionUri: question.uri }
-    }))
   }
 
   render() {
@@ -392,10 +309,12 @@ export default class QuestionairePaneCreateQuestionMatch extends WebComponent {
               `
             })}
           </div>
-          <button class="questionaire-pane-create-question-match-add" type="button" @click=${() => { void this.addPair() }}>
-            <icon-lucide-plus></icon-lucide-plus>
-            <span>Add pair</span>
-          </button>
+          <div class="questionaire-pane-create-question-match-add-area">
+            <button class="questionaire-pane-create-question-match-add" type="button" @click=${() => { void this.addPair() }}>
+              <icon-lucide-plus></icon-lucide-plus>
+              <span>Add pair</span>
+            </button>
+          </div>
           <div class="questionaire-pane-create-question-match-note">
             <icon-lucide-info></icon-lucide-info>
             <span>Pairs are matched by row order.</span>

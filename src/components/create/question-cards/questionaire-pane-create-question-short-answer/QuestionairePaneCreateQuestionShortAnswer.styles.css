@@ -2,6 +2,14 @@
   display: block;
 }
 
+.questionaire-pane-question-image-preview {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
 .questionaire-pane-create-question-short-answer {
   display: flex;
   flex-direction: column;

@@ -18,15 +18,17 @@
   "scripts": {
     "clean": "rm -rf dist",
     "build": "npm run clean && npm run typecheck && vite build",
+    "build:standalone": "npm run typecheck && vite build --config vite.standalone.config.mts",
     "watch": "vite build --watch",
     "lint": "eslint",
     "lint-fix": "eslint --fix",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"No tests specified\" && exit 0",
+    "test": "vitest run",
     "prepublishOnly": "npm run build && npm run lint",
     "preversion": "npm run typecheck && npm run lint",
     "postpublish": "git push origin staging",
-    "start": "vite"
+    "start": "vite",
+    "start:standalone": "vite --config vite.standalone.config.mts"
   },
   "files": [
     "dist/",
@@ -67,6 +69,9 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.3.1",
+    "@lit/context": "^1.1.6",
+    "mammoth": "^1.13.0",
     "rdflib": "2.4.1",
     "solid-logic": "6.0.0-2",
     "solid-ui": "5.0.0-2",

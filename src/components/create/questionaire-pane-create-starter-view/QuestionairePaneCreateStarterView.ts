@@ -1,14 +1,13 @@
 import { html } from 'lit'
 import { consume } from '@lit/context'
 import { customElement, WebComponent } from 'solid-ui'
-import { Namespace, sym } from 'rdflib'
+import { sym } from 'rdflib'
 import styles from './QuestionairePaneCreateStarterView.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
 import { createQuestionaireLogic } from '../../../service/questionaireLogic'
+import { readQuestionValue } from '../../../service/questionaireQuestionAccessors'
 import { questionaireCreateQuestionTypes } from '../question-cards/questionaire-pane-create-question-types'
 import '~icons/lucide/square-pen'
-
-const dct = Namespace('http://purl.org/dc/terms/')
 
 @customElement('questionaire-pane-create-starter-view')
 export default class QuestionairePaneCreateStarterView extends WebComponent {
@@ -73,8 +72,7 @@ export default class QuestionairePaneCreateStarterView extends WebComponent {
     }
 
     const draft = sym(`${this.getBaseUrl() ?? ''}draft.ttl`)
-    const currentIntroduction =
-      store.any(draft, dct('description'), undefined, draft.doc())?.value ?? ''
+    const currentIntroduction = readQuestionValue(store, draft, 'description')
 
     return html`
       <section class="questionaire-pane-create-starter-view">
@@ -102,7 +100,7 @@ export default class QuestionairePaneCreateStarterView extends WebComponent {
               <button
                 class="questionaire-pane-create-starter-view-picker-card ${questionType.accentClass}"
                 type="button"
-                @click=${() => { void this.createStarterQuestion(questionType.questionTypeUri, 'Untitled question') }}
+                @click=${() => { void this.createStarterQuestion(questionType.questionTypeUri, '') }}
               >
                 <span class="questionaire-pane-create-starter-view-picker-card-icon">${questionType.label.slice(0, 2)}</span>
                 <span class="questionaire-pane-create-starter-view-picker-card-copy">

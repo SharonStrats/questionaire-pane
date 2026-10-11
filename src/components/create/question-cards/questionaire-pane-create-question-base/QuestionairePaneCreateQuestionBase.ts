@@ -32,7 +32,7 @@ export default class QuestionairePaneCreateQuestionBase extends WebComponent {
         <div class="questionaire-pane-create-question-base-header">
           <div>
             <p class="questionaire-pane-create-question-base-type">${this.questionTypeLabel}</p>
-            <h2 class="questionaire-pane-create-question-base-title">${this.title || 'Untitled question'}</h2>
+            <h2 class="questionaire-pane-create-question-base-title">${this.title}</h2>
           </div>
         </div>
         ${this.description

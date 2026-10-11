@@ -2,22 +2,15 @@ import { html } from 'lit'
 import { consume } from '@lit/context'
 import { state } from 'lit/decorators.js'
 import { customElement, WebComponent } from 'solid-ui'
-import { Namespace, type NamedNode } from 'rdflib'
 import styles from './QuestionairePaneTakeQuestionAreaView.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
-import { calculateQuestionnaireScore } from '../../../service/questionaireLogic'
+import { calculateQuestionnaireScore } from '../../../service/questionaireQuestionScoring'
+import { loadQuizAiService } from '../../../service/quizAiService'
+import { questionairePredicates } from '../../../service/questionairePredicates'
+import { getQuestionnaireFormat } from '../../../service/questionaireQuestionQueries'
+import { loadQuestionaireQuestionSummaries, type QuestionaireQuestionSummary } from '../../../service/questionaireQuestionQueries'
 import '../questionaire-pane-take-question-dispatcher/QuestionairePaneTakeQuestionDispatcher'
 import '../questionaire-pane-take-final-screen/QuestionairePaneTakeFinalScreen'
-import { ns } from 'solid-ui'
-
-const dct = Namespace('http://purl.org/dc/terms/')
-const quiz = Namespace('http://example.org/ns/quiz#')
-
-interface QuestionSummary {
-  question: NamedNode
-  title: string
-  typeUri: string
-}
 
 type AnswerValue = string | string[] | null
 
@@ -37,35 +30,67 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
   @state()
   private accessor completed = false
 
-  private getQuestions (): QuestionSummary[] {
+  @state()
+  private accessor questions: QuestionaireQuestionSummary[] = []
+
+  @state()
+  private accessor questionsLoading = false
+
+  @state()
+  private accessor semanticAnswerResults: Record<string, boolean> = {}
+
+  private questionsRefreshToken = 0
+  private questionsKey = ''
+
+  protected willUpdate () {
     const questionaire = this.questionaire ?? { store: null, subject: null }
     const store = questionaire.store
     const subject = questionaire.subject
     if (!store || !subject) {
-      return []
+      this.questions = []
+      this.questionsLoading = false
+      this.completed = false
+      this.questionsKey = ''
+      return
     }
 
-    const sourceDoc = subject.doc()
-    const questionStatements = store.statementsMatching(subject, quiz('question'), undefined, sourceDoc)
-
-    return questionStatements
-      .map((statement) => {
-        const question = statement.object as NamedNode
-        const title = store.any(question, dct('title'), undefined, question.doc())?.value ?? 'Untitled question'
-        const typeNode = store.any(question, ns.rdf('type'), undefined, question.doc())
-        return {
-          question,
-          title,
-          typeUri: typeNode?.value ?? ''
-        }
-      })
-      .sort((left, right) => left.question.uri.localeCompare(right.question.uri, undefined, { numeric: true, sensitivity: 'base' }))
+    const nextKey = subject.doc().uri
+    if (nextKey !== this.questionsKey) {
+      this.questionsKey = nextKey
+      void this.refreshQuestions()
+    }
   }
 
-  protected willUpdate () {
-    const questions = this.getQuestions()
+  private async refreshQuestions () {
+    const questionaire = this.questionaire ?? { store: null, subject: null }
+    const store = questionaire.store
+    const subject = questionaire.subject
+    if (!store || !subject) {
+      return
+    }
+
+    const refreshToken = ++this.questionsRefreshToken
+    this.questionsLoading = true
+
+    const questions = await loadQuestionaireQuestionSummaries(store, subject)
+    if (refreshToken !== this.questionsRefreshToken) {
+      return
+    }
+
+    this.questions = questions
+    this.questionsLoading = false
+    const isQuiz = getQuestionnaireFormat(store, subject) === 'quiz'
+    if (isQuiz && questions.some((question) => question.typeUri === questionairePredicates.question.questionType.shortAnswer.value)) {
+      try {
+        const service = await loadQuizAiService()
+        await service.ensureSemanticModel()
+      } catch (error) {
+        console.error('Unable to preload short-answer checking', error)
+      }
+    }
     if (questions.length === 0) {
       this.activeQuestionIndex = 0
+      this.completed = false
       return
     }
 
@@ -79,13 +104,22 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
       ...this.answersByQuestionUri,
       [event.detail.questionUri]: event.detail.answer
     }
+    const { [event.detail.questionUri]: _cleared, ...remainingResults } = this.semanticAnswerResults
+    this.semanticAnswerResults = remainingResults
+  }
+
+  private handleAnswerEvaluated (event: CustomEvent<{ questionUri: string, correct: boolean }>) {
+    this.semanticAnswerResults = {
+      ...this.semanticAnswerResults,
+      [event.detail.questionUri]: event.detail.correct
+    }
   }
 
   private goPrevious () {
     this.activeQuestionIndex = Math.max(0, this.activeQuestionIndex - 1)
   }
 
-  private goNext (questions: QuestionSummary[]) {
+  private goNext (questions: QuestionaireQuestionSummary[]) {
     if (this.activeQuestionIndex >= questions.length - 1) {
       this.completed = true
       return
@@ -108,9 +142,20 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
       return html``
     }
 
-    const questions = this.getQuestions()
+    const questions = this.questions
+    const isSurvey = getQuestionnaireFormat(store, subject) === 'survey'
     const activeQuestion = questions[this.activeQuestionIndex] ?? questions[0] ?? null
-    const score = calculateQuestionnaireScore(store, subject, this.answersByQuestionUri)
+    const score = calculateQuestionnaireScore(store, subject, this.answersByQuestionUri, this.semanticAnswerResults)
+
+    if (this.questionsLoading && questions.length === 0) {
+      return html`
+        <section class="questionaire-pane-take-question-area-view">
+          <div class="questionaire-pane-take-question-area-view-empty">
+            Loading questions...
+          </div>
+        </section>
+      `
+    }
 
     if (this.completed) {
       return html`
@@ -121,6 +166,7 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
               .answeredQuestions=${score.answeredQuestions}
               .availablePoints=${score.availablePoints}
               .earnedPoints=${score.earnedPoints}
+              .isSurvey=${isSurvey}
               @questionaire-take-restart=${() => this.restart()}
             ></questionaire-pane-take-final-screen>
           </div>
@@ -153,6 +199,7 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
             .answer=${currentAnswer}
             .questionTypeUri=${activeQuestion.typeUri}
             @questionaire-answer-changed=${(event: CustomEvent<{ questionUri: string, answer: AnswerValue }>) => this.handleAnswerChanged(event)}
+            @questionaire-answer-evaluated=${(event: CustomEvent<{ questionUri: string, correct: boolean }>) => this.handleAnswerEvaluated(event)}
           ></questionaire-pane-take-question-dispatcher>
           <div class="questionaire-pane-take-question-area-view-navigation">
             <button

@@ -1,11 +1,9 @@
 import { html } from 'lit'
 import { consume } from '@lit/context'
 import { customElement, WebComponent } from 'solid-ui'
-import { Namespace } from 'rdflib'
 import styles from './QuestionairePaneTakeStarterView.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
-
-const dct = Namespace('http://purl.org/dc/terms/')
+import { readQuestionValue } from '../../../service/questionaireQuestionAccessors'
 
 @customElement('questionaire-pane-take-starter-view')
 export default class QuestionairePaneTakeStarterView extends WebComponent {
@@ -22,7 +20,7 @@ export default class QuestionairePaneTakeStarterView extends WebComponent {
       return 'Questionnaire'
     }
 
-    return store.any(subject, dct('title'), undefined, subject.doc())?.value ?? 'Questionnaire'
+    return readQuestionValue(store, subject, 'title') || 'Questionnaire'
   }
 
   private getDescription () {
@@ -33,7 +31,7 @@ export default class QuestionairePaneTakeStarterView extends WebComponent {
       return ''
     }
 
-    return store.any(subject, dct('description'), undefined, subject.doc())?.value ?? ''
+    return readQuestionValue(store, subject, 'description')
   }
 
   private handleStart () {

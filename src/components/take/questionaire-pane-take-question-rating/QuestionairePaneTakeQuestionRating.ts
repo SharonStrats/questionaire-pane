@@ -2,12 +2,10 @@ import { html } from 'lit'
 import { consume } from '@lit/context'
 import { property, state } from 'lit/decorators.js'
 import { customElement, WebComponent } from 'solid-ui'
-import { Namespace, type NamedNode } from 'rdflib'
+import { type NamedNode } from 'rdflib'
 import styles from './QuestionairePaneTakeQuestionRating.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
-
-const dct = Namespace('http://purl.org/dc/terms/')
-const quiz = Namespace('http://example.org/ns/quiz#')
+import { readQuestionValue } from '../../../service/questionaireQuestionAccessors'
 
 @customElement('questionaire-pane-take-question-rating')
 export default class QuestionairePaneTakeQuestionRating extends WebComponent {
@@ -35,7 +33,7 @@ export default class QuestionairePaneTakeQuestionRating extends WebComponent {
       return ''
     }
 
-    return store.any(question, dct('title'), undefined, question.doc())?.value ?? ''
+    return readQuestionValue(store, question, 'title')
   }
 
   private getHint () {
@@ -45,7 +43,7 @@ export default class QuestionairePaneTakeQuestionRating extends WebComponent {
       return ''
     }
 
-    return store.any(question, quiz('hint'), undefined, question.doc())?.value ?? ''
+    return readQuestionValue(store, question, 'hint')
   }
 
   protected willUpdate () {

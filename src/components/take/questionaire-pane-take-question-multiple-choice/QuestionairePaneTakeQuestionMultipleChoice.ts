@@ -2,12 +2,10 @@ import { html } from 'lit'
 import { consume } from '@lit/context'
 import { property, state } from 'lit/decorators.js'
 import { customElement, WebComponent } from 'solid-ui'
-import { Namespace, type NamedNode } from 'rdflib'
+import { type NamedNode } from 'rdflib'
 import styles from './QuestionairePaneTakeQuestionMultipleChoice.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
-
-const dct = Namespace('http://purl.org/dc/terms/')
-const quiz = Namespace('http://example.org/ns/quiz#')
+import { readQuestionValue, readQuestionValues } from '../../../service/questionaireQuestionAccessors'
 
 type AnswerValue = string | string[] | null
 
@@ -50,7 +48,7 @@ export default class QuestionairePaneTakeQuestionMultipleChoice extends WebCompo
       return ''
     }
 
-    return store.any(question, dct('title'), undefined, question.doc())?.value ?? ''
+    return readQuestionValue(store, question, 'title')
   }
 
   private getQuestionHint () {
@@ -60,7 +58,13 @@ export default class QuestionairePaneTakeQuestionMultipleChoice extends WebCompo
       return ''
     }
 
-    return store.any(question, quiz('hint'), undefined, question.doc())?.value ?? ''
+    return readQuestionValue(store, question, 'hint')
+  }
+
+  private getQuestionImage () {
+    const store = this.getStore()
+    const question = this.question
+    return store && question ? readQuestionValue(store, question, 'image') : ''
   }
 
   private getQuestionOptions () {
@@ -70,9 +74,7 @@ export default class QuestionairePaneTakeQuestionMultipleChoice extends WebCompo
       return []
     }
 
-    return store
-      .statementsMatching(question, quiz('option'), undefined, question.doc())
-      .map((statement) => statement.object.value)
+    return readQuestionValues(store, question, 'option')
   }
 
   protected willUpdate () {
@@ -123,11 +125,13 @@ export default class QuestionairePaneTakeQuestionMultipleChoice extends WebCompo
   render() {
     const title = this.getQuestionTitle()
     const hint = this.getQuestionHint()
+    const image = this.getQuestionImage()
     const options = this.getQuestionOptions()
 
     return html`
       <section class="questionaire-pane-take-question-multiple-choice">
         <div class="questionaire-pane-take-question-multiple-choice-type">${this.questionTypeLabel}</div>
+        ${image ? html`<img class="questionaire-pane-question-image" src=${image} alt="" />` : ''}
         <h2 class="questionaire-pane-take-question-multiple-choice-title">${title || 'Untitled question'}</h2>
         ${hint
           ? html`<p class="questionaire-pane-take-question-multiple-choice-hint">${hint}</p>`

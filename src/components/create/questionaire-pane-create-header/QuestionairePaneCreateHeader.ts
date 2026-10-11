@@ -3,11 +3,14 @@ import { consume } from '@lit/context'
 import { customElement, WebComponent } from 'solid-ui'
 import 'solid-ui/components/combobox'
 import 'solid-ui/components/combobox-option'
-import { Namespace, sym } from 'rdflib'
+import { sym, type NamedNode } from 'rdflib'
 import { state } from 'lit/decorators.js'
 import styles from './QuestionairePaneCreateHeader.styles.css'
 import { QuestionaireContext, questionaireContext } from '../../../context'
-import { createQuestionaireLogic, getQuestionnaireFormat } from '../../../service/questionaireLogic'
+import { createQuestionaireLogic } from '../../../service/questionaireLogic'
+import { getQuestionnaireFormat } from '../../../service/questionaireQuestionQueries'
+import { readQuestionValue } from '../../../service/questionaireQuestionAccessors'
+import { questionairePredicates } from '../../../service/questionairePredicates'
 
 import '~icons/lucide/square-pen'
 import '~icons/lucide/check'
@@ -17,11 +20,9 @@ import '~icons/lucide/clock-3'
 import '~icons/lucide/list'
 import '~icons/lucide/star'
 import '~icons/lucide/share-2'
+import '~icons/lucide/file-up'
 
-const dct = Namespace('http://purl.org/dc/terms/')
-const quiz = Namespace('http://example.org/ns/quiz#')
-
-function isNamedNode (term: unknown): term is { doc: () => { uri: string } } {
+function isNamedNode (term: unknown): term is NamedNode {
   return Boolean(
     term &&
       typeof term === 'object' &&
@@ -47,6 +48,12 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
   @state()
   private accessor published = false
 
+  @state()
+  private accessor publishing = false
+
+  @state()
+  private accessor publishError = ''
+
   private async editTitle () {
     const questionaire = this.questionaire ?? { store: null, subject: null }
     const store = questionaire.store
@@ -55,7 +62,7 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
       return
     }
 
-    const currentTitle = store.any(subject, dct('title'))?.value ?? 'Untitled Questionaire'
+    const currentTitle = readQuestionValue(store, subject, 'title')
     this.titleDraft = currentTitle
     this.editingTitle = true
   }
@@ -74,7 +81,7 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
       return
     }
 
-    const currentTitle = store.any(subject, dct('title'))?.value ?? 'Untitled Questionaire'
+    const currentTitle = readQuestionValue(store, subject, 'title')
     const title = this.titleDraft.trim()
 
     if (!title || title === currentTitle) {
@@ -125,12 +132,70 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
     this.requestUpdate()
   }
 
-  private publishQuestionnaire () {
-    this.published = true
-    this.dispatchEvent(new CustomEvent('questionaire-published', {
+  private async publishQuestionnaire () {
+    const questionaire = this.questionaire ?? { store: null, subject: null }
+    const store = questionaire.store
+    const subject = questionaire.subject
+    if (!store || !subject || !isNamedNode(subject) || this.publishing) {
+      return
+    }
+
+    this.publishing = true
+    this.publishError = ''
+
+    try {
+      const questionaireLogic = createQuestionaireLogic(store)
+      const result = await questionaireLogic.publishQuestionnaire({ subject })
+      this.published = true
+      this.dispatchEvent(new CustomEvent('questionaire-published', {
+        bubbles: true,
+        composed: true,
+        detail: result
+      }))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.publishError = `Unable to publish questionnaire: ${message}`
+      console.error(this.publishError, error)
+      this.dispatchEvent(new CustomEvent('questionaire-publish-error', {
+        bubbles: true,
+        composed: true,
+        detail: { error }
+      }))
+    } finally {
+      this.publishing = false
+    }
+  }
+
+  private requestPreview () {
+    if (!this.published) {
+      return
+    }
+
+    this.dispatchEvent(new CustomEvent('questionaire-preview-requested', {
       bubbles: true,
       composed: true
     }))
+  }
+
+  private requestDocumentImport (files: File[] = []) {
+    this.dispatchEvent(new CustomEvent('questionaire-document-import-requested', {
+      bubbles: true,
+      composed: true,
+      detail: { files }
+    }))
+  }
+
+  private onDocumentImportDragOver (event: DragEvent) {
+    event.preventDefault()
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'copy'
+    }
+  }
+
+  private onDocumentImportDrop (event: DragEvent) {
+    event.preventDefault()
+    event.stopPropagation()
+    this.requestDocumentImport(Array.from(event.dataTransfer?.files ?? []))
   }
 
   private getDraftQuestionStats () {
@@ -144,7 +209,7 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
     const baseUrl = subject.doc().uri.replace(/index\.ttl$/, '')
     const draft = sym(`${baseUrl}draft.ttl`)
     const draftDocument = sym(`${baseUrl}draft.ttl`).doc()
-    const questions = store.statementsMatching(draft, quiz('question'), undefined, draftDocument)
+    const questions = store.statementsMatching(draft, questionairePredicates.questionnaire.question, undefined, draftDocument)
 
     let points = 0
     for (const statement of questions) {
@@ -153,7 +218,7 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
         continue
       }
 
-      const questionPoints = store.any(question, quiz('points'), undefined, question.doc())?.value ?? '1'
+      const questionPoints = readQuestionValue(store, question, 'points') || '1'
       const parsed = Number.parseInt(questionPoints, 10)
       points += Number.isFinite(parsed) ? parsed : 1
     }
@@ -172,8 +237,7 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
     }
 
     const format = getQuestionnaireFormat(questionaire.store, questionaire.subject)
-    const title = questionaire.store.any(questionaire.subject, dct('title'))
-    const displayTitle = title?.value ?? 'Untitled Questionaire'
+    const displayTitle = readQuestionValue(questionaire.store, questionaire.subject, 'title')
     const stats = this.getDraftQuestionStats()
 
     return html`
@@ -231,6 +295,9 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
         </div>
         <div class="questionaire-pane-create-header-actions" aria-label="Questionnaire actions">
           <span class="questionaire-pane-create-header-unsaved">Unsaved changes</span>
+          ${this.publishError
+            ? html`<span role="alert">${this.publishError}</span>`
+            : ''}
           <div class="questionaire-pane-create-header-format-group">
             <span class="questionaire-pane-create-header-format-label">FORMAT</span>
             <solid-ui-combobox
@@ -243,21 +310,38 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
               <solid-ui-combobox-option value="survey">Survey</solid-ui-combobox-option>
             </solid-ui-combobox>
           </div>
+          <button
+            class="questionaire-pane-create-header-action questionaire-pane-create-header-action--muted"
+            type="button"
+            aria-label="Import DOCX files"
+            @click=${() => this.requestDocumentImport()}
+            @dragover=${this.onDocumentImportDragOver}
+            @drop=${this.onDocumentImportDrop}
+          >
+            <icon-lucide-file-up></icon-lucide-file-up>
+            <span>Import DOCX</span>
+          </button>
           <button class="questionaire-pane-create-header-action" type="button">
             <icon-lucide-check></icon-lucide-check>
             <span>Save draft</span>
           </button>
-          <button class="questionaire-pane-create-header-action questionaire-pane-create-header-action--muted" type="button">
+          <button
+            class="questionaire-pane-create-header-action questionaire-pane-create-header-action--muted"
+            type="button"
+            ?disabled=${!this.published || this.publishing}
+            @click=${() => this.requestPreview()}
+          >
             <icon-lucide-eye></icon-lucide-eye>
             <span>${this.published ? 'View live' : 'Preview'}</span>
           </button>
           <button
             class="questionaire-pane-create-header-action questionaire-pane-create-header-action--primary"
             type="button"
-            @click=${() => this.publishQuestionnaire()}
+            ?disabled=${this.publishing}
+            @click=${() => { void this.publishQuestionnaire() }}
           >
             <icon-lucide-share-2></icon-lucide-share-2>
-            <span>${this.published ? 'Published' : 'Publish'}</span>
+            <span>${this.publishing ? 'Publishing…' : (this.published ? 'Published' : 'Publish')}</span>
           </button>
         </div>
       </div>

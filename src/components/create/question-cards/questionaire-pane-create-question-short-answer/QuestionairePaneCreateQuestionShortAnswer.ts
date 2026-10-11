@@ -1,29 +1,18 @@
 import { html } from 'lit'
-import { property, state } from 'lit/decorators.js'
-import { consume } from '@lit/context'
-import { customElement, WebComponent } from 'solid-ui'
-import { Namespace, type NamedNode } from 'rdflib'
+import { state } from 'lit/decorators.js'
+import { customElement } from 'solid-ui'
 import styles from './QuestionairePaneCreateQuestionShortAnswer.styles.css'
-import { questionaireContext, type QuestionaireContext } from '../../../../context'
-import { createQuestionaireLogic } from '../../../../service/questionaireLogic'
+import QuestionairePaneCreateQuestionCardBase from '../questionaire-pane-create-question-card-base/QuestionairePaneCreateQuestionCardBase'
+import { readQuestionValue } from '../../../../service/questionaireQuestionAccessors'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
 import '~icons/lucide/chevron-down'
 import '~icons/lucide/info'
 import '~icons/lucide/pencil'
 
-const dct = Namespace('http://purl.org/dc/terms/')
-const quiz = Namespace('http://example.org/ns/quiz#')
-
 @customElement('questionaire-pane-create-question-short-answer')
-export default class QuestionairePaneCreateQuestionShortAnswer extends WebComponent {
+export default class QuestionairePaneCreateQuestionShortAnswer extends QuestionairePaneCreateQuestionCardBase {
   static styles = styles
-
-  @consume({ context: questionaireContext, subscribe: true })
-  accessor questionaire: QuestionaireContext = undefined as unknown as QuestionaireContext
-
-  @property({ attribute: false })
-  accessor question: NamedNode | null = null
 
   @state()
   private accessor draftTitle = ''
@@ -32,33 +21,13 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends WebCompon
   private accessor draftHint = ''
 
   @state()
+  private accessor draftImage = ''
+
+  @state()
   private accessor draftPoints = '1'
 
   @state()
   private accessor loadedQuestionUri: string | null = null
-
-  private getBaseUrl () {
-    const questionaire = this.questionaire ?? { subject: null }
-    const subject = questionaire.subject
-    if (!subject) {
-      return null
-    }
-
-    return subject.doc().uri.replace(/index\.ttl$/, '')
-  }
-
-  private getStore () {
-    return this.questionaire?.store ?? null
-  }
-
-  private getQuestionLogic () {
-    const store = this.getStore()
-    if (!store) {
-      return null
-    }
-
-    return createQuestionaireLogic(store)
-  }
 
   protected willUpdate () {
     const question = this.question
@@ -68,18 +37,9 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends WebCompon
 
     this.draftTitle = this.getQuestionTitle()
     this.draftHint = this.getQuestionHint()
+    this.draftImage = readQuestionValue(this.getStore()!, question, 'image')
     this.draftPoints = String(this.getQuestionPoints())
     this.loadedQuestionUri = question.uri
-  }
-
-  private getQuestionNumber () {
-    const question = this.question
-    if (!question) {
-      return 1
-    }
-
-    const match = question.uri.match(/q(\d+)\.ttl$/)
-    return match ? Number(match[1]) : 1
   }
 
   private getQuestionTitle () {
@@ -89,7 +49,7 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends WebCompon
       return ''
     }
 
-    return store.any(question, dct('title'), undefined, question.doc())?.value ?? ''
+    return readQuestionValue(store, question, 'title')
   }
 
   private getQuestionHint () {
@@ -99,7 +59,7 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends WebCompon
       return ''
     }
 
-    return store.any(question, quiz('hint'), undefined, question.doc())?.value ?? ''
+    return readQuestionValue(store, question, 'hint')
   }
 
   private getQuestionPoints () {
@@ -109,22 +69,9 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends WebCompon
       return 1
     }
 
-    const raw = store.any(question, quiz('points'), undefined, question.doc())?.value ?? '1'
+    const raw = readQuestionValue(store, question, 'points') || '1'
     const parsed = Number.parseInt(raw, 10)
     return Number.isFinite(parsed) ? parsed : 1
-  }
-
-  private emitQuestionChanged () {
-    const question = this.question
-    if (!question) {
-      return
-    }
-
-    this.dispatchEvent(new CustomEvent('questionaire-question-updated', {
-      bubbles: true,
-      composed: true,
-      detail: { questionUri: question.uri }
-    }))
   }
 
   private async persistQuestionCard () {
@@ -136,18 +83,16 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends WebCompon
 
     const title = this.draftTitle.trim()
     const hint = this.draftHint.trim()
+    const image = this.draftImage.trim()
     const points = Number.parseInt(this.draftPoints, 10)
 
     await logic.updateQuestionText({ question, title })
     await logic.updateQuestionHint({ question, hint })
+    await logic.updateQuestionImage({ question, image })
     await logic.updateQuestionPoints({ question, points: Number.isFinite(points) ? points : 0 })
 
     this.emitQuestionChanged()
-    this.dispatchEvent(new CustomEvent('questionaire-question-saved', {
-      bubbles: true,
-      composed: true,
-      detail: { questionUri: question.uri }
-    }))
+    this.emitQuestionSaved()
   }
 
   private async updateQuestionTitle (value: string) {
@@ -174,26 +119,6 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends WebCompon
     await logic.updateQuestionHint({ question, hint: value })
     this.emitQuestionChanged()
     this.requestUpdate()
-  }
-
-  private async deleteQuestion () {
-    const question = this.question
-    const logic = this.getQuestionLogic()
-    const baseUrl = this.getBaseUrl()
-    if (!question || !logic || !baseUrl) {
-      return
-    }
-
-    await logic.deleteQuestionFromQuestionnaire({
-      baseUrl,
-      question
-    })
-
-    this.dispatchEvent(new CustomEvent('questionaire-question-deleted', {
-      bubbles: true,
-      composed: true,
-      detail: { questionUri: question.uri }
-    }))
   }
 
   render() {
@@ -231,6 +156,13 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends WebCompon
               <icon-lucide-chevron-down></icon-lucide-chevron-down>
             </div>
           </div>
+        </div>
+
+        <div class="questionaire-pane-create-question-short-answer-field">
+          <label>Image <span>(optional)</span></label>
+          <input class="questionaire-pane-create-question-short-answer-input" type="url" placeholder="Paste an image URL..." .value=${this.draftImage}
+            @input=${(event: Event) => { this.draftImage = (event.currentTarget as HTMLInputElement).value }} />
+          ${this.draftImage ? html`<img class="questionaire-pane-question-image-preview" src=${this.draftImage} alt="Question preview" />` : ''}
         </div>
 
         <div class="questionaire-pane-create-question-short-answer-field">

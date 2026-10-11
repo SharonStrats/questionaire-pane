@@ -2,19 +2,16 @@ import { html } from 'lit'
 import { consume } from '@lit/context'
 import { property } from 'lit/decorators.js'
 import { customElement, WebComponent } from 'solid-ui'
-import { Namespace, type NamedNode } from 'rdflib'
+import { type NamedNode } from 'rdflib'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
-import { ns } from 'solid-ui'
 import { getQuestionaireCreateQuestionTypeByUri } from '../../create/question-cards/questionaire-pane-create-question-types'
+import { readQuestionTypeUri, readQuestionValue } from '../../../service/questionaireQuestionAccessors'
 import '../questionaire-pane-take-question-multiple-choice/QuestionairePaneTakeQuestionMultipleChoice'
 import '../questionaire-pane-take-question-text-response/QuestionairePaneTakeQuestionTextResponse'
 import '../questionaire-pane-take-question-ordering/QuestionairePaneTakeQuestionOrdering'
 import '../questionaire-pane-take-question-match/QuestionairePaneTakeQuestionMatch'
 import '../questionaire-pane-take-question-rating/QuestionairePaneTakeQuestionRating'
 import '../questionaire-pane-take-question-true-false/QuestionairePaneTakeQuestionTrueFalse'
-
-const dct = Namespace('http://purl.org/dc/terms/')
-const quiz = Namespace('http://example.org/ns/quiz#')
 
 @customElement('questionaire-pane-take-question-dispatcher')
 export default class QuestionairePaneTakeQuestionDispatcher extends WebComponent {
@@ -39,10 +36,10 @@ export default class QuestionairePaneTakeQuestionDispatcher extends WebComponent
       return html``
     }
 
-    const title = store.any(question, dct('title'))?.value ?? 'Untitled question'
-    const hint = store.any(question, quiz('hint'), undefined, question.doc())?.value ?? ''
-    const points = store.any(question, quiz('points'), undefined, question.doc())?.value ?? '1'
-    const typeUri = this.questionTypeUri ?? store.any(question, ns.rdf('type'), undefined, question.doc())?.value ?? ''
+    const title = readQuestionValue(store, question, 'title') || 'Untitled question'
+    const hint = readQuestionValue(store, question, 'hint')
+    const points = readQuestionValue(store, question, 'points') || '1'
+    const typeUri = this.questionTypeUri ?? readQuestionTypeUri(store, question)
     const typeDefinition = getQuestionaireCreateQuestionTypeByUri(typeUri)
 
     if (typeDefinition?.key === 'multiple-choice' || typeDefinition?.key === 'selection') {

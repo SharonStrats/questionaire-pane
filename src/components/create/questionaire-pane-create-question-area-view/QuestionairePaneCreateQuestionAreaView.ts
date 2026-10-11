@@ -2,27 +2,13 @@ import { html } from 'lit'
 import { consume } from '@lit/context'
 import { property, state } from 'lit/decorators.js'
 import { customElement, WebComponent } from 'solid-ui'
-import { Namespace, sym, type NamedNode } from 'rdflib'
 import styles from './QuestionairePaneCreateQuestionAreaView.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
 import { createQuestionaireLogic } from '../../../service/questionaireLogic'
+import { loadQuestionaireQuestionSummaries, type QuestionaireQuestionSummary } from '../../../service/questionaireQuestionQueries'
 import '../questionaire-pane-create-sidebar/QuestionairePaneCreateSidebar'
 import '../question-cards/questionaire-pane-create-question-dispatcher/QuestionairePaneCreateQuestionDispatcher'
-import {
-  getQuestionaireCreateQuestionTypeByUri,
-  questionaireCreateQuestionTypes,
-} from '../question-cards/questionaire-pane-create-question-types'
-import { ns } from 'solid-ui'
-
-const dct = Namespace('http://purl.org/dc/terms/')
-const quiz = Namespace('http://example.org/ns/quiz#')
-
-interface QuestionSummary {
-  question: NamedNode
-  title: string
-  typeLabel: string
-  typeUri: string
-}
+import { questionaireCreateQuestionTypes } from '../question-cards/questionaire-pane-create-question-types'
 
 @customElement('questionaire-pane-create-question-area-view')
 export default class QuestionairePaneCreateQuestionAreaView extends WebComponent {
@@ -40,6 +26,15 @@ export default class QuestionairePaneCreateQuestionAreaView extends WebComponent
   @state()
   private accessor editorDismissed = false
 
+  @state()
+  private accessor questions: QuestionaireQuestionSummary[] = []
+
+  @state()
+  private accessor questionsLoading = false
+
+  private questionsRefreshToken = 0
+  private questionsKey = ''
+
   @property({ attribute: false })
   accessor selectedQuestionTypeUri: string | null = null
 
@@ -53,38 +48,46 @@ export default class QuestionairePaneCreateQuestionAreaView extends WebComponent
     return subject.doc().uri.replace(/index\.ttl$/, '')
   }
 
-  private getQuestions (): QuestionSummary[] {
+  protected willUpdate () {
     const questionaire = this.questionaire ?? { store: null, subject: null }
     const store = questionaire.store
     const subject = questionaire.subject
     if (!store || !subject) {
-      return []
+      this.questions = []
+      this.questionsLoading = false
+      this.activeQuestionUri = null
+      this.activeQuestionTypeUri = null
+      this.editorDismissed = false
+      this.questionsKey = ''
+      return
     }
 
-    const draft = sym(`${this.getBaseUrl() ?? ''}draft.ttl`)
-    const draftDoc = draft.doc()
-    const questionStatements = store.statementsMatching(draft, quiz('question'), undefined, draftDoc)
-
-    return questionStatements
-      .map((statement) => {
-      const question = statement.object as NamedNode
-      const title = store.any(question, dct('title'), undefined, question.doc())?.value ?? 'Untitled question'
-      const typeNode = store.any(question, ns.rdf('type'), undefined, question.doc())
-      const typeUri = typeNode?.value ?? ''
-      const type = getQuestionaireCreateQuestionTypeByUri(typeUri)
-
-      return {
-        question,
-        title,
-        typeLabel: type?.label ?? 'Question',
-        typeUri
-      }
-      })
-      .sort((left, right) => left.question.uri.localeCompare(right.question.uri, undefined, { numeric: true, sensitivity: 'base' }))
+    const nextKey = subject.doc().uri
+    if (nextKey !== this.questionsKey) {
+      this.questionsKey = nextKey
+      void this.refreshQuestions()
+    }
   }
 
-  protected willUpdate () {
-    const questions = this.getQuestions()
+  private async refreshQuestions () {
+    const questionaire = this.questionaire ?? { store: null, subject: null }
+    const store = questionaire.store
+    const subject = questionaire.subject
+    if (!store || !subject) {
+      return
+    }
+
+    const refreshToken = ++this.questionsRefreshToken
+    this.questionsLoading = true
+
+    const questions = await loadQuestionaireQuestionSummaries(store, subject)
+    if (refreshToken !== this.questionsRefreshToken) {
+      return
+    }
+
+    this.questions = questions
+    this.questionsLoading = false
+
     if (questions.length === 0) {
       this.activeQuestionUri = null
       this.activeQuestionTypeUri = null
@@ -93,23 +96,14 @@ export default class QuestionairePaneCreateQuestionAreaView extends WebComponent
     }
 
     if (!this.activeQuestionUri || !questions.some((question) => question.question.uri === this.activeQuestionUri)) {
-      if (this.editorDismissed) {
-        return
+      if (!this.editorDismissed) {
+        this.activeQuestionUri = questions[0].question.uri
+        this.activeQuestionTypeUri = questions[0].typeUri ?? null
       }
-      this.activeQuestionUri = questions[0].question.uri
     }
 
     if (!this.activeQuestionTypeUri) {
       this.activeQuestionTypeUri = this.selectedQuestionTypeUri ?? questions[0].typeUri ?? null
-    }
-  }
-
-  protected updated () {
-    if (this.getQuestions().length === 0) {
-      this.dispatchEvent(new CustomEvent('questionaire-question-list-empty', {
-        bubbles: true,
-        composed: true
-      }))
     }
   }
 
@@ -130,10 +124,11 @@ export default class QuestionairePaneCreateQuestionAreaView extends WebComponent
     this.activeQuestionUri = result.question.uri
     this.activeQuestionTypeUri = questionTypeUri
     this.editorDismissed = false
+    await this.refreshQuestions()
   }
 
   private handleQuestionUpdated (_event: CustomEvent<{ questionUri: string }>) {
-    this.requestUpdate()
+    void this.refreshQuestions()
   }
 
   private async handleSidebarAddQuestion (event: CustomEvent<{ questionTypeUri?: string }>) {
@@ -142,12 +137,12 @@ export default class QuestionairePaneCreateQuestionAreaView extends WebComponent
       return
     }
 
-    await this.addQuestion(questionTypeUri, 'Untitled question')
+    await this.addQuestion(questionTypeUri, '')
   }
 
   private handleSidebarSelection (event: CustomEvent<{ questionUri: string }>) {
     this.activeQuestionUri = event.detail.questionUri
-    const selectedQuestion = this.getQuestions().find((question) => question.question.uri === event.detail.questionUri)
+    const selectedQuestion = this.questions.find((question) => question.question.uri === event.detail.questionUri)
     this.activeQuestionTypeUri = selectedQuestion?.typeUri ?? null
     this.editorDismissed = false
   }
@@ -159,18 +154,18 @@ export default class QuestionairePaneCreateQuestionAreaView extends WebComponent
       this.activeQuestionTypeUri = null
       this.editorDismissed = false
     }
-    this.requestUpdate()
+    void this.refreshQuestions()
   }
 
   private handleQuestionSaved (event: CustomEvent<{ questionUri: string }>) {
     this.activeQuestionUri = null
     this.activeQuestionTypeUri = null
     this.editorDismissed = true
-    this.requestUpdate()
+    void this.refreshQuestions()
   }
 
   render() {
-    const questions = this.getQuestions()
+    const questions = this.questions
     const activeQuestion = this.editorDismissed
       ? null
       : (questions.find((question) => question.question.uri === this.activeQuestionUri) ?? questions[0] ?? null)
@@ -185,7 +180,9 @@ export default class QuestionairePaneCreateQuestionAreaView extends WebComponent
         ></questionaire-pane-create-sidebar>
         <div class="questionaire-pane-create-question-area-view-editor">
           <div class="questionaire-pane-create-question-area-view-editor-card">
-            ${activeQuestion
+            ${this.questionsLoading && questions.length === 0
+              ? html`<div class="questionaire-pane-create-question-area-view-loading">Loading questions…</div>`
+              : activeQuestion
               ? html`
                   <questionaire-pane-create-question-dispatcher
                     .question=${activeQuestion.question}

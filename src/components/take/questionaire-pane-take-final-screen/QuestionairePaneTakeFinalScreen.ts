@@ -19,6 +19,9 @@ export default class QuestionairePaneTakeFinalScreen extends WebComponent {
   @property({ type: Number, attribute: 'earned-points' })
   accessor earnedPoints = 0
 
+  @property({ type: Boolean, attribute: 'is-survey' })
+  accessor isSurvey = false
+
   private handleRestart () {
     this.dispatchEvent(new CustomEvent('questionaire-take-restart', {
       bubbles: true,
@@ -32,9 +35,9 @@ export default class QuestionairePaneTakeFinalScreen extends WebComponent {
         <div class="questionaire-pane-take-final-screen-card">
           <p class="questionaire-pane-take-final-screen-kicker">Completed</p>
           <h2>You've finished the questionnaire</h2>
-          <p class="questionaire-pane-take-final-screen-score">
-            Score: ${this.earnedPoints} / ${this.availablePoints} points
-          </p>
+          ${this.isSurvey
+            ? html`<p class="questionaire-pane-take-final-screen-score">Your responses have been recorded.</p>`
+            : html`<p class="questionaire-pane-take-final-screen-score">Score: ${this.earnedPoints} / ${this.availablePoints} points</p>`}
           <p class="questionaire-pane-take-final-screen-summary">
             ${this.answeredQuestions} of ${this.totalQuestions} questions answered.
           </p>

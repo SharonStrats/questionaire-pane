@@ -1,3 +1,260 @@
 :host {
   display: block;
 }
+
+.questionaire-pane-create-main-view {
+  position: relative;
+  min-height: 100%;
+}
+
+.questionaire-pane-preview-overlay {
+  position: absolute;
+  z-index: 10;
+  inset: 0;
+  min-height: 100%;
+  overflow: auto;
+  background: var(--solid-ui-color-white, #FFF);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.18);
+}
+
+.questionaire-pane-preview-overlay-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--solid-ui-color-slate-200, #E2E8F0);
+  background: var(--solid-ui-color-white, #FFF);
+}
+
+.questionaire-pane-preview-overlay-kicker,
+.questionaire-pane-preview-overlay-description {
+  margin: 0;
+}
+
+.questionaire-pane-preview-overlay-kicker {
+  color: var(--solid-ui-color-indigo-500, #6366F1);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.questionaire-pane-preview-overlay-description {
+  margin-top: 4px;
+  color: var(--solid-ui-color-slate-500, #64748B);
+  font-size: 12px;
+}
+
+.questionaire-pane-preview-overlay-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: 1px solid var(--solid-ui-color-slate-200, #E2E8F0);
+  border-radius: 8px;
+  background: var(--solid-ui-color-white, #FFF);
+  color: var(--solid-ui-color-slate-600, #475569);
+  cursor: pointer;
+}
+
+.questionaire-pane-preview-overlay-close icon-lucide-x {
+  width: 16px;
+  height: 16px;
+}
+
+.questionaire-pane-preview-overlay-message {
+  padding: 48px 24px;
+  color: var(--solid-ui-color-slate-600, #475569);
+  text-align: center;
+}
+
+.questionaire-pane-import-overlay {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.questionaire-pane-import-dialog {
+  width: min(560px, 100%);
+  padding: 24px;
+  border: 1px solid var(--solid-ui-color-slate-200, #E2E8F0);
+  border-radius: 18px;
+  background: var(--solid-ui-color-white, #FFF);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.24);
+}
+
+.questionaire-pane-import-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 24px;
+  border-radius: 12px;
+  background: var(--solid-ui-color-white, #FFF);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.24);
+  color: var(--solid-ui-color-slate-700, #334155);
+}
+
+.questionaire-pane-import-loading p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.questionaire-pane-import-spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid var(--solid-ui-color-indigo-100, #E0E7FF);
+  border-top-color: var(--solid-ui-color-indigo-500, #6366F1);
+  border-radius: 50%;
+  animation: questionaire-pane-import-spin 0.8s linear infinite;
+}
+
+@keyframes questionaire-pane-import-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.questionaire-pane-import-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.questionaire-pane-import-dialog-kicker {
+  margin: 0 0 6px;
+  color: var(--solid-ui-color-indigo-500, #6366F1);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.questionaire-pane-import-dialog h2 {
+  margin: 0;
+  color: var(--solid-ui-color-slate-900, #1E293B);
+  font-size: 22px;
+}
+
+.questionaire-pane-import-dialog-header p:last-child {
+  margin: 8px 0 0;
+  color: var(--solid-ui-color-slate-500, #64748B);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.questionaire-pane-import-dialog-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: 1px solid var(--solid-ui-color-slate-200, #E2E8F0);
+  border-radius: 8px;
+  background: var(--solid-ui-color-white, #FFF);
+  color: var(--solid-ui-color-slate-600, #475569);
+  cursor: pointer;
+}
+
+.questionaire-pane-import-dialog-close icon-lucide-x {
+  width: 16px;
+  height: 16px;
+}
+
+.questionaire-pane-import-picker {
+  display: flex;
+  min-height: 132px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px dashed var(--solid-ui-color-slate-300, #CBD5E1);
+  border-radius: 12px;
+  color: var(--solid-ui-color-slate-700, #334155);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.questionaire-pane-import-picker icon-lucide-file-up {
+  width: 28px;
+  height: 28px;
+  color: var(--solid-ui-color-indigo-500, #6366F1);
+}
+
+.questionaire-pane-import-picker--active {
+  border-color: var(--solid-ui-color-indigo-500, #6366F1);
+  background: var(--solid-ui-color-indigo-50, #EEF2FF);
+}
+
+.questionaire-pane-import-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.questionaire-pane-import-file-list {
+  margin: 16px 0 0;
+  padding-left: 20px;
+  color: var(--solid-ui-color-slate-600, #475569);
+  font-size: 13px;
+}
+
+.questionaire-pane-import-empty {
+  margin: 16px 0 0;
+  color: var(--solid-ui-color-slate-400, #94A3B8);
+  font-size: 13px;
+  text-align: center;
+}
+
+.questionaire-pane-import-error {
+  margin: 16px 0 0;
+  color: #b42318;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.questionaire-pane-import-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.questionaire-pane-import-dialog-actions button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--solid-ui-color-slate-200, #E2E8F0);
+  border-radius: 9px;
+  background: var(--solid-ui-color-white, #FFF);
+  color: var(--solid-ui-color-slate-700, #334155);
+  cursor: pointer;
+}
+
+.questionaire-pane-import-dialog-actions button:disabled,
+.questionaire-pane-import-dialog-close:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.questionaire-pane-import-dialog-actions .questionaire-pane-import-dialog-primary {
+  border-color: transparent;
+  background: #6d5ce7;
+  color: var(--solid-ui-color-white, #FFF);
+}

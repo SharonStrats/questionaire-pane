@@ -1,11 +1,9 @@
 import { html } from 'lit'
 import { property, state } from 'lit/decorators.js'
-import { consume } from '@lit/context'
-import { customElement, WebComponent } from 'solid-ui'
-import { Namespace, type NamedNode } from 'rdflib'
+import { customElement } from 'solid-ui'
 import styles from './QuestionairePaneCreateQuestionMultipleChoice.styles.css'
-import { questionaireContext, type QuestionaireContext } from '../../../../context'
-import { createQuestionaireLogic } from '../../../../service/questionaireLogic'
+import QuestionairePaneCreateQuestionCardBase from '../questionaire-pane-create-question-card-base/QuestionairePaneCreateQuestionCardBase'
+import { readQuestionValue, readQuestionValues } from '../../../../service/questionaireQuestionAccessors'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-base/QuestionairePaneCreateQuestionBase'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
@@ -16,18 +14,9 @@ import '~icons/lucide/plus'
 import '~icons/lucide/square'
 import '~icons/lucide/check-square'
 
-const dct = Namespace('http://purl.org/dc/terms/')
-const quiz = Namespace('http://example.org/ns/quiz#')
-
 @customElement('questionaire-pane-create-question-multiple-choice')
-export default class QuestionairePaneCreateQuestionMultipleChoice extends WebComponent {
+export default class QuestionairePaneCreateQuestionMultipleChoice extends QuestionairePaneCreateQuestionCardBase {
   static styles = styles
-
-  @consume({ context: questionaireContext, subscribe: true })
-  accessor questionaire: QuestionaireContext = undefined as unknown as QuestionaireContext
-
-  @property({ attribute: false })
-  accessor question: NamedNode | null = null
 
   @property({ type: String, attribute: 'question-type-label' })
   accessor questionTypeLabel = 'Multiple choice'
@@ -48,6 +37,9 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends WebCom
   private accessor draftHint = ''
 
   @state()
+  private accessor draftImage = ''
+
+  @state()
   private accessor draftPoints = '1'
 
   @state()
@@ -65,29 +57,6 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends WebCom
   @state()
   private accessor pendingOptionFocusIndex: number | null = null
 
-  private getBaseUrl () {
-    const questionaire = this.questionaire ?? { subject: null }
-    const subject = questionaire.subject
-    if (!subject) {
-      return null
-    }
-
-    return subject.doc().uri.replace(/index\.ttl$/, '')
-  }
-
-  private getStore () {
-    return this.questionaire?.store ?? null
-  }
-
-  private getQuestionLogic () {
-    const store = this.getStore()
-    if (!store) {
-      return null
-    }
-
-    return createQuestionaireLogic(store)
-  }
-
   protected willUpdate () {
     const question = this.question
     if (!question || this.loadedQuestionUri === question.uri) {
@@ -96,6 +65,7 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends WebCom
 
     this.draftTitle = this.getQuestionTitle()
     this.draftHint = this.getQuestionHint()
+    this.draftImage = readQuestionValue(this.getStore()!, question, 'image')
     this.draftPoints = String(this.getQuestionPoints())
     this.draftOptions = this.getQuestionOptions()
     this.draftCorrectOption = this.getCorrectOption()
@@ -119,16 +89,6 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends WebCom
     this.pendingOptionFocusIndex = null
   }
 
-  private getQuestionNumber () {
-    const question = this.question
-    if (!question) {
-      return 1
-    }
-
-    const match = question.uri.match(/q(\d+)\.ttl$/)
-    return match ? Number(match[1]) : 1
-  }
-
   private getQuestionTitle () {
     const store = this.getStore()
     const question = this.question
@@ -136,7 +96,7 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends WebCom
       return ''
     }
 
-    return store.any(question, dct('title'), undefined, question.doc())?.value ?? ''
+    return readQuestionValue(store, question, 'title')
   }
 
   private getQuestionHint () {
@@ -146,7 +106,7 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends WebCom
       return ''
     }
 
-    return store.any(question, quiz('hint'), undefined, question.doc())?.value ?? ''
+    return readQuestionValue(store, question, 'hint')
   }
 
   private getQuestionPoints () {
@@ -156,7 +116,7 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends WebCom
       return 1
     }
 
-    const raw = store.any(question, quiz('points'), undefined, question.doc())?.value ?? '1'
+    const raw = readQuestionValue(store, question, 'points') || '1'
     const parsed = Number.parseInt(raw, 10)
     return Number.isFinite(parsed) ? parsed : 1
   }
@@ -168,9 +128,7 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends WebCom
       return []
     }
 
-    return store
-      .statementsMatching(question, quiz('option'), undefined, question.doc())
-      .map((statement) => statement.object.value)
+    return readQuestionValues(store, question, 'option')
   }
 
   private getCorrectOption () {
@@ -180,7 +138,7 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends WebCom
       return ''
     }
 
-    return store.any(question, quiz('correctOption'), undefined, question.doc())?.value ?? ''
+    return readQuestionValue(store, question, 'correctOption')
   }
 
   private getCorrectOptions () {
@@ -190,22 +148,7 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends WebCom
       return []
     }
 
-    return store
-      .statementsMatching(question, quiz('correctOption'), undefined, question.doc())
-      .map((statement) => statement.object.value)
-  }
-
-  private emitQuestionChanged () {
-    const question = this.question
-    if (!question) {
-      return
-    }
-
-    this.dispatchEvent(new CustomEvent('questionaire-question-updated', {
-      bubbles: true,
-      composed: true,
-      detail: { questionUri: question.uri }
-    }))
+    return readQuestionValues(store, question, 'correctOption')
   }
 
   private async persistQuestionCard () {
@@ -217,6 +160,7 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends WebCom
 
     const title = this.draftTitle.trim()
     const hint = this.draftHint.trim()
+    const image = this.draftImage.trim()
     const points = Number.parseInt(this.draftPoints, 10)
     const options = this.draftOptions.map((option) => option.trim()).filter((option) => option.length > 0)
     const correctOption = this.draftCorrectOption.trim() || undefined
@@ -224,20 +168,17 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends WebCom
 
     await logic.updateQuestionText({ question, title })
     await logic.updateQuestionHint({ question, hint })
+    await logic.updateQuestionImage({ question, image })
     await logic.updateQuestionPoints({ question, points: Number.isFinite(points) ? points : 0 })
     await logic.updateQuestionOptions({
       question,
-      options: options.length > 0 ? options : ['Option 1'],
+      options: options.length > 0 ? options : [''],
       correctOption: this.allowMultipleCorrectAnswers ? null : correctOption,
       correctOptions: this.allowMultipleCorrectAnswers ? correctOptions : null
     })
 
     this.emitQuestionChanged()
-    this.dispatchEvent(new CustomEvent('questionaire-question-saved', {
-      bubbles: true,
-      composed: true,
-      detail: { questionUri: question.uri }
-    }))
+    this.emitQuestionSaved()
   }
 
   private async updateQuestionTitle (value: string) {
@@ -294,7 +235,7 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends WebCom
     }
 
     const options = this.draftOptions.length > 0 ? this.draftOptions.slice() : this.getQuestionOptions().slice()
-    options.push(`Option ${options.length + 1}`)
+    options.push('')
     this.draftOptions = options
     this.pendingOptionFocusIndex = options.length - 1
     await logic.updateQuestionOptions({
@@ -318,7 +259,7 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends WebCom
     const removedOption = options[index]
     options.splice(index, 1)
     if (options.length === 0) {
-      options.push('Option 1')
+      options.push('')
     }
 
     this.draftOptions = options
@@ -374,26 +315,6 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends WebCom
     this.requestUpdate()
   }
 
-  private async deleteQuestion () {
-    const question = this.question
-    const logic = this.getQuestionLogic()
-    const baseUrl = this.getBaseUrl()
-    if (!question || !logic || !baseUrl) {
-      return
-    }
-
-    await logic.deleteQuestionFromQuestionnaire({
-      baseUrl,
-      question
-    })
-
-    this.dispatchEvent(new CustomEvent('questionaire-question-deleted', {
-      bubbles: true,
-      composed: true,
-      detail: { questionUri: question.uri }
-    }))
-  }
-
   render() {
     const store = this.getStore()
     const question = this.question
@@ -405,7 +326,7 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends WebCom
     const title = this.draftTitle
     const hint = this.draftHint || this.getQuestionHint()
     const points = this.draftPoints || String(this.getQuestionPoints())
-    const options = this.draftOptions.length > 0 ? this.draftOptions : this.getQuestionOptions()
+    const options = this.draftOptions.length > 0 ? this.draftOptions : (this.getQuestionOptions().length > 0 ? this.getQuestionOptions() : [''])
     const correctOptions = this.draftCorrectOptions.length > 0 ? this.draftCorrectOptions : this.getCorrectOptions()
     const correctOption = this.draftCorrectOption || this.getCorrectOption()
     const questionNumber = this.getQuestionNumber()
@@ -430,6 +351,13 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends WebCom
               <icon-lucide-chevron-down></icon-lucide-chevron-down>
             </div>
           </div>
+        </div>
+
+        <div class="questionaire-pane-create-question-multiple-choice-field">
+          <label>Image <span>(optional)</span></label>
+          <input class="questionaire-pane-create-question-multiple-choice-input" type="url" placeholder="Paste an image URL..." .value=${this.draftImage}
+            @input=${(event: Event) => { this.draftImage = (event.currentTarget as HTMLInputElement).value }} />
+          ${this.draftImage ? html`<img class="questionaire-pane-question-image-preview" src=${this.draftImage} alt="Question preview" />` : ''}
         </div>
 
         <div class="questionaire-pane-create-question-multiple-choice-field">

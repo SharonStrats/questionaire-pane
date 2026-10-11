@@ -1,29 +1,18 @@
 import { html } from 'lit'
-import { property, state } from 'lit/decorators.js'
-import { consume } from '@lit/context'
-import { customElement, WebComponent } from 'solid-ui'
-import { Namespace, type NamedNode } from 'rdflib'
+import { state } from 'lit/decorators.js'
+import { customElement } from 'solid-ui'
 import styles from './QuestionairePaneCreateQuestionConfidence.styles.css'
-import { questionaireContext, type QuestionaireContext } from '../../../../context'
-import { createQuestionaireLogic } from '../../../../service/questionaireLogic'
+import QuestionairePaneCreateQuestionCardBase from '../questionaire-pane-create-question-card-base/QuestionairePaneCreateQuestionCardBase'
+import { readQuestionValue } from '../../../../service/questionaireQuestionAccessors'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
 import '~icons/lucide/chevron-down'
 import '~icons/lucide/info'
 import '~icons/lucide/heart'
 
-const dct = Namespace('http://purl.org/dc/terms/')
-const quiz = Namespace('http://example.org/ns/quiz#')
-
 @customElement('questionaire-pane-create-question-confidence')
-export default class QuestionairePaneCreateQuestionConfidence extends WebComponent {
+export default class QuestionairePaneCreateQuestionConfidence extends QuestionairePaneCreateQuestionCardBase {
   static styles = styles
-
-  @consume({ context: questionaireContext, subscribe: true })
-  accessor questionaire: QuestionaireContext = undefined as unknown as QuestionaireContext
-
-  @property({ attribute: false })
-  accessor question: NamedNode | null = null
 
   @state()
   private accessor draftTitle = ''
@@ -37,19 +26,6 @@ export default class QuestionairePaneCreateQuestionConfidence extends WebCompone
   @state()
   private accessor loadedQuestionUri: string | null = null
 
-  private getStore () {
-    return this.questionaire?.store ?? null
-  }
-
-  private getQuestionLogic () {
-    const store = this.getStore()
-    if (!store) {
-      return null
-    }
-
-    return createQuestionaireLogic(store)
-  }
-
   protected willUpdate () {
     const question = this.question
     if (!question || this.loadedQuestionUri === question.uri) {
@@ -62,16 +38,6 @@ export default class QuestionairePaneCreateQuestionConfidence extends WebCompone
     this.loadedQuestionUri = question.uri
   }
 
-  private getQuestionNumber () {
-    const question = this.question
-    if (!question) {
-      return 1
-    }
-
-    const match = question.uri.match(/q(\d+)\.ttl$/)
-    return match ? Number(match[1]) : 1
-  }
-
   private getQuestionTitle () {
     const store = this.getStore()
     const question = this.question
@@ -79,7 +45,7 @@ export default class QuestionairePaneCreateQuestionConfidence extends WebCompone
       return ''
     }
 
-    return store.any(question, dct('title'), undefined, question.doc())?.value ?? ''
+    return readQuestionValue(store, question, 'title')
   }
 
   private getQuestionHint () {
@@ -89,7 +55,7 @@ export default class QuestionairePaneCreateQuestionConfidence extends WebCompone
       return ''
     }
 
-    return store.any(question, quiz('hint'), undefined, question.doc())?.value ?? ''
+    return readQuestionValue(store, question, 'hint')
   }
 
   private getQuestionPoints () {
@@ -99,22 +65,9 @@ export default class QuestionairePaneCreateQuestionConfidence extends WebCompone
       return 1
     }
 
-    const raw = store.any(question, quiz('points'), undefined, question.doc())?.value ?? '1'
+    const raw = readQuestionValue(store, question, 'points') || '1'
     const parsed = Number.parseInt(raw, 10)
     return Number.isFinite(parsed) ? parsed : 1
-  }
-
-  private emitQuestionChanged () {
-    const question = this.question
-    if (!question) {
-      return
-    }
-
-    this.dispatchEvent(new CustomEvent('questionaire-question-updated', {
-      bubbles: true,
-      composed: true,
-      detail: { questionUri: question.uri }
-    }))
   }
 
   private async persistQuestionCard () {
@@ -133,11 +86,7 @@ export default class QuestionairePaneCreateQuestionConfidence extends WebCompone
     await logic.updateQuestionPoints({ question, points: Number.isFinite(points) ? points : 0 })
 
     this.emitQuestionChanged()
-    this.dispatchEvent(new CustomEvent('questionaire-question-saved', {
-      bubbles: true,
-      composed: true,
-      detail: { questionUri: question.uri }
-    }))
+    this.emitQuestionSaved()
   }
 
   private async updateQuestionTitle (value: string) {
@@ -185,12 +134,7 @@ export default class QuestionairePaneCreateQuestionConfidence extends WebCompone
           .questionNumber=${questionNumber}
           .questionTypeLabel=${'Confidence / Rating'}
           @questionaire-question-header-delete=${() => {
-            const logic = this.getQuestionLogic()
-            const baseUrl = this.questionaire?.subject?.doc().uri.replace(/index\.ttl$/, '')
-            if (!logic || !baseUrl || !question) {
-              return
-            }
-            void logic.deleteQuestionFromQuestionnaire({ baseUrl, question })
+            void this.deleteQuestion()
           }}
         ></questionaire-pane-create-question-header>
 

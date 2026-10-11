@@ -2,12 +2,12 @@ import { html } from 'lit'
 import { consume } from '@lit/context'
 import { property } from 'lit/decorators.js'
 import { customElement, WebComponent } from 'solid-ui'
-import { Namespace, type NamedNode } from 'rdflib'
+import { type NamedNode } from 'rdflib'
 import { questionaireContext, type QuestionaireContext } from '../../../../context'
-import { ns } from 'solid-ui'
 import {
   getQuestionaireCreateQuestionTypeByUri
 } from '../questionaire-pane-create-question-types'
+import { readQuestionTypeUri, readQuestionValue } from '../../../../service/questionaireQuestionAccessors'
 import '../questionaire-pane-create-question-base/QuestionairePaneCreateQuestionBase'
 import '../questionaire-pane-create-question-multiple-choice/QuestionairePaneCreateQuestionMultipleChoice'
 import '../questionaire-pane-create-question-short-answer/QuestionairePaneCreateQuestionShortAnswer'
@@ -16,9 +16,6 @@ import '../questionaire-pane-create-question-ordering/QuestionairePaneCreateQues
 import '../questionaire-pane-create-question-confidence/QuestionairePaneCreateQuestionConfidence'
 import '../questionaire-pane-create-question-true-false/QuestionairePaneCreateQuestionTrueFalse'
 import '../questionaire-pane-create-question-match/QuestionairePaneCreateQuestionMatch'
-
-const dct = Namespace('http://purl.org/dc/terms/')
-const quiz = Namespace('http://example.org/ns/quiz#')
 
 @customElement('questionaire-pane-create-question-dispatcher')
 export default class QuestionairePaneCreateQuestionDispatcher extends WebComponent {
@@ -40,10 +37,10 @@ export default class QuestionairePaneCreateQuestionDispatcher extends WebCompone
       return html``
     }
 
-    const title = store.any(question, dct('title'))?.value ?? 'Untitled question'
-    const description = store.any(question, dct('description'))?.value ?? ''
-    const points = store.any(question, quiz('points'), undefined, question.doc())?.value ?? '1'
-    const typeUri = this.questionTypeUri ?? store.any(question, ns.rdf('type'), undefined, question.doc())?.value ?? ''
+    const title = readQuestionValue(store, question, 'title')
+    const description = readQuestionValue(store, question, 'description')
+    const points = readQuestionValue(store, question, 'points') || '1'
+    const typeUri = this.questionTypeUri ?? readQuestionTypeUri(store, question)
     const typeDefinition = getQuestionaireCreateQuestionTypeByUri(typeUri)
 
     if (typeDefinition?.key === 'multiple-choice') {
