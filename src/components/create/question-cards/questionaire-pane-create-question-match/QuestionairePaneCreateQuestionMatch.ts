@@ -82,24 +82,24 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
     const store = this.getStore()
     const question = this.question
     if (!store || !question) {
-      return ['Roots', 'Leaves']
+      return ['', '']
     }
 
     const items = readQuestionValues(store, question, 'leftItem')
 
-    return items.length > 0 ? items : ['Roots', 'Leaves']
+    return items.length > 0 ? items : ['', '']
   }
 
   private getRightItems () {
     const store = this.getStore()
     const question = this.question
     if (!store || !question) {
-      return ['Absorb water', 'Make food']
+      return ['', '']
     }
 
     const items = readQuestionValues(store, question, 'rightItem')
 
-    return items.length > 0 ? items : ['Absorb water', 'Make food']
+    return items.length > 0 ? items : ['', '']
   }
 
   private async persistQuestionCard () {
@@ -112,8 +112,8 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
     const title = this.draftTitle.trim()
     const hint = this.draftHint.trim()
     const points = Number.parseInt(this.draftPoints, 10)
-    const leftItems = this.draftLeftItems.length > 0 ? this.draftLeftItems : ['Roots', 'Leaves']
-    const rightItems = this.draftRightItems.length > 0 ? this.draftRightItems : ['Absorb water', 'Make food']
+    const leftItems = this.draftLeftItems.length > 0 ? this.draftLeftItems : ['', '']
+    const rightItems = this.draftRightItems.length > 0 ? this.draftRightItems : ['', '']
 
     await logic.updateQuestionText({ question, title })
     await logic.updateQuestionHint({ question, hint })
@@ -185,8 +185,8 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
 
     const nextLeft = this.draftLeftItems.length > 0 ? this.draftLeftItems.slice() : this.getLeftItems().slice()
     const nextRight = this.draftRightItems.length > 0 ? this.draftRightItems.slice() : this.getRightItems().slice()
-    nextLeft.push(`Item ${nextLeft.length + 1}`)
-    nextRight.push(`Match ${nextRight.length + 1}`)
+    nextLeft.push('')
+    nextRight.push('')
     this.draftLeftItems = nextLeft
     this.draftRightItems = nextRight
 
@@ -323,7 +323,7 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
 
         <questionaire-pane-create-question-footer
           .points=${String(points)}
-          .statusLabel=${'Changes not saved'}
+          .statusLabel=${this.draftDirty ? 'Changes not saved' : 'Saved'}
           .saveLabel=${'Save question'}
           @questionaire-question-footer-points-changed=${(event: CustomEvent<{ points: string }>) => {
             this.draftPoints = event.detail.points

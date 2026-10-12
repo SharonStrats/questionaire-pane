@@ -4,6 +4,7 @@ import { customElement } from 'solid-ui'
 import styles from './QuestionairePaneCreateQuestionTrueFalse.styles.css'
 import QuestionairePaneCreateQuestionCardBase from '../questionaire-pane-create-question-card-base/QuestionairePaneCreateQuestionCardBase'
 import { readQuestionValue } from '../../../../service/questionaireQuestionAccessors'
+import { uploadQuestionImage } from '../../../../service/questionaireImageUpload'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
 import '~icons/lucide/check'
@@ -195,8 +196,18 @@ export default class QuestionairePaneCreateQuestionTrueFalse extends Questionair
 
         <div class="questionaire-pane-create-question-true-false-field">
           <label>Image <span>(optional)</span></label>
-          <input class="questionaire-pane-create-question-true-false-input" type="url" placeholder="Paste an image URL..." .value=${this.draftImage}
-            @input=${(event: Event) => { this.draftImage = (event.currentTarget as HTMLInputElement).value }} />
+          <label class="questionaire-pane-create-question-true-false-upload">
+            <input type="file" accept="image/*" @change=${async (event: Event) => {
+              const file = (event.currentTarget as HTMLInputElement).files?.[0]
+              const question = this.question
+              const logic = this.getQuestionLogic()
+              if (!file || !question || !logic) return
+              const image = await uploadQuestionImage(this.getStore()!, question, file)
+              this.draftImage = image
+              await logic.updateQuestionImage({ question, image })
+            }} />
+            <span>Drop an image here or choose a file</span>
+          </label>
           ${this.draftImage ? html`<img class="questionaire-pane-question-image-preview" src=${this.draftImage} alt="Question preview" />` : ''}
         </div>
 
@@ -261,7 +272,7 @@ export default class QuestionairePaneCreateQuestionTrueFalse extends Questionair
 
         <questionaire-pane-create-question-footer
           .points=${String(points)}
-          .statusLabel=${'Changes not saved'}
+          .statusLabel=${this.draftDirty ? 'Changes not saved' : 'Saved'}
           .saveLabel=${'Save question'}
           @questionaire-question-footer-points-changed=${(event: CustomEvent<{ points: string }>) => {
             this.draftPoints = event.detail.points

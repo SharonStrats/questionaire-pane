@@ -1,9 +1,12 @@
 import { html } from 'lit'
 import { consume } from '@lit/context'
-import { customElement, WebComponent } from 'solid-ui'
+import { customElement, ns, showDialog, WebComponent } from 'solid-ui'
 import 'solid-ui/components/combobox'
 import 'solid-ui/components/combobox-option'
-import { sym, type NamedNode } from 'rdflib'
+import 'solid-ui/components/menu'
+import 'solid-ui/components/menu-item'
+import { literal, sym, type NamedNode } from 'rdflib'
+import { solidLogicSingleton } from 'solid-logic'
 import { state } from 'lit/decorators.js'
 import styles from './QuestionairePaneCreateHeader.styles.css'
 import { QuestionaireContext, questionaireContext } from '../../../context'
@@ -20,7 +23,7 @@ import '~icons/lucide/clock-3'
 import '~icons/lucide/list'
 import '~icons/lucide/star'
 import '~icons/lucide/share-2'
-import '~icons/lucide/file-up'
+import AccessControlModal from 'solid-ui/components/access-control-modal'
 
 function isNamedNode (term: unknown): term is NamedNode {
   return Boolean(
@@ -53,6 +56,107 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
 
   @state()
   private accessor publishError = ''
+
+  @state()
+  private accessor draftStats = { count: 0, points: 0, minutes: 0 }
+
+  @state()
+  private accessor discoveredPublishedVersions: NamedNode[] = []
+
+  private statsSubjectUri: string | null = null
+  private onQuestionUpdated = () => {
+    void this.loadDraftQuestionStats()
+  }
+
+  connectedCallback () {
+    super.connectedCallback()
+    window.addEventListener('questionaire-question-updated', this.onQuestionUpdated)
+    window.addEventListener('questionaire-question-saved', this.onQuestionUpdated)
+  }
+
+  disconnectedCallback () {
+    window.removeEventListener('questionaire-question-updated', this.onQuestionUpdated)
+    window.removeEventListener('questionaire-question-saved', this.onQuestionUpdated)
+    super.disconnectedCallback()
+  }
+
+  protected updated () {
+    const subject = this.questionaire?.subject
+    if (!subject || this.statsSubjectUri === subject.uri) {
+      return
+    }
+
+    this.statsSubjectUri = subject.uri
+    void this.loadDraftQuestionStats()
+    void this.loadPublishedVersions()
+  }
+
+  private async loadDraftQuestionStats () {
+    const questionaire = this.questionaire ?? { store: null, subject: null }
+    const store = questionaire.store
+    const subject = questionaire.subject
+    const fetcher = store?.fetcher
+    if (!store || !subject || !fetcher) {
+      return
+    }
+
+    const baseUrl = subject.doc().uri.replace(/index\.ttl$/, '')
+    const draft = sym(`${baseUrl}draft.ttl`)
+    const draftDocument = draft.doc()
+
+    try {
+      await fetcher.load(draftDocument)
+      const questions = store.statementsMatching(
+        draft,
+        questionairePredicates.questionnaire.question,
+        undefined,
+        draftDocument
+      )
+
+      await Promise.all(
+        questions
+          .map((statement) => statement.object)
+          .filter(isNamedNode)
+          .map((question) => fetcher.load(question.doc()))
+      )
+
+      this.draftStats = this.getDraftQuestionStats()
+    } catch (error) {
+      console.error('Unable to load questionnaire statistics', error)
+    }
+  }
+
+  private async loadPublishedVersions () {
+    const questionaire = this.questionaire ?? { store: null, subject: null }
+    const store = questionaire.store
+    const subject = questionaire.subject
+    const fetcher = store?.fetcher
+    if (!store || !subject || !fetcher) {
+      return
+    }
+
+    const baseUrl = subject.doc().uri.replace(/index\.ttl$/, '')
+    const publishedContainer = sym(`${baseUrl}published/`)
+
+    try {
+      await fetcher.load(publishedContainer)
+      const containers = store.each(publishedContainer, ns.ldp('contains'))
+        .filter(isNamedNode)
+        .filter((container) => container.uri.endsWith('/'))
+
+      const versions = await Promise.all(containers.map(async (container) => {
+        const snapshot = sym(`${container.uri}index.ttl#this`)
+        await fetcher.load(snapshot.doc())
+        return store.holds(snapshot, questionairePredicates.questionnaire.status, literal('Published'), snapshot.doc())
+          ? snapshot
+          : null
+      }))
+
+      this.discoveredPublishedVersions = versions.filter(isNamedNode)
+    } catch (error) {
+      console.error('Unable to discover published questionnaire versions', error)
+    }
+  }
 
   private async editTitle () {
     const questionaire = this.questionaire ?? { store: null, subject: null }
@@ -166,8 +270,64 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
     }
   }
 
+  private getPublishedSnapshot (): NamedNode | null {
+    const questionaire = this.questionaire ?? { store: null, subject: null }
+    const snapshot = questionaire.store && questionaire.subject
+      ? questionaire.store.any(questionaire.subject, questionairePredicates.questionnaire.hasVersion, undefined, questionaire.subject.doc())
+      : null
+    return isNamedNode(snapshot) ? snapshot : null
+  }
+
+  private get isPublished (): boolean {
+    return this.published || this.getPublishedSnapshot() !== null
+  }
+
+  private getShareResources () {
+    const questionaire = this.questionaire ?? { store: null, subject: null }
+    const store = questionaire.store
+    const subject = questionaire.subject
+    if (!store || !subject) {
+      return []
+    }
+
+    const containerUri = (uri: string) => uri.replace(/index\.ttl(?:#this)?$/, '')
+    const linkedVersions = store.each(subject, questionairePredicates.questionnaire.hasVersion, undefined, subject.doc()).filter(isNamedNode)
+    const versions = [...linkedVersions, ...this.discoveredPublishedVersions]
+      .filter((version, index, all) => all.findIndex((candidate) => candidate.doc().uri === version.doc().uri) === index)
+      .sort((left, right) => left.doc().uri.localeCompare(right.doc().uri))
+    return [
+      { label: 'Questionnaire draft', uri: containerUri(subject.doc().uri) },
+      ...versions.map((version, index) => ({
+        label: `Published version ${index + 1} (${version.doc().uri.split('/').slice(-2, -1)[0] ?? 'snapshot'})`,
+        uri: containerUri(version.doc().uri)
+      }))
+    ]
+  }
+
+  private async openShareDialog (resource: { label: string, uri: string }) {
+    const questionaire = this.questionaire ?? { store: null, subject: null }
+    const store = questionaire.store
+    if (!store) {
+      return
+    }
+
+    try {
+      if (solidLogicSingleton.store !== store) {
+        throw new Error('This host does not expose its access-control service to the questionnaire.')
+      }
+      const accessGrants = await solidLogicSingleton.acl.findAccessGrants(resource.uri)
+      showDialog(AccessControlModal, {
+        props: {
+          subjectUri: resource.uri,
+          accessGrants
+        }
+      })
+    } catch (error) {
+      this.publishError = 'Unable to open sharing controls: ' + (error instanceof Error ? error.message : String(error))
+    }
+  }
   private requestPreview () {
-    if (!this.published) {
+    if (!this.isPublished) {
       return
     }
 
@@ -175,27 +335,6 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
       bubbles: true,
       composed: true
     }))
-  }
-
-  private requestDocumentImport (files: File[] = []) {
-    this.dispatchEvent(new CustomEvent('questionaire-document-import-requested', {
-      bubbles: true,
-      composed: true,
-      detail: { files }
-    }))
-  }
-
-  private onDocumentImportDragOver (event: DragEvent) {
-    event.preventDefault()
-    if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = 'copy'
-    }
-  }
-
-  private onDocumentImportDrop (event: DragEvent) {
-    event.preventDefault()
-    event.stopPropagation()
-    this.requestDocumentImport(Array.from(event.dataTransfer?.files ?? []))
   }
 
   private getDraftQuestionStats () {
@@ -238,7 +377,7 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
 
     const format = getQuestionnaireFormat(questionaire.store, questionaire.subject)
     const displayTitle = readQuestionValue(questionaire.store, questionaire.subject, 'title')
-    const stats = this.getDraftQuestionStats()
+    const stats = this.draftStats
 
     return html`
       <div class="questionaire-pane-create-header">
@@ -247,7 +386,7 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
             <icon-lucide-square-pen></icon-lucide-square-pen>
           </div>
           <div class="questionaire-pane-create-header-copy">
-            <p class="questionaire-creator">${this.published ? 'Questionaire Published' : 'Questionaire Creator'}</p>
+            <p class="questionaire-creator">${this.isPublished ? 'Questionaire Published' : 'Questionaire Creator'}</p>
             <div class="questionaire-pane-create-header-title-row">
               ${this.editingTitle
                 ? html`
@@ -294,7 +433,6 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
           </div>
         </div>
         <div class="questionaire-pane-create-header-actions" aria-label="Questionnaire actions">
-          <span class="questionaire-pane-create-header-unsaved">Unsaved changes</span>
           ${this.publishError
             ? html`<span role="alert">${this.publishError}</span>`
             : ''}
@@ -310,29 +448,27 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
               <solid-ui-combobox-option value="survey">Survey</solid-ui-combobox-option>
             </solid-ui-combobox>
           </div>
+          ${this.isPublished ? html`
+            <solid-ui-menu class="questionaire-pane-create-header-share-menu">
+              <button class="questionaire-pane-create-header-action" type="button" slot="trigger">
+                <icon-lucide-share-2></icon-lucide-share-2>
+                <span>Share</span>
+              </button>
+              ${this.getShareResources().map((resource) => html`
+                <solid-ui-menu-item @solid-ui-select=${() => { void this.openShareDialog(resource) }}>
+                  ${resource.label}
+                </solid-ui-menu-item>
+              `)}
+            </solid-ui-menu>
+          ` : ''}
           <button
             class="questionaire-pane-create-header-action questionaire-pane-create-header-action--muted"
             type="button"
-            aria-label="Import DOCX files"
-            @click=${() => this.requestDocumentImport()}
-            @dragover=${this.onDocumentImportDragOver}
-            @drop=${this.onDocumentImportDrop}
-          >
-            <icon-lucide-file-up></icon-lucide-file-up>
-            <span>Import DOCX</span>
-          </button>
-          <button class="questionaire-pane-create-header-action" type="button">
-            <icon-lucide-check></icon-lucide-check>
-            <span>Save draft</span>
-          </button>
-          <button
-            class="questionaire-pane-create-header-action questionaire-pane-create-header-action--muted"
-            type="button"
-            ?disabled=${!this.published || this.publishing}
+            ?disabled=${!this.isPublished || this.publishing}
             @click=${() => this.requestPreview()}
           >
             <icon-lucide-eye></icon-lucide-eye>
-            <span>${this.published ? 'View live' : 'Preview'}</span>
+            <span>${this.isPublished ? 'View live' : 'Preview'}</span>
           </button>
           <button
             class="questionaire-pane-create-header-action questionaire-pane-create-header-action--primary"
@@ -341,7 +477,7 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
             @click=${() => { void this.publishQuestionnaire() }}
           >
             <icon-lucide-share-2></icon-lucide-share-2>
-            <span>${this.publishing ? 'Publishing…' : (this.published ? 'Published' : 'Publish')}</span>
+            <span>${this.publishing ? 'Publishing…' : (this.isPublished ? 'Published' : 'Publish')}</span>
           </button>
         </div>
       </div>

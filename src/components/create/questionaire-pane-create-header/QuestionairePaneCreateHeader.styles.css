@@ -7,17 +7,19 @@
 
 .questionaire-pane-create-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 20px;
   padding: 12px 24px 10px;
+  flex-wrap: nowrap;
 }
 
 .questionaire-pane-create-header-left {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  min-width: 0;
+  flex: 1 1 360px;
+  min-width: min(100%, 360px);
 }
 
 .questionaire-pane-create-header-icon {
@@ -67,9 +69,9 @@
   font-weight: 500;
   line-height: 1.15;
   letter-spacing: -0.02em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .questionaire-pane-create-header-title-edit {
@@ -95,7 +97,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
 }
 
 .questionaire-pane-create-header-format-group {
@@ -133,8 +137,7 @@
   svg,
   icon-lucide-check,
   icon-lucide-eye,
-  icon-lucide-share-2,
-  icon-lucide-file-up {
+  icon-lucide-share-2 {
     width: 16px;
     height: 16px;
   }
@@ -146,6 +149,8 @@
   min-width: 118px;
   justify-content: flex-start;
   min-height: 32px;
+  border: 0;
+  box-shadow: none;
 }
 
 .questionaire-pane-create-header-title-input {
@@ -200,16 +205,31 @@
   color: var(--solid-ui-color-white, #FFF);
 }
 
-.questionaire-pane-create-header-unsaved {
-  color: #e67e22;
-  font-size: 10px;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
 .questionaire-pane-create-header-action--primary:hover,
 .questionaire-pane-create-header-title-edit:hover,
 .questionaire-pane-create-header-action:hover,
 .questionaire-pane-create-header-format:hover {
   filter: brightness(0.98);
+}
+
+@media (max-width: 760px) {
+  .questionaire-pane-create-header {
+    gap: 12px;
+    padding-inline: 16px;
+  }
+
+  .questionaire-pane-create-header-left,
+  .questionaire-pane-create-header-actions {
+    flex-basis: 100%;
+  }
+
+  .questionaire-pane-create-header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .questionaire-pane-create-header-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
 }

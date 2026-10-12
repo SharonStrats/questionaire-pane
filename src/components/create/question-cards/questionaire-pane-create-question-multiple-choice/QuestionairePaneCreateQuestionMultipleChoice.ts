@@ -4,6 +4,7 @@ import { customElement } from 'solid-ui'
 import styles from './QuestionairePaneCreateQuestionMultipleChoice.styles.css'
 import QuestionairePaneCreateQuestionCardBase from '../questionaire-pane-create-question-card-base/QuestionairePaneCreateQuestionCardBase'
 import { readQuestionValue, readQuestionValues } from '../../../../service/questionaireQuestionAccessors'
+import { uploadQuestionImage } from '../../../../service/questionaireImageUpload'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-base/QuestionairePaneCreateQuestionBase'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
@@ -128,7 +129,9 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends Questi
       return []
     }
 
-    return readQuestionValues(store, question, 'option')
+    const options = readQuestionValues(store, question, 'option')
+    const acceptedOptions = readQuestionValues(store, question, 'correctOption')
+    return [...options, ...acceptedOptions.filter((option) => !options.includes(option))]
   }
 
   private getCorrectOption () {
@@ -248,6 +251,21 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends Questi
     this.requestUpdate()
   }
 
+  private async onImageSelected (event: Event) {
+    const file = (event.currentTarget as HTMLInputElement).files?.[0]
+    if (!file || !file.type.startsWith('image/')) return
+    await this.saveImageFile(file)
+  }
+
+  private async saveImageFile (file: File) {
+    if (!file.type.startsWith('image/')) return
+    const store = this.getStore()
+    const question = this.question
+    if (!store || !question) return
+    this.draftImage = await uploadQuestionImage(store, question, file)
+    await this.persistQuestionCard()
+  }
+
   private async removeQuestionOption (index: number) {
     const question = this.question
     const logic = this.getQuestionLogic()
@@ -355,8 +373,18 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends Questi
 
         <div class="questionaire-pane-create-question-multiple-choice-field">
           <label>Image <span>(optional)</span></label>
-          <input class="questionaire-pane-create-question-multiple-choice-input" type="url" placeholder="Paste an image URL..." .value=${this.draftImage}
-            @input=${(event: Event) => { this.draftImage = (event.currentTarget as HTMLInputElement).value }} />
+          <label
+            class="questionaire-pane-create-question-multiple-choice-upload"
+            @dragover=${(event: DragEvent) => { event.preventDefault() }}
+            @drop=${(event: DragEvent) => {
+              event.preventDefault()
+              const file = event.dataTransfer?.files?.[0]
+              if (file) void this.saveImageFile(file)
+            }}
+          >
+            <input type="file" accept="image/*" @change=${(event: Event) => { void this.onImageSelected(event) }} />
+            <span>Drop an image here or choose a file</span>
+          </label>
           ${this.draftImage ? html`<img class="questionaire-pane-question-image-preview" src=${this.draftImage} alt="Question preview" />` : ''}
         </div>
 
@@ -417,6 +445,12 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends Questi
                     @blur=${(event: FocusEvent) => {
                       void this.updateQuestionOption(index, (event.currentTarget as HTMLInputElement).value)
                     }}
+                    @keydown=${(event: KeyboardEvent) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        void this.addQuestionOption()
+                      }
+                    }}
                   />
                   <button
                     class="questionaire-pane-create-question-multiple-choice-option-correct ${this.allowMultipleCorrectAnswers ? 'questionaire-pane-create-question-multiple-choice-option-correct--checkbox' : ''}"
@@ -465,7 +499,7 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends Questi
 
         <questionaire-pane-create-question-footer
           .points=${String(points)}
-          .statusLabel=${'Changes not saved'}
+          .statusLabel=${this.draftDirty ? 'Changes not saved' : 'Saved'}
           .saveLabel=${'Save question'}
           @questionaire-question-footer-points-changed=${(event: CustomEvent<{ points: string }>) => {
             this.draftPoints = event.detail.points

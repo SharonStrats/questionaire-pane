@@ -28,7 +28,9 @@
     "preversion": "npm run typecheck && npm run lint",
     "postpublish": "git push origin staging",
     "start": "vite",
-    "start:standalone": "vite --config vite.standalone.config.mts"
+    "start:standalone": "vite --config vite.standalone.config.mts",
+    "start:standalone:3200": "vite --config vite.standalone.config.mts --port 3200",
+    "watch:standalone:3200": "vite --config vite.standalone.config.mts --port 3200 --open /standalone/index.html"
   },
   "files": [
     "dist/",

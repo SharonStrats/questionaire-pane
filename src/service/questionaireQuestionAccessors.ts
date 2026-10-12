@@ -54,7 +54,7 @@ export function readQuestionValues (
       return items
     }, [])
 
-    return elements
+    const values = elements
       .sort((left, right) => {
         const leftItem = left as NamedNode
         const rightItem = right as NamedNode
@@ -72,6 +72,42 @@ export function readQuestionValues (
         ? store.any(item as NamedNode, questionairePredicates.question.answerText, undefined, question.doc())?.value ?? ''
         : item?.value ?? '')
       .filter((value) => value.length > 0)
+
+    if (values.length > 0) {
+      return values
+    }
+
+    const orderedItemPrefix = `${question.doc().uri}#ordered-item-`
+    const legacyItems = store.statementsMatching(undefined, undefined, undefined, question.doc())
+      .filter((statement) =>
+        statement.subject.termType === 'NamedNode' &&
+        statement.subject.uri.startsWith(orderedItemPrefix)
+      )
+      .map((statement) => statement.subject as NamedNode)
+      .filter((item, index, all) => all.findIndex((candidate) => candidate.uri === item.uri) === index)
+      .sort((left, right) => {
+        const leftPosition = Number(store.any(left, questionairePredicates.question.position, undefined, question.doc())?.value ?? 0)
+        const rightPosition = Number(store.any(right, questionairePredicates.question.position, undefined, question.doc())?.value ?? 0)
+        return leftPosition - rightPosition
+      })
+      .map((listItem) => {
+        const item = store.any(listItem, questionairePredicates.question.item, undefined, question.doc())
+        if (!item || item.termType !== 'NamedNode') {
+          return ''
+        }
+
+        const literals = store.statementsMatching(
+          item as NamedNode,
+          questionairePredicates.question.answerText,
+          undefined,
+          question.doc()
+        ).map((statement) => statement.object.value)
+        const nonPlaceholder = literals.filter((value) => !/^Step \d+$/.test(value.trim()))
+        return nonPlaceholder[nonPlaceholder.length - 1] ?? literals[literals.length - 1] ?? ''
+      })
+      .filter((value) => value.length > 0)
+
+    return legacyItems
   }
 
   return store

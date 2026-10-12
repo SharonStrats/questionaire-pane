@@ -2,6 +2,15 @@
   display: block;
 }
 
+.questionaire-pane-create-question-true-false-upload {
+  display: block;
+  padding: 14px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  color: #64748b;
+  cursor: pointer;
+}
+
 .questionaire-pane-question-image-preview {
   display: block;
   width: 100%;

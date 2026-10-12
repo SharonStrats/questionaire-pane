@@ -15,3 +15,38 @@ body { margin: 0; }
 #app { max-width: 960px; margin: 0 auto; padding: 2rem 1.25rem; }
 .info, .error { padding: 1rem; border-radius: 0.4rem; background: #fff; }
 .error { color: #9b1c1c; border: 1px solid #e6b8b8; }
+
+.questionnaire-create, .questionnaire-library {
+  padding: 1.5rem;
+  background: #fff;
+  border: 1px solid #dce3e8;
+  border-radius: 0.5rem;
+}
+.questionnaire-create h1, .questionnaire-library h1 { margin-top: 0; }
+.questionnaire-create button, .questionnaire-library button {
+  padding: 0.55rem 0.8rem;
+  border: 1px solid #b8c5ce;
+  border-radius: 0.35rem;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+}
+.questionnaire-create button:disabled, .questionnaire-library button:disabled { cursor: not-allowed; opacity: 0.55; }
+.questionnaire-create .primary, .questionnaire-library .primary {
+  border-color: #245b9e;
+  background: #245b9e;
+  color: #fff;
+}
+.container-location {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, monospace;
+  font-size: 0.9rem;
+}
+.container-controls { display: flex; gap: 0.6rem; margin: 1rem 0; }
+.container-list { display: grid; gap: 0.5rem; padding: 0; list-style: none; }
+.container-child { width: 100%; text-align: left; }
+.questionnaire-results { display: grid; gap: 0.75rem; padding: 0; list-style: none; }
+.questionnaire-result, .empty-results { padding: 1rem; border: 1px solid #dce3e8; border-radius: 0.35rem; }
+.questionnaire-result p { margin: 0.5rem 0; color: #52616b; }
+.questionnaire-open { font-weight: 650; text-align: left; }
+.registration-controls { display: flex; flex-wrap: wrap; gap: 0.45rem; }

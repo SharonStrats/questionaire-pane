@@ -10,6 +10,20 @@
   object-fit: cover;
 }
 
+.questionaire-pane-create-question-multiple-choice-upload {
+  display: grid;
+  gap: 4px;
+  padding: 16px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.questionaire-pane-create-question-multiple-choice-upload input {
+  font-size: 12px;
+}
+
 .questionaire-pane-create-question-multiple-choice {
   display: flex;
   flex-direction: column;
@@ -354,6 +368,7 @@
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  align-self: center;
 }
 
 .questionaire-pane-create-question-multiple-choice-add icon-lucide-plus {

@@ -222,6 +222,30 @@
   gap: 12px;
 }
 
+.questionaire-pane-create-question-ordering-item-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #94a3b8;
+  cursor: grab;
+}
+
+.questionaire-pane-create-question-ordering-item-handle:focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.questionaire-pane-create-question-ordering-item-handle icon-lucide-grip-vertical {
+  width: 16px;
+  height: 16px;
+}
+
 .questionaire-pane-create-question-ordering-item-badge {
   display: inline-flex;
   align-items: center;

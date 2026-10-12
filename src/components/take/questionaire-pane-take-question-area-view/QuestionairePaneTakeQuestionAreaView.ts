@@ -128,6 +128,12 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
     this.activeQuestionIndex = Math.min(questions.length - 1, this.activeQuestionIndex + 1)
   }
 
+  private hasCurrentAnswer (question: QuestionaireQuestionSummary | null) {
+    if (!question) return false
+    const answer = this.answersByQuestionUri[question.question.uri]
+    return Array.isArray(answer) ? answer.length > 0 : typeof answer === 'string' ? answer.trim().length > 0 : answer !== null
+  }
+
   private restart () {
     this.completed = false
     this.activeQuestionIndex = 0
@@ -187,6 +193,7 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
     const currentAnswer = this.answersByQuestionUri[activeQuestion.question.uri] ?? null
     const isFirstQuestion = this.activeQuestionIndex <= 0
     const isLastQuestion = this.activeQuestionIndex >= questions.length - 1
+    const answerComplete = this.hasCurrentAnswer(activeQuestion)
 
     return html`
       <section class="questionaire-pane-take-question-area-view">
@@ -214,7 +221,7 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
               class="questionaire-pane-take-question-area-view-nav-button questionaire-pane-take-question-area-view-nav-button--primary"
               type="button"
               @click=${() => this.goNext(questions)}
-              ?disabled=${isLastQuestion}
+              ?disabled=${isLastQuestion && !answerComplete}
             >
               ${isLastQuestion ? 'Finished' : 'Next'}
             </button>

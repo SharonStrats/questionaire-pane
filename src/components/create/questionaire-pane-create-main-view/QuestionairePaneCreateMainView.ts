@@ -54,6 +54,9 @@ export default class QuestionairePaneCreateMainView extends WebComponent {
   private accessor previewLoading = false
 
   @state()
+  private accessor previewVersions: NamedNode[] = []
+
+  @state()
   private accessor importDialogOpen = false
 
   @state()
@@ -151,16 +154,30 @@ export default class QuestionairePaneCreateMainView extends WebComponent {
       return
     }
 
-    const published = store.any(
+    const versions = store.each(
       subject,
       questionairePredicates.questionnaire.hasVersion,
       undefined,
       subject.doc()
-    )
-    if (!isNamedNode(published)) {
+    ).filter(isNamedNode)
+    if (versions.length === 0) {
       this.previewError = 'Publish the questionnaire before opening its live preview.'
       return
     }
+
+    if (versions.length > 1) {
+      this.previewVersions = versions
+      this.previewError = ''
+      return
+    }
+
+    await this.loadPreviewVersion(versions[0])
+  }
+
+  private async loadPreviewVersion (published: NamedNode) {
+    const questionaire = this.questionaire ?? { store: null, subject: null }
+    const store = questionaire.store
+    if (!store || this.previewLoading) return
 
     this.previewLoading = true
     this.previewError = ''
@@ -175,6 +192,10 @@ export default class QuestionairePaneCreateMainView extends WebComponent {
     } finally {
       this.previewLoading = false
     }
+  }
+
+  private closePreviewVersionChooser () {
+    this.previewVersions = []
   }
 
   private closePreview () {
@@ -358,7 +379,31 @@ export default class QuestionairePaneCreateMainView extends WebComponent {
               </questionaire-pane-create-content-view>
             `
           : html``}
-        ${this.previewSubject || this.previewError || this.previewLoading
+        ${this.previewVersions.length > 1
+          ? html`
+              <div class="questionaire-pane-preview-overlay" role="dialog" aria-modal="true" aria-label="Choose published questionnaire version">
+                <div class="questionaire-pane-preview-overlay-toolbar">
+                  <div>
+                    <p class="questionaire-pane-preview-overlay-kicker">Published versions</p>
+                    <p class="questionaire-pane-preview-overlay-description">Choose the version to open in live preview.</p>
+                  </div>
+                  <button class="questionaire-pane-preview-overlay-close" type="button" aria-label="Close version chooser" @click=${() => this.closePreviewVersionChooser()}>
+                    <icon-lucide-x></icon-lucide-x>
+                  </button>
+                </div>
+                <div class="questionaire-pane-preview-overlay-message">
+                  <div class="questionaire-pane-preview-version-list">
+                    ${this.previewVersions.map((version, index) => html`
+                      <button type="button" @click=${() => { this.previewVersions = []; void this.loadPreviewVersion(version) }}>
+                        Published version ${index + 1}
+                        <small>${version.doc().uri}</small>
+                      </button>
+                    `)}
+                  </div>
+                </div>
+              </div>
+            `
+          : this.previewSubject || this.previewError || this.previewLoading
           ? html`
               <div class="questionaire-pane-preview-overlay" role="dialog" aria-modal="true" aria-label="Live questionnaire preview">
                 <div class="questionaire-pane-preview-overlay-toolbar">

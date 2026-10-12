@@ -194,7 +194,7 @@ export default class QuestionairePaneCreateQuestionConfidence extends Questionai
 
         <questionaire-pane-create-question-footer
           .points=${points}
-          .statusLabel=${'Changes not saved'}
+          .statusLabel=${this.draftDirty ? 'Changes not saved' : 'Saved'}
           .saveLabel=${'Save question'}
           @questionaire-question-footer-points-changed=${(event: CustomEvent<{ points: string }>) => {
             this.draftPoints = event.detail.points

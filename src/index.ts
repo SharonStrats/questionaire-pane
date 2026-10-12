@@ -28,7 +28,7 @@ export default {
     const questionaireLogic = createQuestionaireLogic(store)
     const structure = await questionaireLogic.createQuestionnaireStructure({
       baseUrl: newPaneOptions.newBase,
-      title: 'Untitled Questionaire',
+      title: newPaneOptions.title || 'Untitled Questionaire',
       author: newPaneOptions.me ?? null,
       created: new Date()
     })

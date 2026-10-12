@@ -13,7 +13,7 @@ export default class QuestionairePaneCreateQuestionFooter extends WebComponent {
   accessor points = '1'
 
   @property({ type: String, attribute: 'status-label' })
-  accessor statusLabel = 'Changes not saved'
+  accessor statusLabel = 'Saved'
 
   @property({ type: String, attribute: 'save-label' })
   accessor saveLabel = 'Save question'

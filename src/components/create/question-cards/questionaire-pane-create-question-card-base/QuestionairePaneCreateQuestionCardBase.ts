@@ -1,5 +1,5 @@
 import { consume } from '@lit/context'
-import { property } from 'lit/decorators.js'
+import { property, state } from 'lit/decorators.js'
 import { type NamedNode } from 'rdflib'
 import { WebComponent } from 'solid-ui'
 import { questionaireContext, type QuestionaireContext } from '../../../../context'
@@ -12,6 +12,23 @@ export default abstract class QuestionairePaneCreateQuestionCardBase extends Web
 
   @property({ attribute: false })
   accessor question: NamedNode | null = null
+
+  @state()
+  protected accessor draftDirty = false
+
+  connectedCallback () {
+    super.connectedCallback()
+    this.addEventListener('input', this.onDraftInput)
+  }
+
+  disconnectedCallback () {
+    this.removeEventListener('input', this.onDraftInput)
+    super.disconnectedCallback()
+  }
+
+  private onDraftInput = () => {
+    this.draftDirty = true
+  }
 
   protected getStore () {
     return this.questionaire?.store ?? null
@@ -62,6 +79,7 @@ export default abstract class QuestionairePaneCreateQuestionCardBase extends Web
     }
 
     dispatchQuestionaireQuestionEvent(this, 'questionaire-question-saved', question.uri)
+    this.draftDirty = false
   }
 
   protected emitQuestionDeleted () {

@@ -18,10 +18,14 @@ export async function loadQuestionaireQuestionSummaries (store: Store, subject: 
   const baseUrl = ensureTrailingSlash(subject.doc().uri.replace(/index\.ttl$/, ''))
   const draft = sym(`${baseUrl}draft.ttl`)
   const draftDoc = draft.doc()
+  const publishedQuestionStatements = store.statementsMatching(subject, questionairePredicates.questionnaire.question, undefined, subject.doc())
+  if (publishedQuestionStatements.length === 0) {
+    await fetcher.load(draftDoc)
+  }
 
-  await fetcher.load(draftDoc)
-
-  const questionStatements = store.statementsMatching(draft, questionairePredicates.questionnaire.question, undefined, draftDoc)
+  const questionStatements = publishedQuestionStatements.length > 0
+    ? publishedQuestionStatements
+    : store.statementsMatching(draft, questionairePredicates.questionnaire.question, undefined, draftDoc)
   const questionSummaries = await Promise.all(
     questionStatements.map(async (statement) => {
       const question = statement.object as NamedNode

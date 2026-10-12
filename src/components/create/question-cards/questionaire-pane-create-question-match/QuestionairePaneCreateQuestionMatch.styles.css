@@ -251,20 +251,20 @@
 .questionaire-pane-create-question-match-add-area {
   display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: 180px;
-  padding: 20px 0 8px;
+  justify-content: flex-start;
+  min-height: 0;
+  padding: 4px 0 8px 38px;
 }
 
 .questionaire-pane-create-question-match-add {
   display: inline-flex;
   align-items: center;
-  gap: 18px;
+  gap: 8px;
   border: 0;
   background: transparent;
   color: #ea580c;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
   line-height: 1;
   letter-spacing: 0.01em;
@@ -275,9 +275,9 @@
 }
 
 .questionaire-pane-create-question-match-add icon-lucide-plus {
-  width: 164px;
-  height: 164px;
-  stroke-width: 2.25;
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
 }
 
 .questionaire-pane-create-question-match-note {

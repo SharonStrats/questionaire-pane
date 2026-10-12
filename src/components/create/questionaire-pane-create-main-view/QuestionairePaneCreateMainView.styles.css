@@ -71,6 +71,38 @@
   text-align: center;
 }
 
+.questionaire-pane-preview-version-list {
+  display: grid;
+  gap: 10px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.questionaire-pane-preview-version-list button {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--solid-ui-color-slate-200, #E2E8F0);
+  border-radius: 10px;
+  background: var(--solid-ui-color-white, #FFF);
+  color: var(--solid-ui-color-slate-700, #334155);
+  text-align: left;
+  cursor: pointer;
+}
+
+.questionaire-pane-preview-version-list button:hover {
+  border-color: var(--solid-ui-color-indigo-400, #818CF8);
+  background: var(--solid-ui-color-lavender-50, #F5F3FF);
+}
+
+.questionaire-pane-preview-version-list small {
+  overflow: hidden;
+  color: var(--solid-ui-color-slate-400, #94A3B8);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .questionaire-pane-import-overlay {
   position: absolute;
   z-index: 20;

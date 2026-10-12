@@ -137,7 +137,7 @@ export interface QuestionaireMutationService {
   updateQuestionnaireFormat(options: { baseUrl: string, format: 'quiz' | 'survey' }): Promise<void>
   addQuestionToQuestionnaire(options: QuestionaireQuestionOptions): Promise<QuestionaireQuestionResult>
   createQuestionnaireStructure(options: QuestionaireStructureOptions): Promise<QuestionaireStructureResult>
-  publishQuestionnaire(options: { subject: NamedNode }): Promise<{ snapshot: NamedNode, version: string }>
+  publishQuestionnaire(options: { subject: NamedNode }): Promise<{ snapshot: NamedNode, responseContainer: NamedNode, version: string }>
   updateQuestionText(options: { question: NamedNode, title: string }): Promise<void>
   updateQuestionImage(options: { question: NamedNode, image: string }): Promise<void>
   updateQuestionHint(options: { question: NamedNode, hint: string }): Promise<void>
@@ -308,7 +308,9 @@ export function createQuestionaireMutations (store: Store): QuestionaireMutation
           scratch.add(listItem, itemPredicate, itemResource, questionDoc)
           scratch.add(itemResource, answerText, literal(item), questionDoc)
         })
-        scratch.add(list, itemListElement, new Collection(listItems), questionDoc)
+        listItems.forEach((listItem) => {
+          scratch.add(list, itemListElement, listItem, questionDoc)
+        })
       }
       options.leftItems?.forEach((item) => {
         scratch.add(question, quizLeftItem, literal(item), questionDoc)
@@ -335,6 +337,7 @@ export function createQuestionaireMutations (store: Store): QuestionaireMutation
     await createContainerIfMissing(store, baseUrl)
     await createContainerIfMissing(store, `${baseUrl}draft/`)
     await createContainerIfMissing(store, `${baseUrl}draft/questions/`)
+    await createContainerIfMissing(store, `${baseUrl}images/`)
 
     const created = options.created ?? new Date()
     const author = options.author ?? null
@@ -349,6 +352,7 @@ export function createQuestionaireMutations (store: Store): QuestionaireMutation
       }
       scratch.add(index, dct('hasPart'), draft, indexDoc)
       scratch.add(index, dct('hasPart'), draftQuestions, indexDoc)
+      scratch.add(index, dct('hasPart'), sym(`${baseUrl}images/`), indexDoc)
     })
 
     const draftTurtle = buildTurtleDocument(draftDoc, scratch => {
@@ -383,12 +387,17 @@ export function createQuestionaireMutations (store: Store): QuestionaireMutation
     const version = new Date().toISOString().replace(/:/g, '-')
     const publishedBaseUrl = `${baseUrl}published/${version}/`
     const publishedQuestionsUrl = `${publishedBaseUrl}questions/`
+    const publishedResponsesUrl = `${publishedBaseUrl}responses/`
     const snapshot = sym(`${publishedBaseUrl}index.ttl#this`)
     const snapshotDoc = snapshot.doc()
+    const responseContainer = sym(publishedResponsesUrl)
 
     await createContainerIfMissing(store, `${baseUrl}published/`)
     await createContainerIfMissing(store, publishedBaseUrl)
     await createContainerIfMissing(store, publishedQuestionsUrl)
+    await createContainerIfMissing(store, publishedResponsesUrl)
+    const publishedImagesUrl = `${publishedBaseUrl}images/`
+    await createContainerIfMissing(store, publishedImagesUrl)
 
     const questionStatements = [...store.statementsMatching(draft, quizQuestion, undefined, draftDoc)]
     const title = store.any(index, questionairePredicates.questionnaire.title, undefined, indexDoc)
@@ -408,12 +417,50 @@ export function createQuestionaireMutations (store: Store): QuestionaireMutation
       const publishedQuestion = sym(`${publishedQuestionsUrl}${questionFile}`)
       const publishedQuestionDoc = publishedQuestion.doc()
       const questionGraph = graph()
-      store.statementsMatching(sourceQuestion, undefined, undefined, sourceQuestionDoc).forEach((questionStatement) => {
-        const object = questionStatement.predicate.equals(questionairePredicates.question.isPartOf)
-          ? snapshot
-          : questionStatement.object
-        questionGraph.add(publishedQuestion, questionStatement.predicate, object, publishedQuestionDoc)
-      })
+      // Published questions must be self-contained.  In particular, options,
+      // accepted answers, and ItemList entries are blank resources in the
+      // draft document; copying only the question's direct triples leaves the
+      // published take view with no labels or ordering values.
+      const copied = new Set<string>()
+      const mapNode = (node: NamedNode) => {
+        if (node.value.startsWith(`${baseUrl}images/`)) {
+          return sym(`${publishedImagesUrl}${node.value.split('/').pop()}`)
+        }
+        return sym(`${publishedQuestionDoc.uri}${node.value.slice(sourceQuestionDoc.uri.length)}`)
+      }
+      const copyResource = (source: NamedNode, target: NamedNode) => {
+        if (copied.has(source.value)) return
+        copied.add(source.value)
+        store.statementsMatching(source, undefined, undefined, sourceQuestionDoc).forEach((questionStatement) => {
+          const object = questionStatement.predicate.equals(questionairePredicates.question.isPartOf)
+            ? snapshot
+            : questionStatement.object.termType === 'NamedNode' &&
+                questionStatement.object.value.startsWith(`${baseUrl}images/`)
+              ? mapNode(questionStatement.object as NamedNode)
+              : questionStatement.object.termType === 'NamedNode'
+                ? mapNode(questionStatement.object as NamedNode)
+                : (questionStatement.object as any).termType === 'Collection'
+                  ? new Collection(((questionStatement.object as any).elements ?? []).map((member: any) =>
+                    member.termType === 'NamedNode' ? mapNode(member) : member
+                  ))
+                : questionStatement.object
+          questionGraph.add(target, questionStatement.predicate, object, publishedQuestionDoc)
+          if (questionStatement.object.termType === 'NamedNode' &&
+              !questionStatement.predicate.equals(questionairePredicates.question.isPartOf) &&
+              !(questionStatement.object as NamedNode).value.startsWith(`${baseUrl}images/`)) {
+            copyResource(questionStatement.object as NamedNode, object as NamedNode)
+          }
+          // rdflib Collections are serialized through their RDF list members.
+          if ((questionStatement.object as any).termType === 'Collection') {
+            for (const member of ((questionStatement.object as any).elements ?? [])) {
+              if (member.termType === 'NamedNode') {
+                copyResource(member, mapNode(member))
+              }
+            }
+          }
+        })
+      }
+      copyResource(sourceQuestion, publishedQuestion)
       const questionTurtle = serialize(
         publishedQuestionDoc,
         questionGraph,
@@ -422,6 +469,19 @@ export function createQuestionaireMutations (store: Store): QuestionaireMutation
       ) as string
 
       await createDocumentIfMissing(store, publishedQuestionDoc, questionTurtle)
+      const image = store.any(sourceQuestion, questionImage, undefined, sourceQuestionDoc)
+      if (image?.termType === 'NamedNode' && image.value.startsWith(`${baseUrl}images/`)) {
+        const imageResponse = await fetcher.webOperation('GET', image.value)
+        if (!imageResponse.ok) {
+          throw new Error(`Unable to read questionnaire image ${image.value}`)
+        }
+        const imageUri = `${publishedImagesUrl}${image.value.split('/').pop()}`
+        const imageData = await imageResponse.arrayBuffer()
+        await fetcher.webOperation('PUT', imageUri, {
+          data: imageData,
+          contentType: imageResponse.headers.get('content-type') || 'application/octet-stream'
+        } as any)
+      }
       questionLinks.push(publishedQuestion)
     }
 
@@ -438,6 +498,7 @@ export function createQuestionaireMutations (store: Store): QuestionaireMutation
         scratch.add(snapshot, dct('creator'), creator, snapshotDoc)
       }
       scratch.add(snapshot, dct('created'), literal(new Date().toISOString()), snapshotDoc)
+      scratch.add(snapshot, dct('hasPart'), responseContainer, snapshotDoc)
       questionLinks.forEach((question) => {
         scratch.add(snapshot, questionairePredicates.questionnaire.question, question, snapshotDoc)
       })
@@ -445,13 +506,12 @@ export function createQuestionaireMutations (store: Store): QuestionaireMutation
 
     await createDocumentIfMissing(store, snapshotDoc, snapshotTurtle)
 
-    const versions = store.statementsMatching(index, dct('hasVersion'), undefined, indexDoc)
-    await updater.update(versions, [
+    await updater.update([], [
       st(index, dct('hasVersion'), snapshot, indexDoc),
       st(index, dct('modified'), literal(new Date().toISOString()), indexDoc)
     ])
 
-    return { snapshot, version }
+    return { snapshot, responseContainer, version }
   }
 
   async function updateQuestionText (options: { question: NamedNode, title: string }) {
@@ -656,6 +716,14 @@ export function createQuestionaireMutations (store: Store): QuestionaireMutation
           }
         })
       })
+      const orderedResourcePrefix = `${questionDoc.uri}#ordered-`
+      store.statementsMatching(undefined, undefined, undefined, questionDoc).forEach((statement) => {
+        const subjectUri = statement.subject.termType === 'NamedNode' ? statement.subject.uri : ''
+        const objectUri = statement.object.termType === 'NamedNode' ? statement.object.uri : ''
+        if (subjectUri.startsWith(orderedResourcePrefix) || objectUri.startsWith(orderedResourcePrefix)) {
+          del.push(statement)
+        }
+      })
 
       const list = sym(`${options.question.doc().uri}#ordered-items`)
       const listItems: NamedNode[] = []
@@ -677,7 +745,9 @@ export function createQuestionaireMutations (store: Store): QuestionaireMutation
             st(itemResource, answerText, literal(item), questionDoc)
           )
         })
-      ins.push(st(list, itemListElement, new Collection(listItems), questionDoc))
+      listItems.forEach((listItem) => {
+        ins.push(st(list, itemListElement, listItem, questionDoc))
+      })
 
       await updater.update(del, ins)
     })

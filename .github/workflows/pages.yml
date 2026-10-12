@@ -25,6 +25,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build:standalone
+      - run: mv standalone-dist/standalone/index.html standalone-dist/index.html && rmdir standalone-dist/standalone
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -8,6 +8,7 @@ import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuesti
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
 import '~icons/lucide/chevron-down'
 import '~icons/lucide/info'
+import '~icons/lucide/grip-vertical'
 
 @customElement('questionaire-pane-create-question-ordering')
 export default class QuestionairePaneCreateQuestionOrdering extends QuestionairePaneCreateQuestionCardBase {
@@ -82,7 +83,7 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
 
     const items = readQuestionValues(store, question, 'item')
 
-    return items.length > 0 ? items : ['Step 1', 'Step 2', 'Step 3']
+    return items.length > 0 ? items : ['', '', '']
   }
 
   private async persistQuestionCard () {
@@ -95,7 +96,7 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
     const title = this.draftTitle.trim()
     const hint = this.draftHint.trim()
     const points = Number.parseInt(this.draftPoints, 10)
-    const items = this.draftItems.length > 0 ? this.draftItems : ['Step 1', 'Step 2', 'Step 3']
+    const items = this.draftItems.length > 0 ? this.draftItems : ['', '', '']
 
     await logic.updateQuestionText({ question, title })
     await logic.updateQuestionHint({ question, hint })
@@ -147,6 +148,14 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
     this.requestUpdate()
   }
 
+  private async updateQuestionItems (items: string[]) {
+    const question = this.question
+    const logic = this.getQuestionLogic()
+    if (!question || !logic) return
+    await logic.updateQuestionItems({ question, items })
+    this.emitQuestionChanged()
+  }
+
   private async addItem () {
     const question = this.question
     const logic = this.getQuestionLogic()
@@ -155,7 +164,7 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
     }
 
     const items = this.draftItems.length > 0 ? this.draftItems.slice() : this.getQuestionItems().slice()
-    items.push(`Step ${items.length + 1}`)
+    items.push('')
     this.draftItems = items
     await logic.updateQuestionItems({ question, items })
     this.emitQuestionChanged()
@@ -235,6 +244,27 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
           <div class="questionaire-pane-create-question-ordering-items">
             ${items.map((item, index) => html`
               <div class="questionaire-pane-create-question-ordering-item">
+                <button
+                  class="questionaire-pane-create-question-ordering-item-handle"
+                  type="button"
+                  aria-label=${`Move item ${index + 1}`}
+                  title="Use the arrows to reorder"
+                  @keydown=${(event: KeyboardEvent) => {
+                    if (event.key === 'ArrowUp' && index > 0) {
+                      event.preventDefault()
+                      const next = items.slice()
+                      ;[next[index - 1], next[index]] = [next[index], next[index - 1]]
+                      this.draftItems = next
+                      void this.updateQuestionItems(next)
+                    } else if (event.key === 'ArrowDown' && index < items.length - 1) {
+                      event.preventDefault()
+                      const next = items.slice()
+                      ;[next[index], next[index + 1]] = [next[index + 1], next[index]]
+                      this.draftItems = next
+                      void this.updateQuestionItems(next)
+                    }
+                  }}
+                ><icon-lucide-grip-vertical></icon-lucide-grip-vertical></button>
                 <span class="questionaire-pane-create-question-ordering-item-badge">${index + 1}</span>
                 <input
                   class="questionaire-pane-create-question-ordering-item-input"
@@ -264,7 +294,7 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
 
         <questionaire-pane-create-question-footer
           .points=${String(points)}
-          .statusLabel=${'Changes not saved'}
+          .statusLabel=${this.draftDirty ? 'Changes not saved' : 'Saved'}
           .saveLabel=${'Save question'}
           @questionaire-question-footer-points-changed=${(event: CustomEvent<{ points: string }>) => {
             this.draftPoints = event.detail.points

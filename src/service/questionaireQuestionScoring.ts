@@ -1,6 +1,7 @@
-import { type NamedNode, type Store } from 'rdflib'
+import { sym, type NamedNode, type Store } from 'rdflib'
 import { questionairePredicates } from './questionairePredicates'
 import { readQuestionTypeUri as readQuestionTypeUriFromStore } from './questionaireQuestionAccessors'
+import { getQuestionnaireFormat } from './questionaireQuestionQueries'
 
 export interface QuestionaireAnswerValue {
   questionUri: string
@@ -71,10 +72,26 @@ export function evaluateQuestionAnswer (
   answer: string | string[] | null,
   semanticAnswerResults: SemanticAnswerResults = {}
 ): QuestionaireQuestionScore {
-  const availablePoints = getQuestionPointsFromStore(store, question)
+  const parent = store.any(question, questionairePredicates.question.isPartOf, undefined, question.doc())
+  const parentNode = parent?.termType === 'NamedNode' ? parent as NamedNode : null
+  const questionnaire = parentNode?.uri.endsWith('draft.ttl')
+    ? sym(parentNode.uri.replace(/draft\.ttl$/, 'index.ttl'))
+    : parentNode
+  const format = questionnaire ? getQuestionnaireFormat(store, questionnaire) : 'quiz'
+  const availablePoints = format === 'survey' ? 0 : getQuestionPointsFromStore(store, question)
   const questionTypeUri = readQuestionTypeUri(store, question)
   const normalizedAnswer = answerAsArray(answer)
   let correct = false
+
+  if (format === 'survey') {
+    return {
+      questionUri: question.uri,
+      questionTypeUri,
+      availablePoints,
+      earnedPoints: 0,
+      correct: normalizedAnswer.length > 0
+    }
+  }
 
   const correctOptionValues = readQuestionValueList(store, question, questionairePredicates.question.correctOption)
   const answerValues = readQuestionValueList(store, question, questionairePredicates.question.answer)

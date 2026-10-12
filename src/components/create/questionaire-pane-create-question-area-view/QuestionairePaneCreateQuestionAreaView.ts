@@ -80,7 +80,16 @@ export default class QuestionairePaneCreateQuestionAreaView extends WebComponent
     const refreshToken = ++this.questionsRefreshToken
     this.questionsLoading = true
 
-    const questions = await loadQuestionaireQuestionSummaries(store, subject)
+    let questions: QuestionaireQuestionSummary[] = []
+    try {
+      questions = await loadQuestionaireQuestionSummaries(store, subject)
+    } catch (error) {
+      console.error('Unable to load questionnaire questions', error)
+      if (refreshToken === this.questionsRefreshToken) {
+        this.questionsLoading = false
+      }
+      return
+    }
     if (refreshToken !== this.questionsRefreshToken) {
       return
     }

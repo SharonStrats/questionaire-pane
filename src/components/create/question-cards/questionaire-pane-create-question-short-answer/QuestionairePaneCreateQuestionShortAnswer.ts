@@ -3,7 +3,9 @@ import { state } from 'lit/decorators.js'
 import { customElement } from 'solid-ui'
 import styles from './QuestionairePaneCreateQuestionShortAnswer.styles.css'
 import QuestionairePaneCreateQuestionCardBase from '../questionaire-pane-create-question-card-base/QuestionairePaneCreateQuestionCardBase'
-import { readQuestionValue } from '../../../../service/questionaireQuestionAccessors'
+import { readQuestionValue, readQuestionValues } from '../../../../service/questionaireQuestionAccessors'
+import { getQuestionnaireFormat } from '../../../../service/questionaireQuestionQueries'
+import { uploadQuestionImage } from '../../../../service/questionaireImageUpload'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
 import '~icons/lucide/chevron-down'
@@ -27,6 +29,9 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
   private accessor draftPoints = '1'
 
   @state()
+  private accessor draftAnswers: string[] = []
+
+  @state()
   private accessor loadedQuestionUri: string | null = null
 
   protected willUpdate () {
@@ -39,6 +44,7 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
     this.draftHint = this.getQuestionHint()
     this.draftImage = readQuestionValue(this.getStore()!, question, 'image')
     this.draftPoints = String(this.getQuestionPoints())
+    this.draftAnswers = readQuestionValues(this.getStore()!, question, 'answer')
     this.loadedQuestionUri = question.uri
   }
 
@@ -72,6 +78,15 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
     const raw = readQuestionValue(store, question, 'points') || '1'
     const parsed = Number.parseInt(raw, 10)
     return Number.isFinite(parsed) ? parsed : 1
+  }
+
+  private async updateAnswers (answers: string[]) {
+    const question = this.question
+    const logic = this.getQuestionLogic()
+    if (!question || !logic) return
+    this.draftAnswers = answers
+    await logic.updateQuestionAnswers({ question, answers })
+    this.emitQuestionChanged()
   }
 
   private async persistQuestionCard () {
@@ -133,6 +148,9 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
     const hint = this.draftHint || this.getQuestionHint()
     const points = this.draftPoints || String(this.getQuestionPoints())
     const questionNumber = this.getQuestionNumber()
+    const isQuiz = this.questionaire?.subject
+      ? getQuestionnaireFormat(store, this.questionaire.subject) === 'quiz'
+      : true
 
     return html`
       <section class="questionaire-pane-create-question-short-answer">
@@ -160,8 +178,18 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
 
         <div class="questionaire-pane-create-question-short-answer-field">
           <label>Image <span>(optional)</span></label>
-          <input class="questionaire-pane-create-question-short-answer-input" type="url" placeholder="Paste an image URL..." .value=${this.draftImage}
-            @input=${(event: Event) => { this.draftImage = (event.currentTarget as HTMLInputElement).value }} />
+          <label class="questionaire-pane-create-question-short-answer-upload">
+            <input type="file" accept="image/*" @change=${async (event: Event) => {
+              const file = (event.currentTarget as HTMLInputElement).files?.[0]
+              const question = this.question
+              const logic = this.getQuestionLogic()
+              if (!file || !question || !logic) return
+              const image = await uploadQuestionImage(this.getStore()!, question, file)
+              this.draftImage = image
+              await logic.updateQuestionImage({ question, image })
+            }} />
+            <span>Drop an image here or choose a file</span>
+          </label>
           ${this.draftImage ? html`<img class="questionaire-pane-question-image-preview" src=${this.draftImage} alt="Question preview" />` : ''}
         </div>
 
@@ -196,22 +224,30 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
           />
         </div>
 
-        <div class="questionaire-pane-create-question-short-answer-field">
-          <div class="questionaire-pane-create-question-short-answer-field-header">
-            <label>Answer field preview</label>
+        ${isQuiz ? html`
+          <div class="questionaire-pane-create-question-short-answer-field">
+            <div class="questionaire-pane-create-question-short-answer-field-header">
+              <label>Answer</label>
+            </div>
+            <input
+              class="questionaire-pane-create-question-short-answer-input"
+              type="text"
+              required
+              placeholder="Enter the answer for grading..."
+              .value=${this.draftAnswers[0] ?? ''}
+              @input=${(event: Event) => {
+                this.draftAnswers = [(event.currentTarget as HTMLInputElement).value]
+              }}
+              @blur=${(event: FocusEvent) => {
+                void this.updateAnswers([(event.currentTarget as HTMLInputElement).value])
+              }}
+            />
           </div>
-          <div class="questionaire-pane-create-question-short-answer-preview">
-            <span>Respondent types their answer here…</span>
-          </div>
-          <div class="questionaire-pane-create-question-short-answer-note">
-            <icon-lucide-info></icon-lucide-info>
-            <span>Short answer questions in quiz mode are manually graded.</span>
-          </div>
-        </div>
+        ` : ''}
 
         <questionaire-pane-create-question-footer
           .points=${String(points)}
-          .statusLabel=${'Changes not saved'}
+          .statusLabel=${this.draftDirty ? 'Changes not saved' : 'Saved'}
           .saveLabel=${'Save question'}
           @questionaire-question-footer-points-changed=${(event: CustomEvent<{ points: string }>) => {
             this.draftPoints = event.detail.points

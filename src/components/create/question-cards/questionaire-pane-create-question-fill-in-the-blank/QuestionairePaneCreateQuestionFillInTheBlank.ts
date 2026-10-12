@@ -3,7 +3,7 @@ import { state } from 'lit/decorators.js'
 import { customElement } from 'solid-ui'
 import styles from './QuestionairePaneCreateQuestionFillInTheBlank.styles.css'
 import QuestionairePaneCreateQuestionCardBase from '../questionaire-pane-create-question-card-base/QuestionairePaneCreateQuestionCardBase'
-import { readQuestionValue } from '../../../../service/questionaireQuestionAccessors'
+import { readQuestionValue, readQuestionValues } from '../../../../service/questionaireQuestionAccessors'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
 import '~icons/lucide/chevron-down'
@@ -23,7 +23,7 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
   private accessor draftPoints = '1'
 
   @state()
-  private accessor draftAnswer = ''
+  private accessor draftAnswers: string[] = []
 
   @state()
   private accessor loadedQuestionUri: string | null = null
@@ -37,7 +37,7 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
     this.draftTitle = this.getQuestionTitle()
     this.draftHint = this.getQuestionHint()
     this.draftPoints = String(this.getQuestionPoints())
-    this.draftAnswer = this.getQuestionAnswer()
+    this.draftAnswers = this.getQuestionAnswers()
     this.loadedQuestionUri = question.uri
   }
 
@@ -73,14 +73,19 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
     return Number.isFinite(parsed) ? parsed : 1
   }
 
-  private getQuestionAnswer () {
+  private getQuestionAnswers () {
     const store = this.getStore()
     const question = this.question
     if (!store || !question) {
-      return ''
+      return ['']
     }
 
-    return readQuestionValue(store, question, 'answer')
+    const answers = readQuestionValues(store, question, 'answer')
+    return answers.length > 0 ? answers : ['']
+  }
+
+  private getBlankCount (title: string) {
+    return Math.max(1, title.match(/\[_{2,}\]/g)?.length ?? 0)
   }
 
   private async persistQuestionCard () {
@@ -93,12 +98,12 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
     const title = this.draftTitle.trim()
     const hint = this.draftHint.trim()
     const points = Number.parseInt(this.draftPoints, 10)
-    const answer = this.draftAnswer.trim()
+    const answers = this.draftAnswers.map((answer) => answer.trim())
 
     await logic.updateQuestionText({ question, title })
     await logic.updateQuestionHint({ question, hint })
     await logic.updateQuestionPoints({ question, points: Number.isFinite(points) ? points : 0 })
-    await logic.updateQuestionAnswers({ question, answers: answer ? [answer] : [] })
+    await logic.updateQuestionAnswers({ question, answers: answers.filter((answer) => answer.length > 0) })
 
     this.emitQuestionChanged()
     this.emitQuestionSaved()
@@ -130,6 +135,32 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
     this.requestUpdate()
   }
 
+  private insertBlank () {
+    const textarea = this.renderRoot.querySelector<HTMLTextAreaElement>('textarea')
+    if (!textarea) return
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const next = `${textarea.value.slice(0, start)}[____]${textarea.value.slice(end)}`
+    this.draftTitle = next
+    const blankCount = this.getBlankCount(next)
+    this.draftAnswers = this.draftAnswers.concat(
+      Array.from({ length: Math.max(0, blankCount - this.draftAnswers.length) }, () => '')
+    )
+    textarea.value = next
+    textarea.focus()
+    textarea.setSelectionRange(start + 6, start + 6)
+    void this.updateQuestionTitle(next)
+  }
+
+  private updateAnswer (index: number, value: string) {
+    const answers = this.draftAnswers.slice()
+    while (answers.length <= index) {
+      answers.push('')
+    }
+    answers[index] = value
+    this.draftAnswers = answers
+  }
+
   render() {
     const store = this.getStore()
     const question = this.question
@@ -140,7 +171,10 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
     const title = this.draftTitle
     const hint = this.draftHint || this.getQuestionHint()
     const points = this.draftPoints || String(this.getQuestionPoints())
-    const answer = this.draftAnswer || this.getQuestionAnswer()
+    const blankCount = this.getBlankCount(title)
+    const answers = this.draftAnswers.concat(
+      Array.from({ length: Math.max(0, blankCount - this.draftAnswers.length) }, () => '')
+    )
     const questionNumber = this.getQuestionNumber()
 
     return html`
@@ -168,7 +202,7 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
         <div class="questionaire-pane-create-question-fill-in-the-blank-field">
           <div class="questionaire-pane-create-question-fill-in-the-blank-field-header">
             <label>Question</label>
-            <button class="questionaire-pane-create-question-fill-in-the-blank-insert" type="button">
+            <button class="questionaire-pane-create-question-fill-in-the-blank-insert" type="button" @click=${() => this.insertBlank()}>
               <span>+</span>
               <span>Insert blank</span>
             </button>
@@ -184,7 +218,7 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
               void this.updateQuestionTitle((event.currentTarget as HTMLTextAreaElement).value)
             }}
           ></textarea>
-          <p class="questionaire-pane-create-question-fill-in-the-blank-note">1 blank detected — fill in the correct answer(s) below</p>
+          <p class="questionaire-pane-create-question-fill-in-the-blank-note">${blankCount} ${blankCount === 1 ? 'blank' : 'blanks'} detected — fill in the correct answer(s) below</p>
         </div>
 
         <div class="questionaire-pane-create-question-fill-in-the-blank-field">
@@ -205,22 +239,23 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
 
         <div class="questionaire-pane-create-question-fill-in-the-blank-field">
           <label>CORRECT ANSWER(S)</label>
-          <div class="questionaire-pane-create-question-fill-in-the-blank-answer-row">
-            <div class="questionaire-pane-create-question-fill-in-the-blank-answer-badge">Blank 1</div>
-            <input
-              class="questionaire-pane-create-question-fill-in-the-blank-answer-input"
-              type="text"
-              placeholder="Answer"
-              .value=${answer}
-              @input=${(event: Event) => {
-                this.draftAnswer = (event.currentTarget as HTMLInputElement).value
-              }}
-              @blur=${(event: FocusEvent) => {
-                this.draftAnswer = (event.currentTarget as HTMLInputElement).value
-                void this.persistQuestionCard()
-              }}
-            />
-          </div>
+          ${answers.slice(0, blankCount).map((answer, index) => html`
+            <div class="questionaire-pane-create-question-fill-in-the-blank-answer-row">
+              <div class="questionaire-pane-create-question-fill-in-the-blank-answer-badge">Blank ${index + 1}</div>
+              <input
+                class="questionaire-pane-create-question-fill-in-the-blank-answer-input"
+                type="text"
+                placeholder="Answer"
+                .value=${answer}
+                @input=${(event: Event) => {
+                  this.updateAnswer(index, (event.currentTarget as HTMLInputElement).value)
+                }}
+                @blur=${() => {
+                  void this.persistQuestionCard()
+                }}
+              />
+            </div>
+          `)}
           <div class="questionaire-pane-create-question-fill-in-the-blank-note">
             <icon-lucide-info></icon-lucide-info>
             <span>Answers are checked case-insensitively.</span>
@@ -229,7 +264,7 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
 
         <questionaire-pane-create-question-footer
           .points=${String(points)}
-          .statusLabel=${'Changes not saved'}
+          .statusLabel=${this.draftDirty ? 'Changes not saved' : 'Saved'}
           .saveLabel=${'Save question'}
           @questionaire-question-footer-points-changed=${(event: CustomEvent<{ points: string }>) => {
             this.draftPoints = event.detail.points
