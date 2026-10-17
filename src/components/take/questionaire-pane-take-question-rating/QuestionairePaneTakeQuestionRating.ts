@@ -6,6 +6,7 @@ import { type NamedNode } from 'rdflib'
 import styles from './QuestionairePaneTakeQuestionRating.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
 import { readQuestionValue } from '../../../service/questionaireQuestionAccessors'
+import { renderFormattedText } from '../../shared/questionaire-pane-formatting'
 
 @customElement('questionaire-pane-take-question-rating')
 export default class QuestionairePaneTakeQuestionRating extends WebComponent {
@@ -78,8 +79,8 @@ export default class QuestionairePaneTakeQuestionRating extends WebComponent {
     return html`
       <section class="questionaire-pane-take-question-rating">
         <div class="questionaire-pane-take-question-rating-type">Confidence / Rating</div>
-        <h2 class="questionaire-pane-take-question-rating-title">${title || 'Untitled question'}</h2>
-        ${hint ? html`<p class="questionaire-pane-take-question-rating-hint">${hint}</p>` : html``}
+        <h2 class="questionaire-pane-take-question-rating-title">${renderFormattedText(title || 'Untitled question')}</h2>
+        ${hint ? html`<p class="questionaire-pane-take-question-rating-hint">${renderFormattedText(hint)}</p>` : html``}
         <div class="questionaire-pane-take-question-rating-options">
           ${values.map((value) => html`
             <button

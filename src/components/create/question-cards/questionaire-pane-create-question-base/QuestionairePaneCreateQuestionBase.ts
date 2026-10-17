@@ -3,6 +3,7 @@ import { property } from 'lit/decorators.js'
 import { customElement, WebComponent } from 'solid-ui'
 import styles from './QuestionairePaneCreateQuestionBase.styles.css'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
+import { renderFormattedText } from '../../../shared/questionaire-pane-formatting'
 
 @customElement('questionaire-pane-create-question-base')
 export default class QuestionairePaneCreateQuestionBase extends WebComponent {
@@ -32,11 +33,11 @@ export default class QuestionairePaneCreateQuestionBase extends WebComponent {
         <div class="questionaire-pane-create-question-base-header">
           <div>
             <p class="questionaire-pane-create-question-base-type">${this.questionTypeLabel}</p>
-            <h2 class="questionaire-pane-create-question-base-title">${this.title}</h2>
+            <h2 class="questionaire-pane-create-question-base-title">${renderFormattedText(this.title)}</h2>
           </div>
         </div>
         ${this.description
-          ? html`<p class="questionaire-pane-create-question-base-description">${this.description}</p>`
+          ? html`<p class="questionaire-pane-create-question-base-description">${renderFormattedText(this.description)}</p>`
           : html``}
         <div class="questionaire-pane-create-question-base-body">
           <slot></slot>

@@ -74,3 +74,50 @@
 .questionaire-pane-take-question-text-response-feedback--incorrect {
   color: #b45309;
 }
+
+.questionaire-pane-take-question-text-response--fill-in-the-blank {
+  gap: 20px;
+}
+
+.questionaire-pane-take-question-text-response--fill-in-the-blank .questionaire-pane-take-question-text-response-type {
+  background: #e0f2fe;
+  color: #0284c7;
+}
+
+.questionaire-pane-take-question-text-response--fill-in-the-blank .questionaire-pane-take-question-text-response-title {
+  font-size: 24px;
+  line-height: 1.375;
+}
+
+.questionaire-pane-take-question-text-response-question-body {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 124px;
+  padding: 20px;
+  border: 1px solid #e2e5ea;
+  border-radius: 12px;
+  background: #f4f5f7;
+  color: #1a2235;
+  font-size: 14px;
+  line-height: 2.7;
+}
+
+.questionaire-pane-take-question-text-response-blank {
+  box-sizing: border-box;
+  width: 112px;
+  height: 46px;
+  padding: 8px 12px;
+  border: 1px solid #d8b4d8;
+  border-radius: 8px;
+  background: white;
+  color: #1a2235;
+  font: inherit;
+}
+
+.questionaire-pane-take-question-text-response-blank:focus {
+  outline: none;
+  border-color: #6c5ce7;
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.15);
+}

@@ -3,6 +3,7 @@ import { state } from 'lit/decorators.js'
 import { customElement } from 'solid-ui'
 import styles from './QuestionairePaneCreateQuestionFillInTheBlank.styles.css'
 import QuestionairePaneCreateQuestionCardBase from '../questionaire-pane-create-question-card-base/QuestionairePaneCreateQuestionCardBase'
+import '../../../shared/QuestionairePaneFormattingToolbar'
 import { readQuestionValue, readQuestionValues } from '../../../../service/questionaireQuestionAccessors'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
@@ -23,6 +24,9 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
   private accessor draftPoints = '1'
 
   @state()
+  private accessor pointsCustomized = false
+
+  @state()
   private accessor draftAnswers: string[] = []
 
   @state()
@@ -34,9 +38,12 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
       return
     }
 
-    this.draftTitle = this.getQuestionTitle()
+    const title = this.getQuestionTitle()
+    const storedPoints = this.getQuestionPoints()
+    this.draftTitle = title
     this.draftHint = this.getQuestionHint()
-    this.draftPoints = String(this.getQuestionPoints())
+    this.draftPoints = String(storedPoints)
+    this.pointsCustomized = storedPoints !== this.getBlankCount(title)
     this.draftAnswers = this.getQuestionAnswers()
     this.loadedQuestionUri = question.uri
   }
@@ -109,30 +116,8 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
     this.emitQuestionSaved()
   }
 
-  private async updateQuestionTitle (value: string) {
-    const question = this.question
-    const logic = this.getQuestionLogic()
-    if (!question || !logic) {
-      return
-    }
-
+  private updateQuestionTitle (value: string) {
     this.draftTitle = value
-    await logic.updateQuestionText({ question, title: value })
-    this.emitQuestionChanged()
-    this.requestUpdate()
-  }
-
-  private async updateQuestionHint (value: string) {
-    const question = this.question
-    const logic = this.getQuestionLogic()
-    if (!question || !logic) {
-      return
-    }
-
-    this.draftHint = value
-    await logic.updateQuestionHint({ question, hint: value })
-    this.emitQuestionChanged()
-    this.requestUpdate()
   }
 
   private insertBlank () {
@@ -143,13 +128,16 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
     const next = `${textarea.value.slice(0, start)}[____]${textarea.value.slice(end)}`
     this.draftTitle = next
     const blankCount = this.getBlankCount(next)
+    if (!this.pointsCustomized) {
+      this.draftPoints = String(blankCount)
+    }
     this.draftAnswers = this.draftAnswers.concat(
       Array.from({ length: Math.max(0, blankCount - this.draftAnswers.length) }, () => '')
     )
     textarea.value = next
     textarea.focus()
     textarea.setSelectionRange(start + 6, start + 6)
-    void this.updateQuestionTitle(next)
+    this.updateQuestionTitle(next)
   }
 
   private updateAnswer (index: number, value: string) {
@@ -159,6 +147,13 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
     }
     answers[index] = value
     this.draftAnswers = answers
+  }
+
+  private updateQuestionDraftTitle (value: string) {
+    this.draftTitle = value
+    if (!this.pointsCustomized) {
+      this.draftPoints = String(this.getBlankCount(value))
+    }
   }
 
   render() {
@@ -188,7 +183,8 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
         <div class="questionaire-pane-create-question-fill-in-the-blank-field">
           <label>Question type</label>
           <div class="questionaire-pane-create-question-fill-in-the-blank-type-card">
-            <div class="questionaire-pane-create-question-fill-in-the-blank-type-icon">U</div>
+            <div class="questionaire-pane-create-question-fill-in-the-blank-type-icon">U              <questionaire-pane-formatting-toolbar></questionaire-pane-formatting-toolbar>
+            </div>
             <div class="questionaire-pane-create-question-fill-in-the-blank-type-copy">
               <div class="questionaire-pane-create-question-fill-in-the-blank-type-title">Fill in the Blank</div>
               <div class="questionaire-pane-create-question-fill-in-the-blank-type-description">Complete missing words</div>
@@ -212,10 +208,7 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
             placeholder="Type your question here..."
             .value=${title}
             @input=${(event: Event) => {
-              this.draftTitle = (event.currentTarget as HTMLTextAreaElement).value
-            }}
-            @blur=${(event: FocusEvent) => {
-              void this.updateQuestionTitle((event.currentTarget as HTMLTextAreaElement).value)
+              this.updateQuestionDraftTitle((event.currentTarget as HTMLTextAreaElement).value)
             }}
           ></textarea>
           <p class="questionaire-pane-create-question-fill-in-the-blank-note">${blankCount} ${blankCount === 1 ? 'blank' : 'blanks'} detected — fill in the correct answer(s) below</p>
@@ -230,9 +223,6 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
             .value=${hint}
             @input=${(event: Event) => {
               this.draftHint = (event.currentTarget as HTMLInputElement).value
-            }}
-            @blur=${(event: FocusEvent) => {
-              void this.updateQuestionHint((event.currentTarget as HTMLInputElement).value)
             }}
           />
         </div>
@@ -250,9 +240,6 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
                 @input=${(event: Event) => {
                   this.updateAnswer(index, (event.currentTarget as HTMLInputElement).value)
                 }}
-                @blur=${() => {
-                  void this.persistQuestionCard()
-                }}
               />
             </div>
           `)}
@@ -268,6 +255,7 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
           .saveLabel=${'Save question'}
           @questionaire-question-footer-points-changed=${(event: CustomEvent<{ points: string }>) => {
             this.draftPoints = event.detail.points
+            this.pointsCustomized = true
           }}
           @questionaire-question-footer-save=${() => {
             void this.persistQuestionCard()

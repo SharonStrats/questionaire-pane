@@ -9,6 +9,7 @@ import { loadQuestionaireQuestionSummaries, type QuestionaireQuestionSummary } f
 import '../questionaire-pane-create-sidebar/QuestionairePaneCreateSidebar'
 import '../question-cards/questionaire-pane-create-question-dispatcher/QuestionairePaneCreateQuestionDispatcher'
 import { questionaireCreateQuestionTypes } from '../question-cards/questionaire-pane-create-question-types'
+import { scrollQuestionEditorToTop } from './questionEditorNavigation'
 
 @customElement('questionaire-pane-create-question-area-view')
 export default class QuestionairePaneCreateQuestionAreaView extends WebComponent {
@@ -124,6 +125,14 @@ export default class QuestionairePaneCreateQuestionAreaView extends WebComponent
       return
     }
 
+    // Remove the previous editor before mounting the new one. Question URIs can
+    // be reused after deleting the last question, so retaining the element
+    // could also retain its in-memory draft state.
+    this.activeQuestionUri = null
+    this.activeQuestionTypeUri = null
+    this.editorDismissed = true
+    await this.updateComplete
+
     const questionaireLogic = createQuestionaireLogic(store)
     const result = await questionaireLogic.addQuestionToQuestionnaire({
       baseUrl,
@@ -134,6 +143,8 @@ export default class QuestionairePaneCreateQuestionAreaView extends WebComponent
     this.activeQuestionTypeUri = questionTypeUri
     this.editorDismissed = false
     await this.refreshQuestions()
+    await this.updateComplete
+    scrollQuestionEditorToTop(this.renderRoot)
   }
 
   private handleQuestionUpdated (_event: CustomEvent<{ questionUri: string }>) {

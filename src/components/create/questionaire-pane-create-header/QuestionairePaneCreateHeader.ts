@@ -316,7 +316,7 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
         throw new Error('This host does not expose its access-control service to the questionnaire.')
       }
       const accessGrants = await solidLogicSingleton.acl.findAccessGrants(resource.uri)
-      showDialog(AccessControlModal, {
+      showDialog<AccessControlModal>(AccessControlModal, {
         props: {
           subjectUri: resource.uri,
           accessGrants
@@ -326,14 +326,34 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
       this.publishError = 'Unable to open sharing controls: ' + (error instanceof Error ? error.message : String(error))
     }
   }
-  private requestPreview () {
-    if (!this.isPublished) {
+  private getPublishedVersionResources () {
+    const questionaire = this.questionaire ?? { store: null, subject: null }
+    const store = questionaire.store
+    const subject = questionaire.subject
+    if (!store || !subject) {
+      return []
+    }
+
+    const linkedVersions = store.each(subject, questionairePredicates.questionnaire.hasVersion, undefined, subject.doc()).filter(isNamedNode)
+    const versions = [...linkedVersions, ...this.discoveredPublishedVersions]
+      .filter((version, index, all) => all.findIndex((candidate) => candidate.doc().uri === version.doc().uri) === index)
+      .sort((left, right) => left.doc().uri.localeCompare(right.doc().uri))
+
+    return versions.map((version, index) => ({
+      label: `Published version ${index + 1} (${version.doc().uri.split('/').slice(-2, -1)[0] ?? 'snapshot'})`,
+      version
+    }))
+  }
+
+  private requestPreview (version: NamedNode) {
+    if (!this.isPublished || !version) {
       return
     }
 
     this.dispatchEvent(new CustomEvent('questionaire-preview-requested', {
       bubbles: true,
-      composed: true
+      composed: true,
+      detail: { published: version }
     }))
   }
 
@@ -461,15 +481,30 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
               `)}
             </solid-ui-menu>
           ` : ''}
-          <button
-            class="questionaire-pane-create-header-action questionaire-pane-create-header-action--muted"
-            type="button"
-            ?disabled=${!this.isPublished || this.publishing}
-            @click=${() => this.requestPreview()}
-          >
-            <icon-lucide-eye></icon-lucide-eye>
-            <span>${this.isPublished ? 'View live' : 'Preview'}</span>
-          </button>
+          ${this.isPublished
+            ? html`
+                <solid-ui-menu class="questionaire-pane-create-header-preview-menu">
+                  <button class="questionaire-pane-create-header-action questionaire-pane-create-header-action--muted" type="button" slot="trigger">
+                    <icon-lucide-eye></icon-lucide-eye>
+                    <span>View live</span>
+                  </button>
+                  ${this.getPublishedVersionResources().map((resource) => html`
+                    <solid-ui-menu-item @solid-ui-select=${() => { this.requestPreview(resource.version) }}>
+                      ${resource.label}
+                    </solid-ui-menu-item>
+                  `)}
+                </solid-ui-menu>
+              `
+            : html`
+                <button
+                  class="questionaire-pane-create-header-action questionaire-pane-create-header-action--muted"
+                  type="button"
+                  disabled
+                >
+                  <icon-lucide-eye></icon-lucide-eye>
+                  <span>Preview</span>
+                </button>
+              `}
           <button
             class="questionaire-pane-create-header-action questionaire-pane-create-header-action--primary"
             type="button"

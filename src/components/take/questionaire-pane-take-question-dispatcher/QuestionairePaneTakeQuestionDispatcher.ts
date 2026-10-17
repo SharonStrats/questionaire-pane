@@ -6,6 +6,7 @@ import { type NamedNode } from 'rdflib'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
 import { getQuestionaireCreateQuestionTypeByUri } from '../../create/question-cards/questionaire-pane-create-question-types'
 import { readQuestionTypeUri, readQuestionValue } from '../../../service/questionaireQuestionAccessors'
+import { renderFormattedText } from '../../shared/questionaire-pane-formatting'
 import '../questionaire-pane-take-question-multiple-choice/QuestionairePaneTakeQuestionMultipleChoice'
 import '../questionaire-pane-take-question-text-response/QuestionairePaneTakeQuestionTextResponse'
 import '../questionaire-pane-take-question-ordering/QuestionairePaneTakeQuestionOrdering'
@@ -67,7 +68,7 @@ export default class QuestionairePaneTakeQuestionDispatcher extends WebComponent
       return html`
         <questionaire-pane-take-question-text-response
           .question=${question}
-          .answer=${typeof this.answer === 'string' ? this.answer : ''}
+          .answer=${Array.isArray(this.answer) ? this.answer : typeof this.answer === 'string' ? this.answer : ''}
           .multiline=${true}
           .questionTypeLabel=${'Short Answer'}
           .questionTypeDescription=${'Type your response.'}
@@ -116,8 +117,8 @@ export default class QuestionairePaneTakeQuestionDispatcher extends WebComponent
 
     return html`
       <section class="questionaire-pane-take-question-dispatcher">
-        <h2>${title}</h2>
-        ${hint ? html`<p>${hint}</p>` : html``}
+        <h2>${renderFormattedText(title)}</h2>
+        ${hint ? html`<p>${renderFormattedText(hint)}</p>` : html``}
         <p>Question type ${typeDefinition?.label ?? 'Question'} is not yet implemented for taking.</p>
         <p>Points: ${points}</p>
       </section>

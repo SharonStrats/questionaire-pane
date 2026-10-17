@@ -5,9 +5,10 @@ import styles from './QuestionairePaneCreateQuestionShortAnswer.styles.css'
 import QuestionairePaneCreateQuestionCardBase from '../questionaire-pane-create-question-card-base/QuestionairePaneCreateQuestionCardBase'
 import { readQuestionValue, readQuestionValues } from '../../../../service/questionaireQuestionAccessors'
 import { getQuestionnaireFormat } from '../../../../service/questionaireQuestionQueries'
-import { uploadQuestionImage } from '../../../../service/questionaireImageUpload'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
+import '../questionaire-pane-create-question-image-upload/QuestionairePaneCreateQuestionImageUpload'
+import '../../../shared/QuestionairePaneFormattingToolbar'
 import '~icons/lucide/chevron-down'
 import '~icons/lucide/info'
 import '~icons/lucide/pencil'
@@ -80,15 +81,6 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
     return Number.isFinite(parsed) ? parsed : 1
   }
 
-  private async updateAnswers (answers: string[]) {
-    const question = this.question
-    const logic = this.getQuestionLogic()
-    if (!question || !logic) return
-    this.draftAnswers = answers
-    await logic.updateQuestionAnswers({ question, answers })
-    this.emitQuestionChanged()
-  }
-
   private async persistQuestionCard () {
     const question = this.question
     const logic = this.getQuestionLogic()
@@ -108,32 +100,6 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
 
     this.emitQuestionChanged()
     this.emitQuestionSaved()
-  }
-
-  private async updateQuestionTitle (value: string) {
-    const question = this.question
-    const logic = this.getQuestionLogic()
-    if (!question || !logic) {
-      return
-    }
-
-    this.draftTitle = value
-    await logic.updateQuestionText({ question, title: value })
-    this.emitQuestionChanged()
-    this.requestUpdate()
-  }
-
-  private async updateQuestionHint (value: string) {
-    const question = this.question
-    const logic = this.getQuestionLogic()
-    if (!question || !logic) {
-      return
-    }
-
-    this.draftHint = value
-    await logic.updateQuestionHint({ question, hint: value })
-    this.emitQuestionChanged()
-    this.requestUpdate()
   }
 
   render() {
@@ -176,22 +142,14 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
           </div>
         </div>
 
-        <div class="questionaire-pane-create-question-short-answer-field">
-          <label>Image <span>(optional)</span></label>
-          <label class="questionaire-pane-create-question-short-answer-upload">
-            <input type="file" accept="image/*" @change=${async (event: Event) => {
-              const file = (event.currentTarget as HTMLInputElement).files?.[0]
-              const question = this.question
-              const logic = this.getQuestionLogic()
-              if (!file || !question || !logic) return
-              const image = await uploadQuestionImage(this.getStore()!, question, file)
-              this.draftImage = image
-              await logic.updateQuestionImage({ question, image })
-            }} />
-            <span>Drop an image here or choose a file</span>
-          </label>
-          ${this.draftImage ? html`<img class="questionaire-pane-question-image-preview" src=${this.draftImage} alt="Question preview" />` : ''}
-        </div>
+        <questionaire-pane-create-question-image-upload
+          .question=${question}
+          .image=${this.draftImage}
+          @questionaire-question-image-changed=${(event: CustomEvent<{ image: string }>) => {
+            this.draftImage = event.detail.image
+            this.emitQuestionChanged()
+          }}
+        ></questionaire-pane-create-question-image-upload>
 
         <div class="questionaire-pane-create-question-short-answer-field">
           <label>Question</label>
@@ -202,10 +160,8 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
             @input=${(event: Event) => {
               this.draftTitle = (event.currentTarget as HTMLTextAreaElement).value
             }}
-            @blur=${(event: FocusEvent) => {
-              void this.updateQuestionTitle((event.currentTarget as HTMLTextAreaElement).value)
-            }}
           ></textarea>
+          <questionaire-pane-formatting-toolbar></questionaire-pane-formatting-toolbar>
         </div>
 
         <div class="questionaire-pane-create-question-short-answer-field">
@@ -217,9 +173,6 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
             .value=${hint}
             @input=${(event: Event) => {
               this.draftHint = (event.currentTarget as HTMLInputElement).value
-            }}
-            @blur=${(event: FocusEvent) => {
-              void this.updateQuestionHint((event.currentTarget as HTMLInputElement).value)
             }}
           />
         </div>
@@ -237,9 +190,6 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
               .value=${this.draftAnswers[0] ?? ''}
               @input=${(event: Event) => {
                 this.draftAnswers = [(event.currentTarget as HTMLInputElement).value]
-              }}
-              @blur=${(event: FocusEvent) => {
-                void this.updateAnswers([(event.currentTarget as HTMLInputElement).value])
               }}
             />
           </div>

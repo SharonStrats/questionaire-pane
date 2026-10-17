@@ -1,0 +1,20 @@
+:host { display: block; }
+.questionaire-pane-formatting-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+  color: #667085;
+  font-size: 0.75rem;
+}
+.questionaire-pane-formatting-toolbar button {
+  min-width: 2rem;
+  min-height: 1.8rem;
+  border: 1px solid #d0d5dd;
+  border-radius: 0.35rem;
+  background: #fff;
+  color: #344054;
+  cursor: pointer;
+}
+.questionaire-pane-formatting-toolbar button:hover,
+.questionaire-pane-formatting-toolbar button:focus-visible { background: #f2f4f7; }

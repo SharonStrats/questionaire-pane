@@ -1,29 +1,34 @@
-import { authn, authSession, store as solidStore } from 'solid-logic'
-import { literal, Namespace, sym, type NamedNode, type Store } from 'rdflib'
+import { authn, authSession, solidLogicSingleton, store as solidStore } from 'solid-logic'
+import { Namespace, sym, type LiveStore, type NamedNode } from 'rdflib'
 import { ns } from 'solid-ui'
 import 'solid-ui/components/account'
 import 'solid-ui/components/provider'
 import 'solid-ui/theme.css'
-import { questionairePredicates } from '../service/questionairePredicates'
 import questionairePane from '../index'
 import '../components/provider/QuestionaireProvider'
 import '../components/create/questionaire-pane-create-main-view/QuestionairePaneCreateMainView'
 import '../components/take/questionaire-pane-take-main-view/QuestionairePaneTakeMainView'
+import '../components/standalone/questionaire-home/QuestionaireHome'
 import '../questionairePane.css'
 import './standalone.css'
 import { isHttpUrl, parseStandaloneUrl } from './url'
+import { replaceViewWithRestorableContent } from './viewNavigation'
 import {
   addToTypeIndex,
   crawlQuestionnaireContainers,
   ensureQuestionnaireWorkspace,
   entriesFromSubjects,
+  discoverSharedQuestionnaires,
+  isPublishedQuestionnaire,
   loadTypeIndexes,
+  ownPublishedQuestionnaires,
+  publishedQuestionnaireForTake,
   questionnaireClass,
   questionnairesInWorkspace,
   type QuestionnaireIndexStatus
 } from './library'
 
-const store = solidStore as Store
+const store = solidStore as LiveStore
 const app = document.querySelector<HTMLElement>('#app')!
 const loginReturnUrlKey = 'questionaire-pane:login-return-url'
 
@@ -58,21 +63,14 @@ function message (text: string, kind: 'info' | 'error' = 'info'): void {
   app.appendChild(element)
 }
 
-function isPublished (subject: NamedNode): boolean {
-  const type = store.any(subject, questionairePredicates.question.rdfType)
-  return Boolean(
-    (type?.equals(questionairePredicates.questionnaire.quizType) || type?.equals(questionairePredicates.questionnaire.surveyType)) &&
-    store.holds(subject, questionairePredicates.questionnaire.status, literal('Published'))
-  )
-}
-
 function renderQuestionnaire (subject: NamedNode): void {
   app.innerHTML = ''
-  const provider = document.createElement('questionaire-provider') as HTMLElement & { store?: Store, subject?: NamedNode }
+  const provider = document.createElement('questionaire-provider') as HTMLElement & { store?: LiveStore, subject?: NamedNode, acl?: typeof solidLogicSingleton.acl }
   provider.store = store
   provider.subject = subject
+  provider.acl = solidLogicSingleton.acl
   app.appendChild(provider)
-  provider.appendChild(document.createElement(isPublished(subject)
+  provider.appendChild(document.createElement(isPublishedQuestionnaire(store, subject)
     ? 'questionaire-pane-take-main-view'
     : 'questionaire-pane-create-main-view'))
 }
@@ -124,7 +122,6 @@ async function renderContainerPicker (me: NamedNode, initialUrl?: string): Promi
   let children: PodContainer[] = []
   let loading = false
   let canCreate = false
-  app.innerHTML = ''
 
   const section = document.createElement('section')
   section.className = 'questionnaire-create'
@@ -149,7 +146,11 @@ async function renderContainerPicker (me: NamedNode, initialUrl?: string): Promi
   cancel.textContent = 'Cancel'
   controls.append(back, choose, cancel)
   section.append(location, controls, status, list)
-  app.appendChild(section)
+  const restorePreviousView = replaceViewWithRestorableContent(app, section, () => {
+    void start().catch((error: unknown) => {
+      message(error instanceof Error ? error.message : 'Unable to restore questionnaire view.', 'error')
+    })
+  })
 
   const refresh = async (): Promise<void> => {
     loading = true
@@ -217,7 +218,7 @@ async function renderContainerPicker (me: NamedNode, initialUrl?: string): Promi
       })
     }
   })
-  cancel.addEventListener('click', () => { void start() })
+  cancel.addEventListener('click', restorePreviousView)
   await refresh()
 }
 
@@ -227,6 +228,14 @@ async function openSubject (uri: string): Promise<void> {
   if (!store.fetcher) throw new Error('Unable to load questionnaire: no Solid fetcher is available.')
   await store.fetcher.load(subject.doc())
   renderQuestionnaire(subject)
+}
+
+async function openSharedSubject (uri: string): Promise<void> {
+  if (!isHttpUrl(uri)) throw new Error('The subject must be an HTTP(S) URL.')
+  const subject = sym(uri)
+  if (!store.fetcher) throw new Error('Unable to load questionnaire: no Solid fetcher is available.')
+  await store.fetcher.load(subject.doc())
+  renderQuestionnaire(await publishedQuestionnaireForTake(store, subject))
 }
 
 async function createQuestionnaire (baseUrl: string, me: NamedNode, name?: string): Promise<void> {
@@ -244,115 +253,39 @@ async function createQuestionnaire (baseUrl: string, me: NamedNode, name?: strin
   renderQuestionnaire(created.newInstance)
 }
 
-function indexLabel (indexes: QuestionnaireIndexStatus): string {
-  if (indexes.public && indexes.private) return 'Public and private type indexes'
-  if (indexes.public) return 'Public type index'
-  if (indexes.private) return 'Private type index'
-  return 'Not registered in a type index'
-}
-
 async function renderLibrary (me: NamedNode): Promise<void> {
   app.innerHTML = ''
-  const section = document.createElement('section')
-  section.className = 'questionnaire-library'
-  section.innerHTML = '<h1>My Questionnaires</h1><p>Questionnaires saved in your dedicated <strong>Questionnaires</strong> workspace appear here automatically.</p>'
-  const workspace = document.createElement('p')
-  workspace.className = 'container-location'
-  const status = document.createElement('p')
-  status.className = 'info'
-  const actions = document.createElement('div')
-  actions.className = 'container-controls'
-  const create = document.createElement('button')
-  create.type = 'button'
-  create.className = 'primary'
-  create.textContent = 'Create questionnaire'
-  const search = document.createElement('button')
-  search.type = 'button'
-  search.textContent = 'Search my Pod'
-  const results = document.createElement('ul')
-  results.className = 'questionnaire-results'
-  actions.append(create, search)
-  section.append(workspace, actions, status, results)
-  app.appendChild(section)
+  const home = document.createElement('questionaire-home') as HTMLElement & {
+    entries: ReturnType<typeof entriesFromSubjects>
+    publishedEntries: Awaited<ReturnType<typeof ownPublishedQuestionnaires>>
+    sharedEntries: Awaited<ReturnType<typeof discoverSharedQuestionnaires>>
+    section: 'mine' | 'shared'
+    workspaceReady: boolean
+    status: string
+    statusKind: 'info' | 'error'
+  }
+  app.appendChild(home)
 
-  let workspaceUrl: string
+  let workspaceUrl = ''
   let subjects: NamedNode[] = []
   let statuses = new Map<string, QuestionnaireIndexStatus>()
   const renderEntries = (): void => {
-    results.innerHTML = ''
-    const entries = entriesFromSubjects(store, subjects, statuses)
-    if (!entries.length) {
-      const empty = document.createElement('li')
-      empty.className = 'empty-results'
-      empty.textContent = 'No questionnaires found yet. Create one here or search your Pod.'
-      results.appendChild(empty)
-      return
-    }
-    for (const entry of entries) {
-      const item = document.createElement('li')
-      item.className = 'questionnaire-result'
-      const open = document.createElement('button')
-      open.type = 'button'
-      open.className = 'questionnaire-open'
-      open.textContent = entry.title
-      open.addEventListener('click', () => { void openSubject(entry.subject.uri).catch(error => message(error instanceof Error ? error.message : 'Unable to open questionnaire.', 'error')) })
-      const meta = document.createElement('p')
-      meta.textContent = indexLabel(entry.indexes)
-      const registrations = document.createElement('div')
-      registrations.className = 'registration-controls'
-      for (const [kind, label] of [['public', 'Add to public index'], ['private', 'Add to private index']] as const) {
-        const add = document.createElement('button')
-        add.type = 'button'
-        add.textContent = label
-        add.disabled = entry.indexes[kind]
-        add.addEventListener('click', () => {
-          add.disabled = true
-          void addToTypeIndex(store, me, entry.subject, kind).then(() => {
-            const current = statuses.get(entry.subject.uri) ?? { public: false, private: false }
-            current[kind] = true
-            statuses.set(entry.subject.uri, current)
-            renderEntries()
-          }).catch((error: unknown) => {
-            add.disabled = false
-            status.className = 'error'
-            status.textContent = error instanceof Error ? error.message : `Unable to update the ${kind} type index.`
-          })
-        })
-        registrations.appendChild(add)
-      }
-      const both = document.createElement('button')
-      both.type = 'button'
-      both.textContent = 'Add to both indexes'
-      both.disabled = entry.indexes.public && entry.indexes.private
-      both.addEventListener('click', () => {
-        both.disabled = true
-        Promise.all((['public', 'private'] as const).filter(kind => !entry.indexes[kind]).map(kind => addToTypeIndex(store, me, entry.subject, kind)))
-          .then(() => {
-            statuses.set(entry.subject.uri, { public: true, private: true })
-            renderEntries()
-          })
-          .catch((error: unknown) => {
-            both.disabled = false
-            status.className = 'error'
-            status.textContent = error instanceof Error ? error.message : 'Unable to update both type indexes.'
-          })
-      })
-      registrations.appendChild(both)
-      item.append(open, meta, registrations)
-      results.appendChild(item)
-    }
+    home.entries = entriesFromSubjects(store, subjects, statuses)
   }
 
-  status.textContent = 'Preparing your Questionnaires workspace…'
+  const setStatus = (text: string, kind: 'info' | 'error' = 'info'): void => {
+    home.status = text
+    home.statusKind = kind
+  }
+
+  setStatus('Preparing your Questionnaires workspace…')
   try {
     workspaceUrl = await ensureQuestionnaireWorkspace(store, me)
-    workspace.textContent = `Workspace: ${workspaceUrl}`
+    home.workspaceReady = true
   } catch (error) {
     workspaceUrl = ''
-    workspace.textContent = 'Questionnaires workspace could not be prepared.'
-    status.className = 'error'
-    status.textContent = error instanceof Error ? error.message : 'Unable to prepare your Questionnaires workspace.'
-    create.disabled = true
+    home.workspaceReady = false
+    setStatus(error instanceof Error ? error.message : 'Unable to prepare your Questionnaires workspace.', 'error')
   }
   try {
     statuses = await loadTypeIndexes(store, me)
@@ -365,35 +298,70 @@ async function renderLibrary (me: NamedNode): Promise<void> {
       }
     }))
   } catch (error) {
-    status.className = 'error'
-    status.textContent = `Could not load all type indexes: ${error instanceof Error ? error.message : 'unknown error'}`
+    setStatus(`Could not load all type indexes: ${error instanceof Error ? error.message : 'unknown error'}`, 'error')
   }
   if (workspaceUrl) {
     try {
       const workspaceSubjects = await questionnairesInWorkspace(store, workspaceUrl)
       subjects = [...new Map([...subjects, ...workspaceSubjects].map(subject => [subject.uri, subject])).values()]
-      if (status.className !== 'error') {
+      if (home.statusKind !== 'error') {
         const indexedOnly = subjects.length - workspaceSubjects.length
-        status.textContent = subjects.length
+        setStatus(subjects.length
           ? `${workspaceSubjects.length} in your workspace${indexedOnly ? ` and ${indexedOnly} from your type indexes` : ''}.`
-          : 'Your workspace is ready.'
+          : 'Your workspace is ready.')
       }
     } catch (error) {
-      status.className = 'error'
-      status.textContent = error instanceof Error ? error.message : 'Unable to load your Questionnaires workspace.'
+      setStatus(error instanceof Error ? error.message : 'Unable to load your Questionnaires workspace.', 'error')
     }
   }
   renderEntries()
+  home.publishedEntries = await ownPublishedQuestionnaires(store, subjects)
+  try {
+    const people = await solidLogicSingleton.directory.search({
+      user: me,
+      sources: ['contacts', 'friends'],
+      maxFoafDistance: 1
+    })
+    home.sharedEntries = await discoverSharedQuestionnaires(store, people)
+  } catch {
+    // Shared questionnaires are optional: keep the personal library usable if discovery fails.
+    home.sharedEntries = []
+  }
 
-  create.addEventListener('click', () => {
+  home.addEventListener('questionaire-home-create', () => {
     if (workspaceUrl) void renderContainerPicker(me, workspaceUrl).catch((error: unknown) => {
       message(error instanceof Error ? error.message : 'Unable to browse your Pod.', 'error')
     })
   })
-  search.addEventListener('click', () => {
-    search.disabled = true
-    status.className = 'info'
-    status.textContent = 'Searching your Pod for questionnaires…'
+  home.addEventListener('questionaire-home-open', (event) => {
+    const subject = (event as CustomEvent<NamedNode>).detail
+    if (subject?.uri) {
+      const open = home.section === 'shared' ? openSharedSubject : openSubject
+      void open(subject.uri).catch(error => message(error instanceof Error ? error.message : 'Unable to open questionnaire.', 'error'))
+    }
+  })
+  home.addEventListener('questionaire-home-add-index', (event) => {
+    const detail = (event as CustomEvent<{ subject: NamedNode, kind: keyof QuestionnaireIndexStatus }>).detail
+    if (!detail?.subject) return
+    void addToTypeIndex(store, me, detail.subject, detail.kind).then(() => {
+      const current = statuses.get(detail.subject.uri) ?? { public: false, private: false }
+      current[detail.kind] = true
+      statuses.set(detail.subject.uri, current)
+      renderEntries()
+    }).catch((error: unknown) => {
+      setStatus(error instanceof Error ? error.message : `Unable to update the ${detail.kind} type index.`, 'error')
+    })
+  })
+  home.addEventListener('questionaire-home-open-pod', () => {
+    void findStorageContainer(me).then(storageUrl => {
+      if (!storageUrl) throw new Error('Your Pod profile does not advertise a storage container.')
+      return renderContainerPicker(me, storageUrl)
+    }).catch((error: unknown) => {
+      setStatus(error instanceof Error ? error.message : 'Unable to browse your Pod.', 'error')
+    })
+  })
+  home.addEventListener('questionaire-home-search', () => {
+    setStatus('Searching your Pod for questionnaires…')
     const roots = (store.each(me, pim('storage')) as NamedNode[])
       .filter(term => term.termType === 'NamedNode')
       .map(term => term.uri)
@@ -416,15 +384,11 @@ async function renderLibrary (me: NamedNode): Promise<void> {
         renderEntries()
       }
     }).then(result => {
-      search.disabled = false
-      status.className = result.warnings.length ? 'error' : 'info'
-      status.textContent = result.warnings.length
+      setStatus(result.warnings.length
         ? `Search checked ${result.scanned} containers with partial results. ${result.warnings.slice(0, 3).join(' ')}`
-        : `Search checked ${result.scanned} containers.`
+        : `Search checked ${result.scanned} containers.`, result.warnings.length ? 'error' : 'info')
     }).catch((error: unknown) => {
-      search.disabled = false
-      status.className = 'error'
-      status.textContent = error instanceof Error ? error.message : 'Unable to search your Pod.'
+      setStatus(error instanceof Error ? error.message : 'Unable to search your Pod.', 'error')
     })
   })
 }

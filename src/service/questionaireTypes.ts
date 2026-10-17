@@ -1,4 +1,4 @@
-import { graph, type NamedNode, serialize, type Store } from 'rdflib'
+import { graph, type LiveStore, type NamedNode, serialize } from 'rdflib'
 
 export interface QuestionaireStructureOptions {
   baseUrl: string
@@ -66,7 +66,7 @@ function buildTurtleDocument (
   return serialize(doc, scratch, doc.uri, 'text/turtle') as string
 }
 
-async function createContainerIfMissing (store: Store, url: string) {
+async function createContainerIfMissing (store: LiveStore, url: string) {
   const fetcher = store.fetcher
   if (!fetcher) {
     throw new Error('Missing fetcher on questionnaire store')
@@ -104,7 +104,7 @@ async function createContainerIfMissing (store: Store, url: string) {
   }
 }
 
-async function createDocumentIfMissing (store: Store, doc: NamedNode, turtle: string) {
+async function createDocumentIfMissing (store: LiveStore, doc: NamedNode, turtle: string) {
   const fetcher = store.fetcher
   if (!fetcher) {
     throw new Error('Missing fetcher on questionnaire store')

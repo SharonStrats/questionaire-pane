@@ -3,6 +3,7 @@ import { state } from 'lit/decorators.js'
 import { customElement } from 'solid-ui'
 import styles from './QuestionairePaneCreateQuestionConfidence.styles.css'
 import QuestionairePaneCreateQuestionCardBase from '../questionaire-pane-create-question-card-base/QuestionairePaneCreateQuestionCardBase'
+import '../../../shared/QuestionairePaneFormattingToolbar'
 import { readQuestionValue } from '../../../../service/questionaireQuestionAccessors'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
@@ -89,32 +90,6 @@ export default class QuestionairePaneCreateQuestionConfidence extends Questionai
     this.emitQuestionSaved()
   }
 
-  private async updateQuestionTitle (value: string) {
-    const question = this.question
-    const logic = this.getQuestionLogic()
-    if (!question || !logic) {
-      return
-    }
-
-    this.draftTitle = value
-    await logic.updateQuestionText({ question, title: value })
-    this.emitQuestionChanged()
-    this.requestUpdate()
-  }
-
-  private async updateQuestionHint (value: string) {
-    const question = this.question
-    const logic = this.getQuestionLogic()
-    if (!question || !logic) {
-      return
-    }
-
-    this.draftHint = value
-    await logic.updateQuestionHint({ question, hint: value })
-    this.emitQuestionChanged()
-    this.requestUpdate()
-  }
-
   render() {
     const store = this.getStore()
     const question = this.question
@@ -163,10 +138,8 @@ export default class QuestionairePaneCreateQuestionConfidence extends Questionai
             @input=${(event: Event) => {
               this.draftTitle = (event.currentTarget as HTMLTextAreaElement).value
             }}
-            @blur=${(event: FocusEvent) => {
-              void this.updateQuestionTitle((event.currentTarget as HTMLTextAreaElement).value)
-            }}
           ></textarea>
+          <questionaire-pane-formatting-toolbar></questionaire-pane-formatting-toolbar>
         </div>
 
         <div class="questionaire-pane-create-question-confidence-field">
@@ -178,9 +151,6 @@ export default class QuestionairePaneCreateQuestionConfidence extends Questionai
             .value=${hint}
             @input=${(event: Event) => {
               this.draftHint = (event.currentTarget as HTMLInputElement).value
-            }}
-            @blur=${(event: FocusEvent) => {
-              void this.updateQuestionHint((event.currentTarget as HTMLInputElement).value)
             }}
           />
         </div>

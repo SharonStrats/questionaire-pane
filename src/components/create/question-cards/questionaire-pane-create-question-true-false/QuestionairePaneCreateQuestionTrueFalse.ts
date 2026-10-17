@@ -3,10 +3,11 @@ import { state } from 'lit/decorators.js'
 import { customElement } from 'solid-ui'
 import styles from './QuestionairePaneCreateQuestionTrueFalse.styles.css'
 import QuestionairePaneCreateQuestionCardBase from '../questionaire-pane-create-question-card-base/QuestionairePaneCreateQuestionCardBase'
+import '../../../shared/QuestionairePaneFormattingToolbar'
 import { readQuestionValue } from '../../../../service/questionaireQuestionAccessors'
-import { uploadQuestionImage } from '../../../../service/questionaireImageUpload'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
+import '../questionaire-pane-create-question-image-upload/QuestionairePaneCreateQuestionImageUpload'
 import '~icons/lucide/check'
 import '~icons/lucide/chevron-down'
 import '~icons/lucide/info'
@@ -116,47 +117,8 @@ export default class QuestionairePaneCreateQuestionTrueFalse extends Questionair
     this.emitQuestionSaved()
   }
 
-  private async updateQuestionTitle (value: string) {
-    const question = this.question
-    const logic = this.getQuestionLogic()
-    if (!question || !logic) {
-      return
-    }
-
-    this.draftTitle = value
-    await logic.updateQuestionText({ question, title: value })
-    this.emitQuestionChanged()
-    this.requestUpdate()
-  }
-
-  private async updateQuestionHint (value: string) {
-    const question = this.question
-    const logic = this.getQuestionLogic()
-    if (!question || !logic) {
-      return
-    }
-
-    this.draftHint = value
-    await logic.updateQuestionHint({ question, hint: value })
-    this.emitQuestionChanged()
-    this.requestUpdate()
-  }
-
-  private async selectCorrectOption (value: 'true' | 'false') {
-    const question = this.question
-    const logic = this.getQuestionLogic()
-    if (!question || !logic) {
-      return
-    }
-
+  private selectCorrectOption (value: 'true' | 'false') {
     this.draftCorrectOption = value
-    await logic.updateQuestionOptions({
-      question,
-      options: ['true', 'false'],
-      correctOption: value
-    })
-    this.emitQuestionChanged()
-    this.requestUpdate()
   }
 
   render() {
@@ -194,22 +156,14 @@ export default class QuestionairePaneCreateQuestionTrueFalse extends Questionair
           </div>
         </div>
 
-        <div class="questionaire-pane-create-question-true-false-field">
-          <label>Image <span>(optional)</span></label>
-          <label class="questionaire-pane-create-question-true-false-upload">
-            <input type="file" accept="image/*" @change=${async (event: Event) => {
-              const file = (event.currentTarget as HTMLInputElement).files?.[0]
-              const question = this.question
-              const logic = this.getQuestionLogic()
-              if (!file || !question || !logic) return
-              const image = await uploadQuestionImage(this.getStore()!, question, file)
-              this.draftImage = image
-              await logic.updateQuestionImage({ question, image })
-            }} />
-            <span>Drop an image here or choose a file</span>
-          </label>
-          ${this.draftImage ? html`<img class="questionaire-pane-question-image-preview" src=${this.draftImage} alt="Question preview" />` : ''}
-        </div>
+        <questionaire-pane-create-question-image-upload
+          .question=${question}
+          .image=${this.draftImage}
+          @questionaire-question-image-changed=${(event: CustomEvent<{ image: string }>) => {
+            this.draftImage = event.detail.image
+            this.emitQuestionChanged()
+          }}
+        ></questionaire-pane-create-question-image-upload>
 
         <div class="questionaire-pane-create-question-true-false-field">
           <label>Question</label>
@@ -220,10 +174,8 @@ export default class QuestionairePaneCreateQuestionTrueFalse extends Questionair
             @input=${(event: Event) => {
               this.draftTitle = (event.currentTarget as HTMLTextAreaElement).value
             }}
-            @blur=${(event: FocusEvent) => {
-              void this.updateQuestionTitle((event.currentTarget as HTMLTextAreaElement).value)
-            }}
           ></textarea>
+          <questionaire-pane-formatting-toolbar></questionaire-pane-formatting-toolbar>
         </div>
 
         <div class="questionaire-pane-create-question-true-false-field">
@@ -236,9 +188,6 @@ export default class QuestionairePaneCreateQuestionTrueFalse extends Questionair
             @input=${(event: Event) => {
               this.draftHint = (event.currentTarget as HTMLInputElement).value
             }}
-            @blur=${(event: FocusEvent) => {
-              void this.updateQuestionHint((event.currentTarget as HTMLInputElement).value)
-            }}
           />
         </div>
 
@@ -250,7 +199,7 @@ export default class QuestionairePaneCreateQuestionTrueFalse extends Questionair
             <button
               class="questionaire-pane-create-question-true-false-choice ${correctOption === 'true' ? 'questionaire-pane-create-question-true-false-choice--selected' : ''}"
               type="button"
-              @click=${() => { void this.selectCorrectOption('true') }}
+              @click=${() => this.selectCorrectOption('true')}
             >
               <span class="questionaire-pane-create-question-true-false-choice-check">${correctOption === 'true' ? html`<icon-lucide-check></icon-lucide-check>` : html``}</span>
               <span>True</span>
@@ -258,7 +207,7 @@ export default class QuestionairePaneCreateQuestionTrueFalse extends Questionair
             <button
               class="questionaire-pane-create-question-true-false-choice ${correctOption === 'false' ? 'questionaire-pane-create-question-true-false-choice--selected' : ''}"
               type="button"
-              @click=${() => { void this.selectCorrectOption('false') }}
+              @click=${() => this.selectCorrectOption('false')}
             >
               <span class="questionaire-pane-create-question-true-false-choice-check">${correctOption === 'false' ? html`<icon-lucide-check></icon-lucide-check>` : html``}</span>
               <span>False</span>

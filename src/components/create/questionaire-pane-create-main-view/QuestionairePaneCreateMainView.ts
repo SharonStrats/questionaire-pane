@@ -146,7 +146,7 @@ export default class QuestionairePaneCreateMainView extends WebComponent {
     this.questionListStatus = 'populated'
   }
 
-  private async openPreview () {
+  private async openPreview (selectedVersion?: NamedNode) {
     const questionaire = this.questionaire ?? { store: null, subject: null }
     const store = questionaire.store
     const subject = questionaire.subject
@@ -160,6 +160,11 @@ export default class QuestionairePaneCreateMainView extends WebComponent {
       undefined,
       subject.doc()
     ).filter(isNamedNode)
+    if (selectedVersion) {
+      await this.loadPreviewVersion(selectedVersion)
+      return
+    }
+
     if (versions.length === 0) {
       this.previewError = 'Publish the questionnaire before opening its live preview.'
       return
@@ -359,7 +364,7 @@ export default class QuestionairePaneCreateMainView extends WebComponent {
         ${store && subject
           ? html`
               <questionaire-pane-create-header
-                @questionaire-preview-requested=${() => { void this.openPreview() }}
+                @questionaire-preview-requested=${(event: CustomEvent<{ published?: NamedNode }>) => { void this.openPreview(event.detail?.published) }}
                 @questionaire-document-import-requested=${(event: Event) => { void this.openImportDialog(event) }}
               ></questionaire-pane-create-header>
               <questionaire-pane-create-content-view>

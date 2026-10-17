@@ -4,6 +4,7 @@ import { customElement, WebComponent } from 'solid-ui'
 import styles from './QuestionairePaneTakeStarterView.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
 import { readQuestionValue } from '../../../service/questionaireQuestionAccessors'
+import { renderFormattedText } from '../../shared/questionaire-pane-formatting'
 
 @customElement('questionaire-pane-take-starter-view')
 export default class QuestionairePaneTakeStarterView extends WebComponent {
@@ -49,9 +50,9 @@ export default class QuestionairePaneTakeStarterView extends WebComponent {
       <section class="questionaire-pane-take-starter-view">
         <div class="questionaire-pane-take-starter-view-card">
           <p class="questionaire-pane-take-starter-view-kicker">Ready to begin</p>
-          <h2>${title}</h2>
+          <h2>${renderFormattedText(title)}</h2>
           ${description
-            ? html`<p class="questionaire-pane-take-starter-view-description">${description}</p>`
+            ? html`<p class="questionaire-pane-take-starter-view-description">${renderFormattedText(description)}</p>`
             : html``}
           <button class="questionaire-pane-take-starter-view-start" type="button" @click=${() => this.handleStart()}>
             Start questionnaire

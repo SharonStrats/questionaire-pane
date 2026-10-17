@@ -2,7 +2,7 @@
  **
  **  This allows a user to build and publish a questionnaire
  */
-import { literal, Store } from 'rdflib'
+import { literal, type LiveStore } from 'rdflib'
 import { icons, ns } from 'solid-ui'
 import { createQuestionaireLogic } from './service/questionaireLogic'
 import { questionairePredicates } from './service/questionairePredicates'
@@ -20,7 +20,7 @@ export default {
 
   // Create a new questionnaire
   mintNew: async function (context, newPaneOptions) {
-    const store = context.session.store as Store
+    const store = context.session.store as LiveStore
     if (newPaneOptions.me && !newPaneOptions.me.uri) {
       throw new Error('questionaire mintNew:  Invalid userid')
     }
@@ -59,9 +59,10 @@ export default {
     const div = dom.createElement('div')
     div.classList.add('questionaire-pane')
 
-    const provider = dom.createElement('questionaire-provider') as unknown as HTMLElement & { store?: Store | null, subject?: typeof subject | null }
-    provider.store = context.session.store as Store
+    const provider = dom.createElement('questionaire-provider') as unknown as HTMLElement & { store?: LiveStore | null, subject?: typeof subject | null, acl?: unknown }
+    provider.store = context.session.store as LiveStore
     provider.subject = subject
+    provider.acl = context.session.acl
 
     const isPublished = (
       kb.holds(subject, ns.rdf('type'), questionairePredicates.questionnaire.quizType) ||

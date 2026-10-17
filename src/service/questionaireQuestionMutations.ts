@@ -1,4 +1,4 @@
-import { Collection, graph, Namespace, type NamedNode, literal, serialize, st, sym, type Statement, type Store } from 'rdflib'
+import { Collection, graph, Namespace, type LiveStore, type NamedNode, literal, serialize, st, sym, type Statement } from 'rdflib'
 import { ns } from 'solid-ui'
 import { DISCO_URI, disco } from '../namespaces'
 import {
@@ -12,6 +12,7 @@ import {
   type QuestionaireStructureResult
 } from './questionaireTypes'
 import { questionairePredicates } from './questionairePredicates'
+import { nextPublishedVersion } from './publishedVersion'
 
 const dct = Namespace('http://purl.org/dc/terms/')
 const schema = Namespace('https://schema.org/')
@@ -97,6 +98,7 @@ const itemPredicate = questionairePredicates.question.item
 const itemPosition = questionairePredicates.question.position
 const quizLeftItem = quiz('leftItem')
 const quizRightItem = quiz('rightItem')
+const quizMatchPair = questionairePredicates.question.matchPair
 const multipleChoiceQuestionTypeUri = quiz('MultipleChoiceQuestion').value
 const documentUpdateQueues = new Map<string, Promise<unknown>>()
 
@@ -104,8 +106,8 @@ function answerResource (question: NamedNode, kind: 'option' | 'answer', index: 
   return sym(`${question.doc().uri}#${kind}-${index + 1}`)
 }
 
-function registerQuestionairePrefix (store: Store) {
-  const registerPrefix = (store as Store & {
+function registerQuestionairePrefix (store: LiveStore) {
+  const registerPrefix = (store as LiveStore & {
     setPrefixForURI?: (prefix: string, uri: string) => void
   }).setPrefixForURI
   registerPrefix?.call(store, 'disco', DISCO_URI)
@@ -149,7 +151,7 @@ export interface QuestionaireMutationService {
   deleteQuestionFromQuestionnaire(options: { baseUrl: string, question: NamedNode }): Promise<void>
 }
 
-export function createQuestionaireMutations (store: Store): QuestionaireMutationService {
+export function createQuestionaireMutations (store: LiveStore): QuestionaireMutationService {
   registerQuestionairePrefix(store)
 
   async function createQuestionnaireDocument (doc: NamedNode, turtle: string) {
@@ -312,11 +314,24 @@ export function createQuestionaireMutations (store: Store): QuestionaireMutation
           scratch.add(list, itemListElement, listItem, questionDoc)
         })
       }
-      options.leftItems?.forEach((item) => {
-        scratch.add(question, quizLeftItem, literal(item), questionDoc)
+      const matchPairs = (options.leftItems ?? [])
+        .map((leftItem, index) => ({
+          leftItem: leftItem.trim(),
+          rightItem: options.rightItems?.[index]?.trim() ?? ''
+        }))
+        .filter(({ leftItem, rightItem }) => leftItem.length > 0 && rightItem.length > 0)
+      matchPairs.forEach(({ leftItem }) => {
+        scratch.add(question, quizLeftItem, literal(leftItem), questionDoc)
       })
-      options.rightItems?.forEach((item) => {
-        scratch.add(question, quizRightItem, literal(item), questionDoc)
+      matchPairs.forEach(({ rightItem }) => {
+        scratch.add(question, quizRightItem, literal(rightItem), questionDoc)
+      })
+      matchPairs.forEach(({ leftItem, rightItem }, index) => {
+        const pair = sym(`${question.doc().uri}#match-pair-${index + 1}`)
+        scratch.add(question, quizMatchPair, pair, questionDoc)
+        scratch.add(pair, quizLeftItem, literal(leftItem), questionDoc)
+        scratch.add(pair, quizRightItem, literal(rightItem), questionDoc)
+        scratch.add(pair, itemPosition, literal(String(index + 1)), questionDoc)
       })
     })
 
@@ -384,7 +399,10 @@ export function createQuestionaireMutations (store: Store): QuestionaireMutation
     await fetcher.load(indexDoc)
     await fetcher.load(draftDoc)
 
-    const version = new Date().toISOString().replace(/:/g, '-')
+    const existingVersions = store.each(index, dct('hasVersion'), undefined, indexDoc)
+      .filter((version): version is NamedNode => version.termType === 'NamedNode')
+      .map((version) => version.uri)
+    const version = nextPublishedVersion(existingVersions)
     const publishedBaseUrl = `${baseUrl}published/${version}/`
     const publishedQuestionsUrl = `${publishedBaseUrl}questions/`
     const publishedResponsesUrl = `${publishedBaseUrl}responses/`
@@ -766,13 +784,32 @@ export function createQuestionaireMutations (store: Store): QuestionaireMutation
 
       const del = [
         ...store.statementsMatching(options.question, quizLeftItem, undefined, questionDoc),
-        ...store.statementsMatching(options.question, quizRightItem, undefined, questionDoc)
+        ...store.statementsMatching(options.question, quizRightItem, undefined, questionDoc),
+        ...store.statementsMatching(options.question, quizMatchPair, undefined, questionDoc)
       ]
-      const leftItems = options.leftItems.map((item) => item.trim()).filter((item) => item.length > 0)
-      const rightItems = options.rightItems.map((item) => item.trim()).filter((item) => item.length > 0)
+      store.statementsMatching(options.question, quizMatchPair, undefined, questionDoc).forEach((statement) => {
+        if (statement.object.termType === 'NamedNode') {
+          del.push(...store.statementsMatching(statement.object, undefined, undefined, questionDoc))
+        }
+      })
+      const matchPairs = options.leftItems
+        .map((leftItem, index) => ({
+          leftItem: leftItem.trim(),
+          rightItem: options.rightItems[index]?.trim() ?? ''
+        }))
+        .filter(({ leftItem, rightItem }) => leftItem.length > 0 && rightItem.length > 0)
       const ins = [
-        ...leftItems.map((item) => st(options.question, quizLeftItem, literal(item), questionDoc)),
-        ...rightItems.map((item) => st(options.question, quizRightItem, literal(item), questionDoc))
+        ...matchPairs.map(({ leftItem }) => st(options.question, quizLeftItem, literal(leftItem), questionDoc)),
+        ...matchPairs.map(({ rightItem }) => st(options.question, quizRightItem, literal(rightItem), questionDoc)),
+        ...matchPairs.flatMap(({ leftItem, rightItem }, index) => {
+          const pair = sym(`${options.question.doc().uri}#match-pair-${index + 1}`)
+          return [
+            st(options.question, quizMatchPair, pair, questionDoc),
+            st(pair, quizLeftItem, literal(leftItem), questionDoc),
+            st(pair, quizRightItem, literal(rightItem), questionDoc),
+            st(pair, itemPosition, literal(String(index + 1)), questionDoc)
+          ]
+        })
       ]
 
       await updater.update(del, ins)

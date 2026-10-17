@@ -1,0 +1,44 @@
+:host {
+  display: block;
+}
+
+.questionaire-pane-create-question-image-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.questionaire-pane-create-question-image-upload > label {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.28px;
+  text-transform: uppercase;
+}
+
+.questionaire-pane-create-question-image-upload > label span {
+  text-transform: none;
+  font-weight: 500;
+}
+
+.questionaire-pane-create-question-image-upload-control {
+  display: grid;
+  gap: 4px;
+  padding: 16px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.questionaire-pane-create-question-image-upload-control input {
+  font-size: 12px;
+}
+
+.questionaire-pane-question-image-preview {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  border-radius: 12px;
+  object-fit: cover;
+}

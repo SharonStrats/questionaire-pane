@@ -6,6 +6,7 @@ import { type NamedNode } from 'rdflib'
 import styles from './QuestionairePaneTakeQuestionTrueFalse.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
 import { readQuestionValue } from '../../../service/questionaireQuestionAccessors'
+import { renderFormattedText } from '../../shared/questionaire-pane-formatting'
 
 type AnswerValue = string | null
 
@@ -92,9 +93,9 @@ export default class QuestionairePaneTakeQuestionTrueFalse extends WebComponent 
       <section class="questionaire-pane-take-question-true-false">
         <div class="questionaire-pane-take-question-true-false-type">True / False</div>
         ${image ? html`<img class="questionaire-pane-question-image" src=${image} alt="" />` : ''}
-        <h2 class="questionaire-pane-take-question-true-false-title">${title || 'Untitled question'}</h2>
+        <h2 class="questionaire-pane-take-question-true-false-title">${renderFormattedText(title || 'Untitled question')}</h2>
         ${hint
-          ? html`<p class="questionaire-pane-take-question-true-false-hint">${hint}</p>`
+          ? html`<p class="questionaire-pane-take-question-true-false-hint">${renderFormattedText(hint)}</p>`
           : html``}
         <div class="questionaire-pane-take-question-true-false-options">
           <button

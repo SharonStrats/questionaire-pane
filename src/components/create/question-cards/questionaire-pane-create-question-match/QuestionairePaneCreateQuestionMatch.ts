@@ -3,6 +3,7 @@ import { state } from 'lit/decorators.js'
 import { customElement } from 'solid-ui'
 import styles from './QuestionairePaneCreateQuestionMatch.styles.css'
 import QuestionairePaneCreateQuestionCardBase from '../questionaire-pane-create-question-card-base/QuestionairePaneCreateQuestionCardBase'
+import '../../../shared/QuestionairePaneFormattingToolbar'
 import { readQuestionValue, readQuestionValues } from '../../../../service/questionaireQuestionAccessors'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
@@ -124,65 +125,7 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
     this.emitQuestionSaved()
   }
 
-  private async updateQuestionTitle (value: string) {
-    const question = this.question
-    const logic = this.getQuestionLogic()
-    if (!question || !logic) {
-      return
-    }
-
-    this.draftTitle = value
-    await logic.updateQuestionText({ question, title: value })
-    this.emitQuestionChanged()
-    this.requestUpdate()
-  }
-
-  private async updateQuestionHint (value: string) {
-    const question = this.question
-    const logic = this.getQuestionLogic()
-    if (!question || !logic) {
-      return
-    }
-
-    this.draftHint = value
-    await logic.updateQuestionHint({ question, hint: value })
-    this.emitQuestionChanged()
-    this.requestUpdate()
-  }
-
-  private async updatePair (index: number, side: 'left' | 'right', value: string) {
-    const question = this.question
-    const logic = this.getQuestionLogic()
-    if (!question || !logic) {
-      return
-    }
-
-    if (side === 'left') {
-      const nextLeft = this.draftLeftItems.slice()
-      nextLeft[index] = value
-      this.draftLeftItems = nextLeft
-    } else {
-      const nextRight = this.draftRightItems.slice()
-      nextRight[index] = value
-      this.draftRightItems = nextRight
-    }
-
-    await logic.updateQuestionMatchPairs({
-      question,
-      leftItems: this.draftLeftItems,
-      rightItems: this.draftRightItems
-    })
-    this.emitQuestionChanged()
-    this.requestUpdate()
-  }
-
-  private async addPair () {
-    const question = this.question
-    const logic = this.getQuestionLogic()
-    if (!question || !logic) {
-      return
-    }
-
+  private addPair () {
     const nextLeft = this.draftLeftItems.length > 0 ? this.draftLeftItems.slice() : this.getLeftItems().slice()
     const nextRight = this.draftRightItems.length > 0 ? this.draftRightItems.slice() : this.getRightItems().slice()
     nextLeft.push('')
@@ -190,13 +133,6 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
     this.draftLeftItems = nextLeft
     this.draftRightItems = nextRight
 
-    await logic.updateQuestionMatchPairs({
-      question,
-      leftItems: nextLeft,
-      rightItems: nextRight
-    })
-    this.emitQuestionChanged()
-    this.requestUpdate()
   }
 
   render() {
@@ -244,10 +180,8 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
             @input=${(event: Event) => {
               this.draftTitle = (event.currentTarget as HTMLTextAreaElement).value
             }}
-            @blur=${(event: FocusEvent) => {
-              void this.updateQuestionTitle((event.currentTarget as HTMLTextAreaElement).value)
-            }}
           ></textarea>
+          <questionaire-pane-formatting-toolbar></questionaire-pane-formatting-toolbar>
         </div>
 
         <div class="questionaire-pane-create-question-match-field">
@@ -259,9 +193,6 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
             .value=${hint}
             @input=${(event: Event) => {
               this.draftHint = (event.currentTarget as HTMLInputElement).value
-            }}
-            @blur=${(event: FocusEvent) => {
-              void this.updateQuestionHint((event.currentTarget as HTMLInputElement).value)
             }}
           />
         </div>
@@ -287,9 +218,6 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
                       nextLeftItems[index] = (event.currentTarget as HTMLInputElement).value
                       this.draftLeftItems = nextLeftItems
                     }}
-                    @blur=${(event: FocusEvent) => {
-                      void this.updatePair(index, 'left', (event.currentTarget as HTMLInputElement).value)
-                    }}
                   />
                   <input
                     class="questionaire-pane-create-question-match-pair-input"
@@ -300,9 +228,6 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
                       const nextRightItems = rightItems.slice()
                       nextRightItems[index] = (event.currentTarget as HTMLInputElement).value
                       this.draftRightItems = nextRightItems
-                    }}
-                    @blur=${(event: FocusEvent) => {
-                      void this.updatePair(index, 'right', (event.currentTarget as HTMLInputElement).value)
                     }}
                   />
                 </div>

@@ -6,6 +6,8 @@ import { type NamedNode } from 'rdflib'
 import styles from './QuestionairePaneTakeQuestionMultipleChoice.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
 import { readQuestionValue, readQuestionValues } from '../../../service/questionaireQuestionAccessors'
+import { shuffle } from '../../../service/shuffle'
+import { renderFormattedText } from '../../shared/questionaire-pane-formatting'
 
 type AnswerValue = string | string[] | null
 
@@ -36,6 +38,11 @@ export default class QuestionairePaneTakeQuestionMultipleChoice extends WebCompo
 
   @state()
   private accessor loadedQuestionUri: string | null = null
+
+  @state()
+  private accessor shuffledOptions: string[] = []
+
+  private loadedOptionsSignature = ''
 
   private getStore () {
     return this.questionaire?.store ?? null
@@ -74,17 +81,40 @@ export default class QuestionairePaneTakeQuestionMultipleChoice extends WebCompo
       return []
     }
 
-    return readQuestionValues(store, question, 'option')
+    const options = readQuestionValues(store, question, 'option')
+    const correctOptions = readQuestionValues(store, question, 'correctOption')
+    return [...options, ...correctOptions.filter((option) => !options.includes(option))]
+  }
+
+  private getDisplayedOptions () {
+    const options = this.getQuestionOptions()
+    const signature = options.join('\u0000')
+    if (signature !== this.loadedOptionsSignature) {
+      this.shuffledOptions = shuffle(options)
+      this.loadedOptionsSignature = signature
+    }
+    return this.shuffledOptions
   }
 
   protected willUpdate () {
     const question = this.question
-    if (!question || this.loadedQuestionUri === question.uri) {
+    if (!question) {
       return
     }
 
-    this.draftAnswer = this.answer
-    this.loadedQuestionUri = question.uri
+    if (this.loadedQuestionUri !== question.uri) {
+      this.draftAnswer = this.answer
+      this.loadedQuestionUri = question.uri
+      this.loadedOptionsSignature = ''
+      this.shuffledOptions = []
+    }
+
+    const options = this.getQuestionOptions()
+    const signature = options.join('\u0000')
+    if (signature !== this.loadedOptionsSignature) {
+      this.shuffledOptions = shuffle(options)
+      this.loadedOptionsSignature = signature
+    }
   }
 
   private syncAnswer (nextAnswer: AnswerValue) {
@@ -126,15 +156,15 @@ export default class QuestionairePaneTakeQuestionMultipleChoice extends WebCompo
     const title = this.getQuestionTitle()
     const hint = this.getQuestionHint()
     const image = this.getQuestionImage()
-    const options = this.getQuestionOptions()
+    const options = this.getDisplayedOptions()
 
     return html`
       <section class="questionaire-pane-take-question-multiple-choice">
         <div class="questionaire-pane-take-question-multiple-choice-type">${this.questionTypeLabel}</div>
         ${image ? html`<img class="questionaire-pane-question-image" src=${image} alt="" />` : ''}
-        <h2 class="questionaire-pane-take-question-multiple-choice-title">${title || 'Untitled question'}</h2>
+        <h2 class="questionaire-pane-take-question-multiple-choice-title">${renderFormattedText(title || 'Untitled question')}</h2>
         ${hint
-          ? html`<p class="questionaire-pane-take-question-multiple-choice-hint">${hint}</p>`
+          ? html`<p class="questionaire-pane-take-question-multiple-choice-hint">${renderFormattedText(hint)}</p>`
           : html``}
         <div class="questionaire-pane-take-question-multiple-choice-options">
           ${options.map((option) => html`

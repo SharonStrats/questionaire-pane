@@ -6,6 +6,9 @@ import { type NamedNode } from 'rdflib'
 import styles from './QuestionairePaneTakeQuestionOrdering.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
 import { readQuestionValue, readQuestionValues } from '../../../service/questionaireQuestionAccessors'
+import { renderFormattedText } from '../../shared/questionaire-pane-formatting'
+import 'solid-ui/components/button'
+import '~icons/lucide/grip-vertical'
 
 @customElement('questionaire-pane-take-question-ordering')
 export default class QuestionairePaneTakeQuestionOrdering extends WebComponent {
@@ -25,6 +28,10 @@ export default class QuestionairePaneTakeQuestionOrdering extends WebComponent {
 
   @state()
   private accessor loadedQuestionUri: string | null = null
+
+  private draggedItemIndex: number | null = null
+  private dropTargetIndex: number | null = null
+  private touchPointerId: number | null = null
 
   private getTitle () {
     const store = this.questionaire?.store
@@ -92,6 +99,116 @@ export default class QuestionairePaneTakeQuestionOrdering extends WebComponent {
     this.syncAnswer(next)
   }
 
+  private handleDragStart (index: number, event: DragEvent) {
+    this.draggedItemIndex = index
+    this.dropTargetIndex = index
+    event.dataTransfer?.setData('text/plain', String(index))
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move'
+    }
+  }
+
+  private handleDrop (targetIndex: number, event: DragEvent) {
+    event.preventDefault()
+    const sourceIndex = this.draggedItemIndex ?? Number(event.dataTransfer?.getData('text/plain'))
+    this.draggedItemIndex = null
+    this.dropTargetIndex = null
+
+    if (!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= this.draftAnswer.length || sourceIndex === targetIndex) {
+      return
+    }
+
+    const next = this.draftAnswer.slice()
+    const [item] = next.splice(sourceIndex, 1)
+    next.splice(targetIndex, 0, item)
+    this.syncAnswer(next)
+  }
+
+  private handleDragEnd () {
+    this.draggedItemIndex = null
+    this.dropTargetIndex = null
+  }
+
+  private handleDragEnter (index: number) {
+    if (this.draggedItemIndex !== null) {
+      this.dropTargetIndex = index
+    }
+  }
+
+  private handleDragOver (index: number, event: DragEvent) {
+    event.preventDefault()
+    this.handleDragEnter(index)
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move'
+    }
+  }
+
+  private updateTouchDropTarget (event: PointerEvent) {
+    const target = (event.currentTarget as HTMLElement).ownerDocument
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest('[data-questionaire-ordering-index]') as HTMLElement | null
+    const nextIndex = Number(target?.dataset.questionaireOrderingIndex)
+    if (Number.isInteger(nextIndex)) {
+      this.dropTargetIndex = nextIndex
+      this.requestUpdate()
+    }
+  }
+
+  private handlePointerDown (index: number, event: PointerEvent) {
+    if (event.pointerType !== 'touch') {
+      return
+    }
+
+    event.preventDefault()
+    this.draggedItemIndex = index
+    this.dropTargetIndex = index
+    this.touchPointerId = event.pointerId
+    ;(event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId)
+  }
+
+  private handlePointerMove (event: PointerEvent) {
+    if (event.pointerType !== 'touch' || this.touchPointerId !== event.pointerId || this.draggedItemIndex === null) {
+      return
+    }
+
+    event.preventDefault()
+    this.updateTouchDropTarget(event)
+  }
+
+  private handlePointerUp (event: PointerEvent) {
+    if (event.pointerType !== 'touch' || this.touchPointerId !== event.pointerId) {
+      return
+    }
+
+    event.preventDefault()
+    this.updateTouchDropTarget(event)
+    const sourceIndex = this.draggedItemIndex
+    const targetIndex = this.dropTargetIndex
+    ;(event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId)
+    this.touchPointerId = null
+    this.draggedItemIndex = null
+    this.dropTargetIndex = null
+
+    if (sourceIndex === null || targetIndex === null || sourceIndex === targetIndex) {
+      return
+    }
+
+    const next = this.draftAnswer.slice()
+    const [item] = next.splice(sourceIndex, 1)
+    next.splice(targetIndex, 0, item)
+    this.syncAnswer(next)
+  }
+
+  private handlePointerCancel (event: PointerEvent) {
+    if (event.pointerType !== 'touch' || this.touchPointerId !== event.pointerId) {
+      return
+    }
+
+    this.touchPointerId = null
+    this.draggedItemIndex = null
+    this.dropTargetIndex = null
+  }
+
   render() {
     const title = this.getTitle()
     const hint = this.getHint()
@@ -100,17 +217,41 @@ export default class QuestionairePaneTakeQuestionOrdering extends WebComponent {
     return html`
       <section class="questionaire-pane-take-question-ordering">
         <div class="questionaire-pane-take-question-ordering-type">Ordering</div>
-        <h2 class="questionaire-pane-take-question-ordering-title">${title || 'Untitled question'}</h2>
-        ${hint ? html`<p class="questionaire-pane-take-question-ordering-hint">${hint}</p>` : html``}
+        <h2 class="questionaire-pane-take-question-ordering-title">${renderFormattedText(title || 'Untitled question')}</h2>
+        ${hint ? html`<p class="questionaire-pane-take-question-ordering-hint">${renderFormattedText(hint)}</p>` : html``}
         <div class="questionaire-pane-take-question-ordering-list">
           ${items.map((item, index) => html`
-            <div class="questionaire-pane-take-question-ordering-item">
+            <div
+              class="questionaire-pane-take-question-ordering-item ${this.dropTargetIndex === index ? 'questionaire-pane-take-question-ordering-item--drop-target' : ''}"
+              data-questionaire-ordering-index=${index}
+              draggable="true"
+              @dragstart=${(event: DragEvent) => this.handleDragStart(index, event)}
+              @dragend=${this.handleDragEnd}
+              @dragenter=${() => this.handleDragEnter(index)}
+              @dragover=${(event: DragEvent) => this.handleDragOver(index, event)}
+              @drop=${(event: DragEvent) => this.handleDrop(index, event)}
+              @pointerdown=${(event: PointerEvent) => this.handlePointerDown(index, event)}
+              @pointermove=${(event: PointerEvent) => this.handlePointerMove(event)}
+              @pointerup=${(event: PointerEvent) => this.handlePointerUp(event)}
+              @pointercancel=${(event: PointerEvent) => this.handlePointerCancel(event)}
+            >
+              <solid-ui-button
+                class="questionaire-pane-take-question-ordering-item-handle"
+                variant="ghost"
+                aria-label=${`Move item ${index + 1}`}
+                title="Drag to reorder"
+                @keydown=${(event: KeyboardEvent) => {
+                  if (event.key === 'ArrowUp' && index > 0) {
+                    event.preventDefault()
+                    this.moveItem(index, -1)
+                  } else if (event.key === 'ArrowDown' && index < items.length - 1) {
+                    event.preventDefault()
+                    this.moveItem(index, 1)
+                  }
+                }}
+              ><icon-lucide-grip-vertical slot="icon"></icon-lucide-grip-vertical></solid-ui-button>
               <span class="questionaire-pane-take-question-ordering-item-index">${index + 1}</span>
               <span class="questionaire-pane-take-question-ordering-item-label">${item}</span>
-              <div class="questionaire-pane-take-question-ordering-item-actions">
-                <button type="button" @click=${() => this.moveItem(index, -1)} ?disabled=${index === 0}>↑</button>
-                <button type="button" @click=${() => this.moveItem(index, 1)} ?disabled=${index === items.length - 1}>↓</button>
-              </div>
             </div>
           `)}
         </div>
