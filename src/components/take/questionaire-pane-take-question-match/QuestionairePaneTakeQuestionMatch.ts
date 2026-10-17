@@ -6,6 +6,8 @@ import { type NamedNode } from 'rdflib'
 import styles from './QuestionairePaneTakeQuestionMatch.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
 import { readQuestionValue, readQuestionValues } from '../../../service/questionaireQuestionAccessors'
+import '~icons/lucide/grip-vertical'
+import '~icons/lucide/x'
 
 @customElement('questionaire-pane-take-question-match')
 export default class QuestionairePaneTakeQuestionMatch extends WebComponent {
@@ -25,6 +27,8 @@ export default class QuestionairePaneTakeQuestionMatch extends WebComponent {
 
   @state()
   private accessor loadedQuestionUri: string | null = null
+
+  private draggedRightIndex: number | null = null
 
   private getTitle () {
     const store = this.questionaire?.store
@@ -75,8 +79,7 @@ export default class QuestionairePaneTakeQuestionMatch extends WebComponent {
     }
 
     const leftItems = this.getLeftItems()
-    const rightItems = this.getRightItems()
-    this.draftAnswer = this.answer ?? leftItems.map((_left, index) => `${leftItems[index] ?? ''}|||${rightItems[index] ?? rightItems[0] ?? ''}`)
+    this.draftAnswer = this.answer ?? leftItems.map((leftItem) => `${leftItem}|||`)
     this.loadedQuestionUri = question.uri
   }
 
@@ -101,35 +104,117 @@ export default class QuestionairePaneTakeQuestionMatch extends WebComponent {
     this.syncAnswer(current)
   }
 
+  private getMatchForField (index: number, matches: string[]): string {
+    return (matches[index] ?? '').split('|||')[1] ?? ''
+  }
+
+  private handleDragStart (index: number, event: DragEvent) {
+    this.draggedRightIndex = index
+    event.dataTransfer?.setData('text/plain', String(index))
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move'
+    }
+  }
+
+  private handleDrop (leftIndex: number, event: DragEvent) {
+    event.preventDefault()
+    const rightIndex = this.draggedRightIndex ?? Number(event.dataTransfer?.getData('text/plain'))
+    this.draggedRightIndex = null
+
+    if (!Number.isInteger(rightIndex) || rightIndex < 0 || rightIndex >= this.getRightItems().length) {
+      return
+    }
+
+    this.setMatch(leftIndex, this.getRightItems()[rightIndex])
+  }
+
+  private handleDragEnd () {
+    this.draggedRightIndex = null
+  }
+
+  private clearMatch (leftIndex: number) {
+    const leftItems = this.getLeftItems()
+    const current = this.draftAnswer.slice()
+    current[leftIndex] = `${leftItems[leftIndex] ?? ''}|||`
+    this.syncAnswer(current)
+  }
+
   render() {
     const title = this.getTitle()
     const hint = this.getHint()
     const leftItems = this.getLeftItems()
     const rightItems = this.getRightItems()
-    const current = this.draftAnswer.length > 0 ? this.draftAnswer : leftItems.map((_left, index) => `${leftItems[index] ?? ''}|||${rightItems[index] ?? rightItems[0] ?? ''}`)
+    const current = this.draftAnswer.length > 0 ? this.draftAnswer : leftItems.map((leftItem) => `${leftItem}|||`)
+    const matchedValues = new Set(current.map((value) => value.split('|||')[1]).filter(Boolean))
 
     return html`
       <section class="questionaire-pane-take-question-match">
         <div class="questionaire-pane-take-question-match-type">Match</div>
         <h2 class="questionaire-pane-take-question-match-title">${title || 'Untitled question'}</h2>
         ${hint ? html`<p class="questionaire-pane-take-question-match-hint">${hint}</p>` : html``}
-        <div class="questionaire-pane-take-question-match-list">
-          ${leftItems.map((leftItem, index) => {
-            const currentRight = (current[index] ?? '').split('|||')[1] ?? rightItems[0] ?? ''
-            return html`
-              <div class="questionaire-pane-take-question-match-item">
-                <span class="questionaire-pane-take-question-match-item-left">${leftItem}</span>
-                <span class="questionaire-pane-take-question-match-item-arrow">→</span>
-                <select
-                  class="questionaire-pane-take-question-match-item-select"
-                  .value=${currentRight}
-                  @change=${(event: Event) => this.setMatch(index, (event.currentTarget as HTMLSelectElement).value)}
-                >
-                  ${rightItems.map((rightItem) => html`<option value=${rightItem}>${rightItem}</option>`)}
-                </select>
-              </div>
-            `
-          })}
+        <div class="questionaire-pane-take-question-match-board">
+          <div class="questionaire-pane-take-question-match-column">
+            <div class="questionaire-pane-take-question-match-column-label">Fields</div>
+            <div class="questionaire-pane-take-question-match-fields">
+              ${leftItems.map((leftItem, index) => {
+                const currentRight = this.getMatchForField(index, current)
+                return html`
+                  <div class="questionaire-pane-take-question-match-field-card">
+                    <div class="questionaire-pane-take-question-match-field-heading">
+                      <span class="questionaire-pane-take-question-match-index">${index + 1}</span>
+                      <span class="questionaire-pane-take-question-match-field-label">${leftItem}</span>
+                    </div>
+                    <div
+                      class=${currentRight
+                        ? 'questionaire-pane-take-question-match-drop-zone questionaire-pane-take-question-match-drop-zone--filled'
+                        : 'questionaire-pane-take-question-match-drop-zone'}
+                      @dragover=${(event: DragEvent) => {
+                        event.preventDefault()
+                        if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+                      }}
+                      @drop=${(event: DragEvent) => this.handleDrop(index, event)}
+                    >
+                      ${currentRight
+                        ? html`
+                            <span class="questionaire-pane-take-question-match-check">✓</span>
+                            <span>${currentRight}</span>
+                            <button
+                              type="button"
+                              class="questionaire-pane-take-question-match-clear"
+                              aria-label=${`Remove match for ${leftItem}`}
+                              @click=${() => this.clearMatch(index)}
+                            ><icon-lucide-x></icon-lucide-x></button>
+                          `
+                        : html`<span>Drop definition here</span>`}
+                    </div>
+                  </div>
+                `
+              })}
+            </div>
+          </div>
+          <div class="questionaire-pane-take-question-match-column">
+            <div class="questionaire-pane-take-question-match-column-label questionaire-pane-take-question-match-column-label--right">Drag definitions to a field</div>
+            <div class="questionaire-pane-take-question-match-definitions">
+              ${rightItems.map((rightItem, index) => {
+                const isMatched = matchedValues.has(rightItem)
+                return html`
+                  <div
+                    class=${isMatched
+                      ? 'questionaire-pane-take-question-match-definition questionaire-pane-take-question-match-definition--matched'
+                      : 'questionaire-pane-take-question-match-definition'}
+                    draggable="true"
+                    @dragstart=${(event: DragEvent) => this.handleDragStart(index, event)}
+                    @dragend=${this.handleDragEnd}
+                  >
+                    <icon-lucide-grip-vertical class="questionaire-pane-take-question-match-definition-handle"></icon-lucide-grip-vertical>
+                    <span class="questionaire-pane-take-question-match-definition-label">${rightItem}</span>
+                    <span class="questionaire-pane-take-question-match-definition-status">${isMatched ? 'Matched' : 'Drag'}</span>
+                  </div>
+                `
+              })}
+            </div>
+            <p class="questionaire-pane-take-question-match-instruction">On a touch device, tap a definition and then tap its destination.</p>
+          </div>
         </div>
       </section>
     `

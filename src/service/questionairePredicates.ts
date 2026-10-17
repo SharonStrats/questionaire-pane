@@ -1,10 +1,10 @@
 import { Namespace } from 'rdflib'
-import { ns } from 'solid-ui'
 
 const dct = Namespace('http://purl.org/dc/terms/')
 const quiz = Namespace('https://sharonstrats.github.io/solidnext-vocab/vocab/quiz#')
 const schema = Namespace('https://schema.org/')
 const disco = Namespace('http://rdf-vocabulary.ddialliance.org/discovery#')
+const rdf = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
 
 export const questionairePredicates = {
   questionnaire: {
@@ -21,7 +21,8 @@ export const questionairePredicates = {
     status: schema('creativeWorkStatus'),
     // DCMI Terms dct:modified and dct:hasVersion: publication metadata.
     modified: dct('modified'),
-    hasVersion: dct('hasVersion')
+    hasVersion: dct('hasVersion'),
+    hasPart: dct('hasPart')
   },
   question: {
     // schema:text: the wording of the question.
@@ -40,7 +41,7 @@ export const questionairePredicates = {
     // Application-specific quiz vocabulary: question guidance and scoring.
     hint: quiz('hint'),
     points: quiz('points'),
-    rdfType: ns.rdf('type'),
+    rdfType: rdf('type'),
     // Schema.org: linked suggested and accepted answer resources.
     option: schema('suggestedAnswer'),
     correctOption: schema('acceptedAnswer'),
@@ -48,6 +49,7 @@ export const questionairePredicates = {
     // Application-specific match vocabulary aligned with QTI source/target choices.
     sourceItem: quiz('sourceItem'),
     targetItem: quiz('targetItem'),
+    matchPair: quiz('matchPair'),
     // DCMI Terms: resource creation, identity, composition, and containment.
     created: dct('created'),
     modified: dct('modified'),

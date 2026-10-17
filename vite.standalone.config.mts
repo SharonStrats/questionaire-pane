@@ -1,9 +1,17 @@
 import { defineConfig } from 'vite'
 import { solidPane } from 'solidos-toolkit/vite'
 
+// The standalone HTML entry lives in `standalone/` so local development can
+// keep using http://localhost:3200/standalone/. Pages publishes that entry at
+// the project-site root, so CI supplies `/questionaire-pane/` instead.
+const configuredBase = process.env.VITE_BASE_PATH?.trim() || '/'
+const base = configuredBase === '/'
+  ? '/'
+  : `/${configuredBase.replace(/^\/+|\/+$/g, '')}/`
+
 export default defineConfig({
   root: '.',
-  base: process.env.GITHUB_ACTIONS ? '/questionaire-pane/' : '/',
+  base,
   plugins: [solidPane({ litDecoratorPaths: ['src/components'] })],
   build: {
     outDir: 'standalone-dist',

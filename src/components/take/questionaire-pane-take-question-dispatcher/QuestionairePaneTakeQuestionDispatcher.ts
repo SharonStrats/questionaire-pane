@@ -67,7 +67,7 @@ export default class QuestionairePaneTakeQuestionDispatcher extends WebComponent
       return html`
         <questionaire-pane-take-question-text-response
           .question=${question}
-          .answer=${typeof this.answer === 'string' ? this.answer : ''}
+          .answer=${Array.isArray(this.answer) ? this.answer : typeof this.answer === 'string' ? this.answer : ''}
           .multiline=${true}
           .questionTypeLabel=${'Short Answer'}
           .questionTypeDescription=${'Type your response.'}

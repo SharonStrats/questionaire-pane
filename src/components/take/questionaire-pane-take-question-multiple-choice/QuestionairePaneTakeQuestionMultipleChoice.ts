@@ -74,7 +74,9 @@ export default class QuestionairePaneTakeQuestionMultipleChoice extends WebCompo
       return []
     }
 
-    return readQuestionValues(store, question, 'option')
+    const options = readQuestionValues(store, question, 'option')
+    const correctOptions = readQuestionValues(store, question, 'correctOption')
+    return [...options, ...correctOptions.filter((option) => !options.includes(option))]
   }
 
   protected willUpdate () {

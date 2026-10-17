@@ -41,11 +41,12 @@ than creating an ambiguous ACL grant.
 
 ## Deploying
 
-The included Pages workflow builds `standalone-dist` and publishes it to
-GitHub Pages. Set the repository Pages source to **GitHub Actions**. The app
-must be served over HTTPS. The Pod must permit the deployed origin with CORS
-(`Access-Control-Allow-Origin`) and support authenticated Solid-OIDC requests;
-do not put client secrets in this repository.
+The included `.github/workflows/deploy-pages.yml` workflow builds
+`standalone-dist` and publishes it to GitHub Pages. Set the repository Pages
+source to **GitHub Actions**. The app must be served over HTTPS. The Pod must
+permit the deployed origin with CORS (`Access-Control-Allow-Origin`) and
+support authenticated Solid-OIDC requests; do not put client secrets in this
+repository.
 
 For the `SharonStrats/questionaire-pane` repository, the deployed app URL is:
 
@@ -63,9 +64,12 @@ https://sharonstrats.github.io/questionaire-pane/?base=https%3A%2F%2Fyour-pod.ex
 Use the header's **Log In** control and enter the Pivot issuer URL. The
 questionnaire container must already grant that Pivot WebID write permission.
 For a locally running Pivot server, the issuer is `http://localhost:3100/`; for
-the deployed app, use the HTTPS URL of the Pivot server. The GitHub Actions
-build sets the `/questionaire-pane/` asset base automatically, so local
-standalone development continues to use `/`.
+the deployed app, use the HTTPS URL of the Pivot server. The workflow derives
+the asset base from the repository name (currently `/questionaire-pane/`) and
+passes it as `VITE_BASE_PATH`, so entrypoint assets and lazy-loaded chunks work
+on the project site. Local standalone development continues to use `/`; set
+`VITE_BASE_PATH` explicitly only when serving the standalone app below another
+local path.
 
 For local Pod development, use a Pod/server configured to allow the Vite
 origin (normally `http://localhost:3200`) and its credentials. A questionnaire

@@ -5,9 +5,9 @@ import styles from './QuestionairePaneCreateQuestionShortAnswer.styles.css'
 import QuestionairePaneCreateQuestionCardBase from '../questionaire-pane-create-question-card-base/QuestionairePaneCreateQuestionCardBase'
 import { readQuestionValue, readQuestionValues } from '../../../../service/questionaireQuestionAccessors'
 import { getQuestionnaireFormat } from '../../../../service/questionaireQuestionQueries'
-import { uploadQuestionImage } from '../../../../service/questionaireImageUpload'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
+import '../questionaire-pane-create-question-image-upload/QuestionairePaneCreateQuestionImageUpload'
 import '~icons/lucide/chevron-down'
 import '~icons/lucide/info'
 import '~icons/lucide/pencil'
@@ -176,22 +176,14 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
           </div>
         </div>
 
-        <div class="questionaire-pane-create-question-short-answer-field">
-          <label>Image <span>(optional)</span></label>
-          <label class="questionaire-pane-create-question-short-answer-upload">
-            <input type="file" accept="image/*" @change=${async (event: Event) => {
-              const file = (event.currentTarget as HTMLInputElement).files?.[0]
-              const question = this.question
-              const logic = this.getQuestionLogic()
-              if (!file || !question || !logic) return
-              const image = await uploadQuestionImage(this.getStore()!, question, file)
-              this.draftImage = image
-              await logic.updateQuestionImage({ question, image })
-            }} />
-            <span>Drop an image here or choose a file</span>
-          </label>
-          ${this.draftImage ? html`<img class="questionaire-pane-question-image-preview" src=${this.draftImage} alt="Question preview" />` : ''}
-        </div>
+        <questionaire-pane-create-question-image-upload
+          .question=${question}
+          .image=${this.draftImage}
+          @questionaire-question-image-changed=${(event: CustomEvent<{ image: string }>) => {
+            this.draftImage = event.detail.image
+            this.emitQuestionChanged()
+          }}
+        ></questionaire-pane-create-question-image-upload>
 
         <div class="questionaire-pane-create-question-short-answer-field">
           <label>Question</label>

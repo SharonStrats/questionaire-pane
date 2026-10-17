@@ -1,5 +1,5 @@
 import * as UI from 'solid-ui'
-import type { NamedNode, Store } from 'rdflib'
+import type { LiveStore, NamedNode } from 'rdflib'
 
 function questionnaireBaseUrl (question: NamedNode): string {
   const questionsMarker = '/draft/questions/'
@@ -14,7 +14,7 @@ function questionnaireBaseUrl (question: NamedNode): string {
  * Uploads an image through the same authenticated fetcher used by the folder
  * pane. The returned URL is suitable for storing as disco:image.
  */
-export function uploadQuestionImage (store: Store, question: NamedNode, file: File): Promise<string> {
+export function uploadQuestionImage (store: LiveStore, question: NamedNode, file: File): Promise<string> {
   const fetcher = store.fetcher
   if (!fetcher) {
     return Promise.reject(new Error('Missing fetcher on questionnaire store'))

@@ -29,6 +29,8 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
   @state()
   private accessor loadedQuestionUri: string | null = null
 
+  private draggedItemIndex: number | null = null
+
   protected willUpdate () {
     const question = this.question
     if (!question || this.loadedQuestionUri === question.uri) {
@@ -96,13 +98,15 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
     const title = this.draftTitle.trim()
     const hint = this.draftHint.trim()
     const points = Number.parseInt(this.draftPoints, 10)
-    const items = this.draftItems.length > 0 ? this.draftItems : ['', '', '']
+    const items = (this.draftItems.length > 0 ? this.draftItems : ['', '', ''])
+      .map((item) => item.trim())
 
     await logic.updateQuestionText({ question, title })
     await logic.updateQuestionHint({ question, hint })
     await logic.updateQuestionPoints({ question, points: Number.isFinite(points) ? points : 0 })
     await logic.updateQuestionItems({ question, items })
 
+    this.draftItems = items
     this.emitQuestionChanged()
     this.emitQuestionSaved()
   }
@@ -169,6 +173,34 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
     await logic.updateQuestionItems({ question, items })
     this.emitQuestionChanged()
     this.requestUpdate()
+  }
+
+  private handleDragStart (index: number, event: DragEvent) {
+    this.draggedItemIndex = index
+    event.dataTransfer?.setData('text/plain', String(index))
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move'
+    }
+  }
+
+  private handleDrop (targetIndex: number, event: DragEvent) {
+    event.preventDefault()
+    const sourceIndex = this.draggedItemIndex ?? Number(event.dataTransfer?.getData('text/plain'))
+    this.draggedItemIndex = null
+
+    if (!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= this.draftItems.length || sourceIndex === targetIndex) {
+      return
+    }
+
+    const next = this.draftItems.slice()
+    const [item] = next.splice(sourceIndex, 1)
+    next.splice(targetIndex, 0, item)
+    this.draftItems = next
+    void this.updateQuestionItems(next)
+  }
+
+  private handleDragEnd () {
+    this.draggedItemIndex = null
   }
 
   render() {
@@ -243,12 +275,19 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
           </div>
           <div class="questionaire-pane-create-question-ordering-items">
             ${items.map((item, index) => html`
-              <div class="questionaire-pane-create-question-ordering-item">
+              <div
+                class="questionaire-pane-create-question-ordering-item"
+                @dragover=${(event: DragEvent) => event.preventDefault()}
+                @drop=${(event: DragEvent) => this.handleDrop(index, event)}
+              >
                 <button
                   class="questionaire-pane-create-question-ordering-item-handle"
                   type="button"
+                  draggable="true"
                   aria-label=${`Move item ${index + 1}`}
-                  title="Use the arrows to reorder"
+                  title="Drag to reorder"
+                  @dragstart=${(event: DragEvent) => this.handleDragStart(index, event)}
+                  @dragend=${this.handleDragEnd}
                   @keydown=${(event: KeyboardEvent) => {
                     if (event.key === 'ArrowUp' && index > 0) {
                       event.preventDefault()

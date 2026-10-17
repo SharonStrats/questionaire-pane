@@ -1,4 +1,4 @@
-import { sym, type NamedNode, type Store } from 'rdflib'
+import { sym, type LiveStore, type NamedNode } from 'rdflib'
 import { questionairePredicates } from './questionairePredicates'
 import { readQuestionTypeUri as readQuestionTypeUriFromStore } from './questionaireQuestionAccessors'
 import { getQuestionnaireFormat } from './questionaireQuestionQueries'
@@ -30,22 +30,49 @@ function normalizeTextAnswer (value: string) {
   return value.trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
-function getQuestionPointsFromStore (store: Store, question: any) {
+function getQuestionPointsFromStore (store: LiveStore, question: any) {
   const raw = store.any(question, questionairePredicates.question.points, undefined, question.doc())?.value ?? '1'
   const parsed = Number.parseInt(raw, 10)
   return Number.isFinite(parsed) ? parsed : 1
 }
 
-function readQuestionTypeUri (store: Store, question: any) {
+function readQuestionTypeUri (store: LiveStore, question: any) {
   return readQuestionTypeUriFromStore(store, question)
 }
 
-function readQuestionValueList (store: Store, question: any, predicate: any) {
+function readQuestionValueList (store: LiveStore, question: any, predicate: any) {
   return store
     .statementsMatching(question, predicate, undefined, question.doc())
     .map((statement) => statement.object.termType === 'NamedNode'
       ? store.any(statement.object, questionairePredicates.question.answerText, undefined, question.doc())?.value ?? ''
       : statement.object.value)
+}
+
+function readMatchPairs (store: LiveStore, question: NamedNode) {
+  const doc = question.doc()
+  const pairStatements = store.statementsMatching(
+    question,
+    questionairePredicates.question.matchPair,
+    undefined,
+    doc
+  )
+  if (pairStatements.length === 0) {
+    const leftItems = readQuestionValueList(store, question, questionairePredicates.question.sourceItem)
+    const rightItems = readQuestionValueList(store, question, questionairePredicates.question.targetItem)
+    return leftItems.map((left, index) => [left, rightItems[index] ?? ''] as const)
+  }
+
+  return pairStatements
+    .map((statement) => statement.object as NamedNode)
+    .sort((left, right) => {
+      const leftPosition = Number(store.any(left, questionairePredicates.question.position, undefined, doc)?.value ?? 0)
+      const rightPosition = Number(store.any(right, questionairePredicates.question.position, undefined, doc)?.value ?? 0)
+      return leftPosition - rightPosition
+    })
+    .map((pair) => [
+      store.any(pair, questionairePredicates.question.sourceItem, undefined, doc)?.value ?? '',
+      store.any(pair, questionairePredicates.question.targetItem, undefined, doc)?.value ?? ''
+    ] as const)
 }
 
 function sameStringSet (left: string[], right: string[]) {
@@ -67,7 +94,7 @@ function answerAsArray (answer: string | string[] | null) {
 }
 
 export function evaluateQuestionAnswer (
-  store: Store,
+  store: LiveStore,
   question: NamedNode,
   answer: string | string[] | null,
   semanticAnswerResults: SemanticAnswerResults = {}
@@ -96,8 +123,6 @@ export function evaluateQuestionAnswer (
   const correctOptionValues = readQuestionValueList(store, question, questionairePredicates.question.correctOption)
   const answerValues = readQuestionValueList(store, question, questionairePredicates.question.answer)
   const itemValues = readQuestionValueList(store, question, questionairePredicates.question.item)
-  const leftItemValues = readQuestionValueList(store, question, questionairePredicates.question.sourceItem)
-  const rightItemValues = readQuestionValueList(store, question, questionairePredicates.question.targetItem)
 
   if (questionTypeUri === questionairePredicates.question.questionType.multipleChoice.value || questionTypeUri === questionairePredicates.question.questionType.trueFalse.value) {
     correct = normalizedAnswer.length === 1 && correctOptionValues.some((value) => normalizeTextAnswer(value) === normalizeTextAnswer(normalizedAnswer[0]))
@@ -114,7 +139,8 @@ export function evaluateQuestionAnswer (
   } else if (questionTypeUri === questionairePredicates.question.questionType.ordering.value) {
     correct = itemValues.length > 0 && normalizedAnswer.length === itemValues.length && normalizedAnswer.every((value, index) => normalizeTextAnswer(value) === normalizeTextAnswer(itemValues[index] ?? ''))
   } else if (questionTypeUri === questionairePredicates.question.questionType.match.value) {
-    const expectedPairs = leftItemValues.map((left, index) => `${normalizeTextAnswer(left)}|||${normalizeTextAnswer(rightItemValues[index] ?? '')}`)
+    const expectedPairs = readMatchPairs(store, question)
+      .map(([left, right]) => `${normalizeTextAnswer(left)}|||${normalizeTextAnswer(right)}`)
     const actualPairs = normalizedAnswer.map(normalizeTextAnswer)
     correct = expectedPairs.length > 0 && sameStringSet(expectedPairs, actualPairs)
   } else {
@@ -131,7 +157,7 @@ export function evaluateQuestionAnswer (
 }
 
 export function calculateQuestionnaireScore (
-  store: Store,
+  store: LiveStore,
   subject: any,
   answersByQuestionUri: Record<string, string | string[] | null>,
   semanticAnswerResults: SemanticAnswerResults = {}

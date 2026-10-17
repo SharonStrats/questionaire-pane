@@ -17,6 +17,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # GitHub Pages serves this repository as a project site. Vite uses this
+      # value for both entrypoint assets and dynamically loaded chunks.
+      VITE_BASE_PATH: /${{ github.event.repository.name }}/
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,11 +29,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build:standalone
+      # Vite preserves the standalone/ entry directory. Pages needs index.html
+      # at the artifact root so /<repository>/ opens the app.
       - run: mv standalone-dist/standalone/index.html standalone-dist/index.html && rmdir standalone-dist/standalone
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: standalone-dist
+
   deploy:
     environment:
       name: github-pages

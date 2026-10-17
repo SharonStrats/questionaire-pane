@@ -20,7 +20,7 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
   accessor question: NamedNode | null = null
 
   @property({ attribute: false })
-  accessor answer: string | null = null
+  accessor answer: string | string[] | null = null
 
   @property({ type: Boolean, attribute: 'multiline' })
   accessor multiline = false
@@ -33,6 +33,9 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
 
   @state()
   private accessor draftAnswer = ''
+
+  @state()
+  private accessor draftBlankAnswers: string[] = []
 
   @state()
   private accessor loadedQuestionUri: string | null = null
@@ -72,9 +75,26 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
       return
     }
 
-    this.draftAnswer = this.answer ?? ''
+    const answerValues = Array.isArray(this.answer)
+      ? this.answer
+      : this.answer
+        ? [this.answer]
+        : []
+    this.draftAnswer = typeof this.answer === 'string' ? this.answer : ''
+    this.draftBlankAnswers = Array.from(
+      { length: this.getBlankCount(this.getTitle()) },
+      (_, index) => answerValues[index] ?? ''
+    )
     this.loadedQuestionUri = question.uri
     this.semanticStatus = 'idle'
+  }
+
+  private getBlankCount (title: string) {
+    return Math.max(1, title.match(/\[_{2,}\]|_{3,}/g)?.length ?? 0)
+  }
+
+  private isFillInTheBlank () {
+    return this.questionTypeLabel === 'Fill in the Blank'
   }
 
   private syncAnswer (value: string) {
@@ -90,6 +110,46 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
       composed: true,
       detail: { questionUri: question.uri, answer: value }
     }))
+  }
+
+  private syncBlankAnswer (index: number, value: string) {
+    const answers = this.draftBlankAnswers.slice()
+    answers[index] = value
+    this.draftBlankAnswers = answers
+    this.semanticStatus = 'idle'
+
+    const question = this.question
+    if (!question) {
+      return
+    }
+
+    this.dispatchEvent(new CustomEvent('questionaire-answer-changed', {
+      bubbles: true,
+      composed: true,
+      detail: { questionUri: question.uri, answer: answers }
+    }))
+  }
+
+  private renderFillInTheBlank (text: string) {
+    const parts = text.split(/(\[_{2,}\]|_{3,})/)
+    let blankIndex = 0
+
+    return parts.map((part) => {
+      if (!/^(\[_{2,}\]|_{3,})$/.test(part)) {
+        return part
+      }
+
+      const index = blankIndex++
+      return html`
+        <input
+          class="questionaire-pane-take-question-text-response-blank"
+          type="text"
+          aria-label=${`Blank ${index + 1}`}
+          .value=${this.draftBlankAnswers[index] ?? ''}
+          @input=${(event: Event) => this.syncBlankAnswer(index, (event.currentTarget as HTMLInputElement).value)}
+        />
+      `
+    })
   }
 
   private async checkShortAnswer () {
@@ -129,14 +189,25 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
     const title = this.getTitle()
     const hint = this.getHint()
     const image = this.getImage()
+    const fillInTheBlank = this.isFillInTheBlank()
+    const fillInTheBlankText = hint || title
 
     return html`
-      <section class="questionaire-pane-take-question-text-response">
+      <section class="questionaire-pane-take-question-text-response${fillInTheBlank ? ' questionaire-pane-take-question-text-response--fill-in-the-blank' : ''}">
         <div class="questionaire-pane-take-question-text-response-type">${this.questionTypeLabel}</div>
         ${image ? html`<img class="questionaire-pane-question-image" src=${image} alt="" />` : ''}
-        <h2 class="questionaire-pane-take-question-text-response-title">${title || 'Untitled question'}</h2>
-        ${hint ? html`<p class="questionaire-pane-take-question-text-response-hint">${hint}</p>` : html``}
-        ${this.multiline
+        ${fillInTheBlank
+          ? html`
+              ${hint ? html`<h2 class="questionaire-pane-take-question-text-response-title">${title || 'Untitled question'}</h2>` : html``}
+              <div class="questionaire-pane-take-question-text-response-question-body">
+                ${this.renderFillInTheBlank(fillInTheBlankText || 'Complete the sentence.')}
+              </div>
+            `
+          : html`
+            <h2 class="questionaire-pane-take-question-text-response-title">${title || 'Untitled question'}</h2>
+            ${hint ? html`<p class="questionaire-pane-take-question-text-response-hint">${hint}</p>` : html``}
+          `}
+        ${!fillInTheBlank && this.multiline
           ? html`
               <textarea
                 class="questionaire-pane-take-question-text-response-input questionaire-pane-take-question-text-response-input--textarea"
@@ -146,7 +217,8 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
                 @blur=${() => { void this.checkShortAnswer() }}
               ></textarea>
             `
-          : html`
+          : !fillInTheBlank
+            ? html`
               <input
                 class="questionaire-pane-take-question-text-response-input"
                 type="text"
@@ -155,7 +227,8 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
                 @input=${(event: Event) => this.syncAnswer((event.currentTarget as HTMLInputElement).value)}
                 @blur=${() => { void this.checkShortAnswer() }}
               />
-            `}
+            `
+            : html``}
         ${this.semanticStatus === 'checking'
           ? html`<p class="questionaire-pane-take-question-text-response-feedback">Checking your answer…</p>`
           : this.semanticStatus === 'correct'

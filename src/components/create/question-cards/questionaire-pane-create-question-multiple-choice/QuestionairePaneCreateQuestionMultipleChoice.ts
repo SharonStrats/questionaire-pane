@@ -4,10 +4,10 @@ import { customElement } from 'solid-ui'
 import styles from './QuestionairePaneCreateQuestionMultipleChoice.styles.css'
 import QuestionairePaneCreateQuestionCardBase from '../questionaire-pane-create-question-card-base/QuestionairePaneCreateQuestionCardBase'
 import { readQuestionValue, readQuestionValues } from '../../../../service/questionaireQuestionAccessors'
-import { uploadQuestionImage } from '../../../../service/questionaireImageUpload'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-base/QuestionairePaneCreateQuestionBase'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
+import '../questionaire-pane-create-question-image-upload/QuestionairePaneCreateQuestionImageUpload'
 import '~icons/lucide/check'
 import '~icons/lucide/chevron-down'
 import '~icons/lucide/info'
@@ -251,21 +251,6 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends Questi
     this.requestUpdate()
   }
 
-  private async onImageSelected (event: Event) {
-    const file = (event.currentTarget as HTMLInputElement).files?.[0]
-    if (!file || !file.type.startsWith('image/')) return
-    await this.saveImageFile(file)
-  }
-
-  private async saveImageFile (file: File) {
-    if (!file.type.startsWith('image/')) return
-    const store = this.getStore()
-    const question = this.question
-    if (!store || !question) return
-    this.draftImage = await uploadQuestionImage(store, question, file)
-    await this.persistQuestionCard()
-  }
-
   private async removeQuestionOption (index: number) {
     const question = this.question
     const logic = this.getQuestionLogic()
@@ -371,22 +356,14 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends Questi
           </div>
         </div>
 
-        <div class="questionaire-pane-create-question-multiple-choice-field">
-          <label>Image <span>(optional)</span></label>
-          <label
-            class="questionaire-pane-create-question-multiple-choice-upload"
-            @dragover=${(event: DragEvent) => { event.preventDefault() }}
-            @drop=${(event: DragEvent) => {
-              event.preventDefault()
-              const file = event.dataTransfer?.files?.[0]
-              if (file) void this.saveImageFile(file)
-            }}
-          >
-            <input type="file" accept="image/*" @change=${(event: Event) => { void this.onImageSelected(event) }} />
-            <span>Drop an image here or choose a file</span>
-          </label>
-          ${this.draftImage ? html`<img class="questionaire-pane-question-image-preview" src=${this.draftImage} alt="Question preview" />` : ''}
-        </div>
+        <questionaire-pane-create-question-image-upload
+          .question=${question}
+          .image=${this.draftImage}
+          @questionaire-question-image-changed=${(event: CustomEvent<{ image: string }>) => {
+            this.draftImage = event.detail.image
+            this.emitQuestionChanged()
+          }}
+        ></questionaire-pane-create-question-image-upload>
 
         <div class="questionaire-pane-create-question-multiple-choice-field">
           <label>Question</label>

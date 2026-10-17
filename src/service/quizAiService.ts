@@ -1,4 +1,4 @@
-import { sym, type Store } from 'rdflib'
+import { sym, type LiveStore } from 'rdflib'
 import { createContainerIfMissing } from './questionaireTypes'
 
 const sourceDirectoryName = 'source-documents'
@@ -39,7 +39,7 @@ export interface ShortAnswerEvaluation {
 }
 
 export interface QuizAiService {
-  importDocuments(store: Store, baseUrl: string, files: File[], format: 'quiz' | 'survey'): Promise<ImportedQuizQuestion[]>
+  importDocuments(store: LiveStore, baseUrl: string, files: File[], format: 'quiz' | 'survey'): Promise<ImportedQuizQuestion[]>
   ensureSemanticModel(): Promise<void>
   evaluateShortAnswer(answer: string, expectedAnswers: string[]): Promise<ShortAnswerEvaluation>
 }
@@ -289,7 +289,7 @@ async function createService (): Promise<QuizAiService> {
     extractor = await extractorPromise
   }
 
-  async function saveSourceDocument (store: Store, baseUrl: string, file: File, contents: ArrayBuffer) {
+  async function saveSourceDocument (store: LiveStore, baseUrl: string, file: File, contents: ArrayBuffer) {
     const fetcher = store.fetcher
     if (!fetcher) {
       throw new Error('Missing fetcher on questionnaire store')
@@ -312,7 +312,7 @@ async function createService (): Promise<QuizAiService> {
     }
   }
 
-  async function importDocuments (store: Store, baseUrl: string, files: File[], format: 'quiz' | 'survey') {
+  async function importDocuments (store: LiveStore, baseUrl: string, files: File[], format: 'quiz' | 'survey') {
     const importedQuestions: ImportedQuizQuestion[] = []
     for (const file of files) {
       if (!file.name.toLowerCase().endsWith('.docx')) {

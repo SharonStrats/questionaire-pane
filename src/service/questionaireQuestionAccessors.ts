@@ -1,8 +1,8 @@
-import { type NamedNode, type Store } from 'rdflib'
+import { type LiveStore, type NamedNode } from 'rdflib'
 import { questionairePredicates } from './questionairePredicates'
 
 export function readQuestionValue (
-  store: Store,
+  store: LiveStore,
   question: NamedNode,
   field: 'title' | 'image' | 'hint' | 'points' | 'description' | 'identifier' | 'created' | 'isPartOf' | 'creator' | 'answer' | 'correctOption' | 'rdfType' | 'eduQuestionType'
 ) {
@@ -24,12 +24,35 @@ export function readQuestionValue (
 }
 
 export function readQuestionValues (
-  store: Store,
+  store: LiveStore,
   question: NamedNode,
   field: 'option' | 'correctOption' | 'answer' | 'item' | 'leftItem' | 'rightItem'
 ) {
   const resolvedField = field === 'leftItem' ? 'sourceItem' : field === 'rightItem' ? 'targetItem' : field
   const predicate = questionairePredicates.question[resolvedField]
+
+  if (field === 'leftItem' || field === 'rightItem') {
+    const pairStatements = store.statementsMatching(
+      question,
+      questionairePredicates.question.matchPair,
+      undefined,
+      question.doc()
+    )
+    if (pairStatements.length > 0) {
+      const pairPredicate = field === 'leftItem'
+        ? questionairePredicates.question.sourceItem
+        : questionairePredicates.question.targetItem
+      return pairStatements
+        .map((statement) => statement.object as NamedNode)
+        .sort((left, right) => {
+          const leftPosition = Number(store.any(left, questionairePredicates.question.position, undefined, question.doc())?.value ?? 0)
+          const rightPosition = Number(store.any(right, questionairePredicates.question.position, undefined, question.doc())?.value ?? 0)
+          return leftPosition - rightPosition
+        })
+        .map((pair) => store.any(pair, pairPredicate, undefined, question.doc())?.value ?? '')
+        .filter((value) => value.length > 0)
+    }
+  }
 
   if (field === 'item') {
     const list = store.any(
@@ -127,7 +150,7 @@ export function readQuestionValues (
 }
 
 export function readQuestionTypeUri (
-  store: Store,
+  store: LiveStore,
   question: NamedNode
 ) {
   const label = readQuestionValue(store, question, 'eduQuestionType').toLowerCase()

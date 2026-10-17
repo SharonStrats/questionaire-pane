@@ -1,6 +1,7 @@
-import { Namespace, literal, st, sym, type NamedNode, type Store } from 'rdflib'
+import { Namespace, literal, st, sym, type LiveStore, type NamedNode } from 'rdflib'
 import { disco } from '../namespaces'
 import { createContainerIfMissing } from '../service/questionaireTypes'
+import { questionairePredicates } from '../service/questionairePredicates'
 
 const pim = Namespace('http://www.w3.org/ns/pim/space#')
 const solid = Namespace('http://www.w3.org/ns/solid/terms#')
@@ -19,7 +20,23 @@ export interface QuestionnaireIndexStatus {
 export interface QuestionnaireEntry {
   subject: NamedNode
   title: string
+  description: string
+  kind: 'quiz' | 'survey'
+  questionCount: number
   indexes: QuestionnaireIndexStatus
+}
+
+export interface SharedQuestionnaireEntry extends QuestionnaireEntry {
+  sharedBy: {
+    uri: string
+    label: string
+  }
+}
+
+export interface KnownPerson {
+  kind: 'person' | 'group'
+  uri: string
+  label: string
 }
 
 export interface CrawlResult {
@@ -38,19 +55,19 @@ function namedNodes (terms: unknown[]): NamedNode[] {
   return terms.filter(term => (term as { termType?: string }).termType === 'NamedNode') as NamedNode[]
 }
 
-function labelFor (store: Store, subject: NamedNode): string {
+function labelFor (store: LiveStore, subject: NamedNode): string {
   const title = store.any(subject, schema('name'))
   if (title?.termType === 'Literal') return title.value
   const path = new URL(subject.doc().uri).pathname.split('/').filter(Boolean)
   return decodeURIComponent(path[path.length - 2] ?? subject.doc().uri)
 }
 
-async function load (store: Store, resource: NamedNode): Promise<void> {
+async function load (store: LiveStore, resource: NamedNode): Promise<void> {
   if (!store.fetcher) throw new Error('No Solid fetcher is available.')
   await store.fetcher.load(resource.doc())
 }
 
-export async function loadTypeIndexes (store: Store, me: NamedNode): Promise<Map<string, QuestionnaireIndexStatus>> {
+export async function loadTypeIndexes (store: LiveStore, me: NamedNode): Promise<Map<string, QuestionnaireIndexStatus>> {
   await load(store, me)
   const result = new Map<string, QuestionnaireIndexStatus>()
   const indexSources: Array<[NamedNode, keyof QuestionnaireIndexStatus]> = []
@@ -78,8 +95,103 @@ export async function loadTypeIndexes (store: Store, me: NamedNode): Promise<Map
   return result
 }
 
+export async function discoverSharedQuestionnaires (
+  store: LiveStore,
+  people: Iterable<KnownPerson>
+): Promise<SharedQuestionnaireEntry[]> {
+  const registrations = new Map<string, KnownPerson>()
+  const visitedPeople = new Set<string>()
+
+  for (const person of people) {
+    if (person.kind !== 'person' || visitedPeople.has(person.uri)) continue
+    visitedPeople.add(person.uri)
+
+    const profile = sym(person.uri)
+    try {
+      await load(store, profile)
+      const publicIndexes = namedNodes(store.each(profile, solid('publicTypeIndex'), undefined, profile.doc()))
+      for (const index of publicIndexes) {
+        await load(store, index)
+        const indexDocument = index.doc()
+        const typeRegistrations = (store.each(undefined, solid('forClass'), questionnaireClass, indexDocument) as NamedNode[])
+          .filter(registration => store.holds(registration, rdf('type'), solid('TypeRegistration'), indexDocument))
+        for (const registration of typeRegistrations) {
+          for (const subject of namedNodes(store.each(registration, solid('instance'), undefined, indexDocument))) {
+            if (!registrations.has(subject.uri)) registrations.set(subject.uri, person)
+          }
+        }
+      }
+    } catch {
+      // A known person's public data may be unavailable without preventing other discoveries.
+    }
+  }
+
+  const subjects = [...registrations.keys()].map(uri => sym(uri))
+  await Promise.all(subjects.map(async subject => {
+    try {
+      await load(store, subject)
+    } catch {
+      // Keep a public registration available to open even if its document cannot be read yet.
+    }
+  }))
+
+  return entriesFromSubjects(store, subjects, new Map()).map(entry => ({
+    ...entry,
+    sharedBy: {
+      uri: registrations.get(entry.subject.uri)!.uri,
+      label: registrations.get(entry.subject.uri)!.label
+    }
+  }))
+}
+
+export function isPublishedQuestionnaire (store: LiveStore, subject: NamedNode): boolean {
+  const type = store.any(subject, rdf('type'))
+  return Boolean(
+    (type?.equals(questionairePredicates.questionnaire.quizType) || type?.equals(questionairePredicates.questionnaire.surveyType)) &&
+    store.holds(subject, questionairePredicates.questionnaire.status, literal('Published'))
+  )
+}
+
+export async function publishedQuestionnaireForTake (store: LiveStore, subject: NamedNode): Promise<NamedNode> {
+  if (isPublishedQuestionnaire(store, subject)) return subject
+
+  const versions = namedNodes(store.each(subject, dct('hasVersion'), undefined, subject.doc()))
+  await Promise.all(versions.map(async version => {
+    try {
+      await load(store, version)
+    } catch {
+      // Continue looking for another public version.
+    }
+  }))
+  const publishedVersions = versions.filter(version => isPublishedQuestionnaire(store, version))
+  if (!publishedVersions.length) {
+    throw new Error('This shared questionnaire does not advertise a published version.')
+  }
+  return publishedVersions.sort((left, right) => {
+    const leftCreated = store.anyValue(left, dct('created'), undefined, left.doc()) ?? ''
+    const rightCreated = store.anyValue(right, dct('created'), undefined, right.doc()) ?? ''
+    return rightCreated.localeCompare(leftCreated)
+  })[0]
+}
+
+export async function ownPublishedQuestionnaires (
+  store: LiveStore,
+  subjects: Iterable<NamedNode>
+): Promise<QuestionnaireEntry[]> {
+  const published = new Map<string, NamedNode>()
+  for (const subject of subjects) {
+    try {
+      const version = await publishedQuestionnaireForTake(store, subject)
+      published.set(version.uri, version)
+    } catch {
+      // Drafts and unavailable questionnaires do not belong in the Take library.
+    }
+  }
+  return entriesFromSubjects(store, published.values(), new Map())
+}
+
 export async function addToTypeIndex (
-  store: Store,
+  store: LiveStore,
   me: NamedNode,
   subject: NamedNode,
   kind: keyof QuestionnaireIndexStatus
@@ -108,7 +220,7 @@ export async function addToTypeIndex (
   if (insertions.length) await store.updater.update([], insertions)
 }
 
-export async function ensureQuestionnaireWorkspace (store: Store, me: NamedNode): Promise<string> {
+export async function ensureQuestionnaireWorkspace (store: LiveStore, me: NamedNode): Promise<string> {
   await load(store, me)
   const preferences = store.any(me, pim('preferencesFile')) as NamedNode | undefined
   if (preferences?.termType === 'NamedNode') {
@@ -142,7 +254,7 @@ export async function ensureQuestionnaireWorkspace (store: Store, me: NamedNode)
   return container
 }
 
-export async function questionnairesInWorkspace (store: Store, workspaceUrl: string): Promise<NamedNode[]> {
+export async function questionnairesInWorkspace (store: LiveStore, workspaceUrl: string): Promise<NamedNode[]> {
   const container = sym(trailingSlash(workspaceUrl))
   await load(store, container)
   const candidates = namedNodes(store.each(container, ldp('contains'))).filter(term => term.uri.endsWith('/'))
@@ -160,7 +272,7 @@ export async function questionnairesInWorkspace (store: Store, workspaceUrl: str
 }
 
 export function entriesFromSubjects (
-  store: Store,
+  store: LiveStore,
   subjects: Iterable<NamedNode>,
   statuses: Map<string, QuestionnaireIndexStatus>
 ): QuestionnaireEntry[] {
@@ -169,6 +281,9 @@ export function entriesFromSubjects (
   return [...unique.values()].map(subject => ({
     subject,
     title: labelFor(store, subject),
+    description: store.any(subject, dct('description'))?.value ?? '',
+    kind: store.holds(subject, rdf('type'), schema('Quiz'), subject.doc()) ? 'quiz' as const : 'survey' as const,
+    questionCount: store.each(subject, disco('question'), undefined, subject.doc()).length,
     indexes: statuses.get(subject.uri) ?? { public: false, private: false }
   })).sort((left, right) => left.title.localeCompare(right.title))
 }

@@ -1,6 +1,6 @@
-import { type Store } from 'rdflib'
+import { type LiveStore } from 'rdflib'
 import { createQuestionaireMutations } from './questionaireQuestionMutations'
 
-export function createQuestionaireLogic (store: Store) {
+export function createQuestionaireLogic (store: LiveStore) {
   return createQuestionaireMutations(store)
 }

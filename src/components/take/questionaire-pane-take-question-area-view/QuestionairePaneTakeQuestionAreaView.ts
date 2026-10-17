@@ -9,6 +9,7 @@ import { loadQuizAiService } from '../../../service/quizAiService'
 import { questionairePredicates } from '../../../service/questionairePredicates'
 import { getQuestionnaireFormat } from '../../../service/questionaireQuestionQueries'
 import { loadQuestionaireQuestionSummaries, type QuestionaireQuestionSummary } from '../../../service/questionaireQuestionQueries'
+import { shareQuestionnaireResults } from '../../../service/shareQuestionnaireResults'
 import '../questionaire-pane-take-question-dispatcher/QuestionairePaneTakeQuestionDispatcher'
 import '../questionaire-pane-take-final-screen/QuestionairePaneTakeFinalScreen'
 
@@ -38,6 +39,12 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
 
   @state()
   private accessor semanticAnswerResults: Record<string, boolean> = {}
+
+  @state()
+  private accessor shareStatus: 'idle' | 'sharing' | 'shared' | 'error' = 'idle'
+
+  @state()
+  private accessor shareError = ''
 
   private questionsRefreshToken = 0
   private questionsKey = ''
@@ -137,6 +144,30 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
   private restart () {
     this.completed = false
     this.activeQuestionIndex = 0
+    this.answersByQuestionUri = {}
+    this.semanticAnswerResults = {}
+    this.shareStatus = 'idle'
+    this.shareError = ''
+  }
+
+  private async shareResults () {
+    const { store, subject, acl } = this.questionaire ?? { store: null, subject: null, acl: null }
+    if (!store || !subject || !acl) {
+      this.shareStatus = 'error'
+      this.shareError = 'Sharing is unavailable because ACL services are not configured.'
+      console.error(this.shareError)
+      return
+    }
+    this.shareStatus = 'sharing'
+    this.shareError = ''
+    try {
+      await shareQuestionnaireResults(store, acl, subject)
+      this.shareStatus = 'shared'
+    } catch (error) {
+      this.shareStatus = 'error'
+      this.shareError = error instanceof Error ? error.message : String(error)
+      console.error('Unable to share questionnaire results', error)
+    }
   }
 
   render() {
@@ -173,7 +204,14 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
               .availablePoints=${score.availablePoints}
               .earnedPoints=${score.earnedPoints}
               .isSurvey=${isSurvey}
+              .store=${store}
+              .questionSummaries=${questions}
+              .questionScores=${score.questionScores}
+              .answers=${this.answersByQuestionUri}
+              .shareStatus=${this.shareStatus}
+              .shareError=${this.shareError}
               @questionaire-take-restart=${() => this.restart()}
+              @questionaire-take-share-results=${() => { void this.shareResults() }}
             ></questionaire-pane-take-final-screen>
           </div>
         </section>
@@ -194,6 +232,9 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
     const isFirstQuestion = this.activeQuestionIndex <= 0
     const isLastQuestion = this.activeQuestionIndex >= questions.length - 1
     const answerComplete = this.hasCurrentAnswer(activeQuestion)
+    const currentScore = activeQuestion
+      ? score.questionScores.find((questionScore) => questionScore.questionUri === activeQuestion.question.uri)
+      : undefined
 
     return html`
       <section class="questionaire-pane-take-question-area-view">
@@ -208,6 +249,18 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
             @questionaire-answer-changed=${(event: CustomEvent<{ questionUri: string, answer: AnswerValue }>) => this.handleAnswerChanged(event)}
             @questionaire-answer-evaluated=${(event: CustomEvent<{ questionUri: string, correct: boolean }>) => this.handleAnswerEvaluated(event)}
           ></questionaire-pane-take-question-dispatcher>
+          ${!isSurvey && answerComplete && currentScore
+            ? html`
+                <p class=${currentScore.correct
+                  ? 'questionaire-pane-take-question-area-view-feedback questionaire-pane-take-question-area-view-feedback--correct'
+                  : 'questionaire-pane-take-question-area-view-feedback questionaire-pane-take-question-area-view-feedback--incorrect'}
+                >
+                  ${currentScore.correct
+                    ? `Correct — ${currentScore.earnedPoints} point${currentScore.earnedPoints === 1 ? '' : 's'} earned.`
+                    : 'Not quite. You can review the correct answer when you finish.'}
+                </p>
+              `
+            : ''}
           <div class="questionaire-pane-take-question-area-view-navigation">
             <button
               class="questionaire-pane-take-question-area-view-nav-button"

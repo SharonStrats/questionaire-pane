@@ -1,4 +1,4 @@
-import { sym, type NamedNode, type Store } from 'rdflib'
+import { sym, type LiveStore, type NamedNode } from 'rdflib'
 import { ensureTrailingSlash } from './questionaireTypes'
 import { questionairePredicates } from './questionairePredicates'
 import { readQuestionTypeUri } from './questionaireQuestionAccessors'
@@ -9,7 +9,7 @@ export interface QuestionaireQuestionSummary {
   typeUri: string
 }
 
-export async function loadQuestionaireQuestionSummaries (store: Store, subject: NamedNode): Promise<QuestionaireQuestionSummary[]> {
+export async function loadQuestionaireQuestionSummaries (store: LiveStore, subject: NamedNode): Promise<QuestionaireQuestionSummary[]> {
   const fetcher = store.fetcher
   if (!fetcher) {
     throw new Error('Missing fetcher on questionnaire store')
@@ -42,7 +42,7 @@ export async function loadQuestionaireQuestionSummaries (store: Store, subject: 
   return questionSummaries.sort((left, right) => left.question.uri.localeCompare(right.question.uri, undefined, { numeric: true, sensitivity: 'base' }))
 }
 
-export function getQuestionnaireFormat (store: Store, subject: NamedNode): 'quiz' | 'survey' {
+export function getQuestionnaireFormat (store: LiveStore, subject: NamedNode): 'quiz' | 'survey' {
   if (store.holds(subject, questionairePredicates.question.rdfType, questionairePredicates.questionnaire.surveyType)) {
     return 'survey'
   }
