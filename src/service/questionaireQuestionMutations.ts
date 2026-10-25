@@ -38,6 +38,8 @@ const quiz = (fragment: string) => {
       return questionairePredicates.questionnaire.question
     case 'hint':
       return questionairePredicates.question.hint
+    case 'explanation':
+      return questionairePredicates.question.explanation
     case 'points':
       return questionairePredicates.question.points
     case 'option':
@@ -83,6 +85,7 @@ const quiz = (fragment: string) => {
 
 const quizQuestion = questionairePredicates.questionnaire.question
 const quizHint = quiz('hint')
+const quizExplanation = quiz('explanation')
 const quizPoints = quiz('points')
 const quizOption = quiz('option')
 const quizCorrectOption = quiz('correctOption')
@@ -143,6 +146,7 @@ export interface QuestionaireMutationService {
   updateQuestionText(options: { question: NamedNode, title: string }): Promise<void>
   updateQuestionImage(options: { question: NamedNode, image: string }): Promise<void>
   updateQuestionHint(options: { question: NamedNode, hint: string }): Promise<void>
+  updateQuestionExplanation(options: { question: NamedNode, explanation: string }): Promise<void>
   updateQuestionPoints(options: { question: NamedNode, points: number }): Promise<void>
   updateQuestionOptions(options: { question: NamedNode, options: string[], correctOption?: string | null, correctOptions?: string[] | null }): Promise<void>
   updateQuestionAnswers(options: { question: NamedNode, answers: string[] }): Promise<void>
@@ -279,6 +283,9 @@ export function createQuestionaireMutations (store: LiveStore): QuestionaireMuta
       scratch.add(question, dct('identifier'), literal(questionIdentifier), questionDoc)
       if (options.hint?.trim()) {
         scratch.add(question, quizHint, literal(options.hint), questionDoc)
+      }
+      if (options.explanation?.trim()) {
+        scratch.add(question, quizExplanation, literal(options.explanation), questionDoc)
       }
       const questionPoints = options.points ?? 1
       scratch.add(question, quizPoints, literal(String(questionPoints)), questionDoc)
@@ -595,6 +602,29 @@ export function createQuestionaireMutations (store: LiveStore): QuestionaireMuta
     })
   }
 
+  async function updateQuestionExplanation (options: { question: NamedNode, explanation: string }) {
+    const fetcher = store.fetcher
+    const updater = store.updater
+    if (!fetcher || !updater) {
+      throw new Error('Missing fetcher or updater on questionnaire store')
+    }
+
+    const questionDoc = options.question.doc()
+    await enqueueDocumentUpdate(questionDoc, async () => {
+      await fetcher.load(questionDoc)
+
+      const del = [
+        ...store.statementsMatching(options.question, quizExplanation, undefined, questionDoc)
+      ]
+      const explanation = options.explanation.trim()
+      const ins = explanation
+        ? [st(options.question, quizExplanation, literal(explanation), questionDoc)]
+        : []
+
+      await updater.update(del, ins)
+    })
+  }
+
   async function updateQuestionPoints (options: { question: NamedNode, points: number }) {
     const fetcher = store.fetcher
     const updater = store.updater
@@ -855,6 +885,7 @@ export function createQuestionaireMutations (store: LiveStore): QuestionaireMuta
     updateQuestionText,
     updateQuestionImage,
     updateQuestionHint,
+    updateQuestionExplanation,
     updateQuestionPoints,
     updateQuestionOptions,
     updateQuestionAnswers,

@@ -41,9 +41,6 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
   @state()
   private accessor loadedQuestionUri: string | null = null
 
-  @state()
-  private accessor semanticStatus: 'idle' | 'checking' | 'correct' | 'incorrect' | 'unavailable' = 'idle'
-
   private getTitle () {
     const store = this.questionaire?.store
     const question = this.question
@@ -52,16 +49,6 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
     }
 
     return readQuestionValue(store, question, 'title')
-  }
-
-  private getHint () {
-    const store = this.questionaire?.store
-    const question = this.question
-    if (!store || !question) {
-      return ''
-    }
-
-    return readQuestionValue(store, question, 'hint')
   }
 
   private getImage () {
@@ -87,7 +74,6 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
       (_, index) => answerValues[index] ?? ''
     )
     this.loadedQuestionUri = question.uri
-    this.semanticStatus = 'idle'
   }
 
   private getBlankCount (title: string) {
@@ -100,7 +86,6 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
 
   private syncAnswer (value: string) {
     this.draftAnswer = value
-    this.semanticStatus = 'idle'
     const question = this.question
     if (!question) {
       return
@@ -117,7 +102,6 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
     const answers = this.draftBlankAnswers.slice()
     answers[index] = value
     this.draftBlankAnswers = answers
-    this.semanticStatus = 'idle'
 
     const question = this.question
     if (!question) {
@@ -166,11 +150,9 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
       return
     }
 
-    this.semanticStatus = 'checking'
     try {
       const service = await loadQuizAiService()
       const evaluation = await service.evaluateShortAnswer(this.draftAnswer, expectedAnswers)
-      this.semanticStatus = evaluation.correct ? 'correct' : 'incorrect'
       this.dispatchEvent(new CustomEvent('questionaire-answer-evaluated', {
         bubbles: true,
         composed: true,
@@ -181,17 +163,15 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
         }
       }))
     } catch (error) {
-      this.semanticStatus = 'unavailable'
       console.error('Unable to evaluate short answer', error)
     }
   }
 
   render() {
     const title = this.getTitle()
-    const hint = this.getHint()
     const image = this.getImage()
     const fillInTheBlank = this.isFillInTheBlank()
-    const fillInTheBlankText = hint || title
+    const fillInTheBlankText = title
 
     return html`
       <section class="questionaire-pane-take-question-text-response${fillInTheBlank ? ' questionaire-pane-take-question-text-response--fill-in-the-blank' : ''}">
@@ -199,14 +179,13 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
         ${image ? html`<img class="questionaire-pane-question-image" src=${image} alt="" />` : ''}
         ${fillInTheBlank
           ? html`
-              ${hint ? html`<h2 class="questionaire-pane-take-question-text-response-title">${renderFormattedText(title || 'Untitled question')}</h2>` : html``}
+              <h2 class="questionaire-pane-take-question-text-response-title">${renderFormattedText(title || 'Untitled question')}</h2>
               <div class="questionaire-pane-take-question-text-response-question-body">
                 ${this.renderFillInTheBlank(fillInTheBlankText || 'Complete the sentence.')}
               </div>
             `
           : html`
             <h2 class="questionaire-pane-take-question-text-response-title">${renderFormattedText(title || 'Untitled question')}</h2>
-            ${hint ? html`<p class="questionaire-pane-take-question-text-response-hint">${renderFormattedText(hint)}</p>` : html``}
           `}
         ${!fillInTheBlank && this.multiline
           ? html`
@@ -230,15 +209,6 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
               />
             `
             : html``}
-        ${this.semanticStatus === 'checking'
-          ? html`<p class="questionaire-pane-take-question-text-response-feedback">Checking your answer…</p>`
-          : this.semanticStatus === 'correct'
-          ? html`<p class="questionaire-pane-take-question-text-response-feedback questionaire-pane-take-question-text-response-feedback--correct">This answer looks correct.</p>`
-          : this.semanticStatus === 'incorrect'
-          ? html`<p class="questionaire-pane-take-question-text-response-feedback questionaire-pane-take-question-text-response-feedback--incorrect">This answer may need another look.</p>`
-          : this.semanticStatus === 'unavailable'
-          ? html`<p class="questionaire-pane-take-question-text-response-feedback">Answer checking is unavailable, so the response will use the normal exact-match score.</p>`
-          : html``}
       </section>
     `
   }

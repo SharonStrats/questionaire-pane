@@ -37,22 +37,36 @@
   border-top: 1px solid #f1f5f9;
 }
 
-.questionaire-pane-take-question-area-view-feedback {
-  margin: 20px 0 0;
-  padding: 10px 12px;
+.questionaire-pane-take-question-area-view-hint {
+  margin-top: 20px;
+}
+
+.questionaire-pane-take-question-area-view-hint-button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
   border-radius: 10px;
+  background: #f8fafc;
+  color: #475569;
   font-size: 13px;
   font-weight: 600;
+  cursor: pointer;
 }
 
-.questionaire-pane-take-question-area-view-feedback--correct {
-  background: #ecfdf5;
-  color: #047857;
+.questionaire-pane-take-question-area-view-hint-button:hover {
+  background: #f1f5f9;
 }
 
-.questionaire-pane-take-question-area-view-feedback--incorrect {
-  background: #fff7ed;
-  color: #c2410c;
+.questionaire-pane-take-question-area-view-hint-button:focus-visible {
+  outline: 2px solid #6c5ce7;
+  outline-offset: 2px;
+}
+
+.questionaire-pane-take-question-area-view-hint p {
+  margin: 10px 0 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .questionaire-pane-take-question-area-view-nav-button {

@@ -4,6 +4,7 @@ import { customElement } from 'solid-ui'
 import styles from './QuestionairePaneCreateQuestionMultipleChoice.styles.css'
 import QuestionairePaneCreateQuestionCardBase from '../questionaire-pane-create-question-card-base/QuestionairePaneCreateQuestionCardBase'
 import '../../../shared/QuestionairePaneFormattingToolbar'
+import '../../../shared/QuestionairePaneFormattedTextEditor'
 import { readQuestionValue, readQuestionValues } from '../../../../service/questionaireQuestionAccessors'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-base/QuestionairePaneCreateQuestionBase'
@@ -39,6 +40,9 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends Questi
   private accessor draftHint = ''
 
   @state()
+  private accessor draftExplanation = ''
+
+  @state()
   private accessor draftImage = ''
 
   @state()
@@ -67,6 +71,7 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends Questi
 
     this.draftTitle = this.getQuestionTitle()
     this.draftHint = this.getQuestionHint()
+    this.draftExplanation = readQuestionValue(this.getStore()!, question, 'explanation')
     this.draftImage = readQuestionValue(this.getStore()!, question, 'image')
     this.draftPoints = String(this.getQuestionPoints())
     this.draftOptions = this.getQuestionOptions()
@@ -164,6 +169,7 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends Questi
 
     const title = this.draftTitle.trim()
     const hint = this.draftHint.trim()
+    const explanation = this.draftExplanation.trim()
     const image = this.draftImage.trim()
     const points = Number.parseInt(this.draftPoints, 10)
     const options = this.draftOptions.map((option) => option.trim()).filter((option) => option.length > 0)
@@ -172,6 +178,7 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends Questi
 
     await logic.updateQuestionText({ question, title })
     await logic.updateQuestionHint({ question, hint })
+    await logic.updateQuestionExplanation({ question, explanation })
     await logic.updateQuestionImage({ question, image })
     await logic.updateQuestionPoints({ question, points: Number.isFinite(points) ? points : 0 })
     await logic.updateQuestionOptions({
@@ -223,6 +230,7 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends Questi
 
     const title = this.draftTitle
     const hint = this.draftHint || this.getQuestionHint()
+    const explanation = this.draftExplanation
     const points = this.draftPoints || String(this.getQuestionPoints())
     const options = this.draftOptions.length > 0 ? this.draftOptions : (this.getQuestionOptions().length > 0 ? this.getQuestionOptions() : [''])
     const correctOptions = this.draftCorrectOptions.length > 0 ? this.draftCorrectOptions : this.getCorrectOptions()
@@ -251,6 +259,11 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends Questi
           </div>
         </div>
 
+        <div class="questionaire-pane-create-question-multiple-choice-field">
+          <label>More details <span>(optional)</span></label>
+          <textarea class="questionaire-pane-create-question-multiple-choice-input" rows="4" placeholder="Shown after an incorrect answer to explain the concept..." .value=${explanation} @input=${(event: Event) => { this.draftExplanation = (event.currentTarget as HTMLTextAreaElement).value }}></textarea>
+        </div>
+
         <questionaire-pane-create-question-image-upload
           .question=${question}
           .image=${this.draftImage}
@@ -262,14 +275,14 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends Questi
 
         <div class="questionaire-pane-create-question-multiple-choice-field">
           <label>Question</label>
-          <textarea
+          <questionaire-pane-formatted-text-editor
             class="questionaire-pane-create-question-multiple-choice-textarea"
             placeholder="Type your question here..."
             .value=${title}
-            @input=${(event: Event) => {
-              this.draftTitle = (event.currentTarget as HTMLTextAreaElement).value
+            @questionaire-formatted-text-input=${(event: CustomEvent<{ value: string }>) => {
+              this.draftTitle = event.detail.value
             }}
-          ></textarea>
+          ></questionaire-pane-formatted-text-editor>
           <questionaire-pane-formatting-toolbar></questionaire-pane-formatting-toolbar>
         </div>
 
@@ -364,6 +377,7 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends Questi
         <questionaire-pane-create-question-footer
           .points=${String(points)}
           .statusLabel=${this.draftDirty ? 'Changes not saved' : 'Saved'}
+          .saveDisabled=${!this.draftDirty}
           .saveLabel=${'Save question'}
           @questionaire-question-footer-points-changed=${(event: CustomEvent<{ points: string }>) => {
             this.draftPoints = event.detail.points

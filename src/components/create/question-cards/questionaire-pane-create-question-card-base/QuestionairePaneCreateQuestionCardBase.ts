@@ -19,15 +19,33 @@ export default abstract class QuestionairePaneCreateQuestionCardBase extends Web
   connectedCallback () {
     super.connectedCallback()
     this.addEventListener('input', this.onDraftInput)
+    this.addEventListener('click', this.onDraftClick)
   }
 
   disconnectedCallback () {
     this.removeEventListener('input', this.onDraftInput)
+    this.removeEventListener('click', this.onDraftClick)
     super.disconnectedCallback()
   }
 
   private onDraftInput = () => {
     this.draftDirty = true
+  }
+
+  private onDraftClick = (event: Event) => {
+    const target = event.target
+    if (!(target instanceof HTMLButtonElement) ||
+        target.disabled ||
+        target.closest('questionaire-pane-create-question-footer, questionaire-pane-create-question-header')) {
+      return
+    }
+    this.draftDirty = true
+  }
+
+  protected updated (changedProperties: Map<PropertyKey, unknown>) {
+    if (changedProperties.has('question')) {
+      this.draftDirty = false
+    }
   }
 
   protected getStore () {

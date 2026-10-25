@@ -1,10 +1,10 @@
 import { html, nothing } from 'lit'
-import { property } from 'lit/decorators.js'
+import { property, state } from 'lit/decorators.js'
 import { customElement, WebComponent } from 'solid-ui'
 import type { LiveStore, NamedNode } from 'rdflib'
 import styles from './QuestionairePaneTakeFinalScreen.styles.css'
 import { questionairePredicates } from '../../../service/questionairePredicates'
-import { readQuestionValues } from '../../../service/questionaireQuestionAccessors'
+import { readQuestionValue, readQuestionValues } from '../../../service/questionaireQuestionAccessors'
 import type { QuestionaireQuestionSummary } from '../../../service/questionaireQuestionQueries'
 import type { QuestionaireQuestionScore } from '../../../service/questionaireQuestionScoring'
 
@@ -45,6 +45,9 @@ export default class QuestionairePaneTakeFinalScreen extends WebComponent {
   @property({ attribute: false })
   accessor shareError = ''
 
+  @state()
+  private accessor visibleExplanations = new Set<string>()
+
   private getCorrectAnswers (question: NamedNode, score: QuestionaireQuestionScore): string[] {
     if (!this.store) return []
 
@@ -71,6 +74,16 @@ export default class QuestionairePaneTakeFinalScreen extends WebComponent {
   private formatAnswer (answer: string | string[] | null): string {
     if (Array.isArray(answer)) return answer.filter(Boolean).join(' → ')
     return answer?.trim() || 'No answer'
+  }
+
+  private toggleExplanation (questionUri: string) {
+    const visible = new Set(this.visibleExplanations)
+    if (visible.has(questionUri)) {
+      visible.delete(questionUri)
+    } else {
+      visible.add(questionUri)
+    }
+    this.visibleExplanations = visible
   }
   private handleRestart () {
     this.dispatchEvent(new CustomEvent('questionaire-take-restart', {
@@ -108,6 +121,10 @@ export default class QuestionairePaneTakeFinalScreen extends WebComponent {
                   ${missed.map((score) => {
                     const summary = this.questionSummaries.find((item) => item.question.uri === score.questionUri)
                     const correctAnswers = summary ? this.getCorrectAnswers(summary.question, score) : []
+                    const explanation = summary && this.store
+                      ? readQuestionValue(this.store, summary.question, 'explanation')
+                      : ''
+                    const explanationVisible = this.visibleExplanations.has(score.questionUri)
                     return html`
                       <article class="questionaire-pane-take-final-screen-review-item">
                         <div class="questionaire-pane-take-final-screen-review-heading">
@@ -118,6 +135,21 @@ export default class QuestionairePaneTakeFinalScreen extends WebComponent {
                         <p class="questionaire-pane-take-final-screen-correct-answer">
                           <span>Correct answer:</span> ${correctAnswers.length ? correctAnswers.join(' · ') : 'See the question instructions.'}
                         </p>
+                        ${explanation
+                          ? html`
+                              <button
+                                type="button"
+                                class="questionaire-pane-take-final-screen-explanation-button"
+                                aria-expanded=${String(explanationVisible)}
+                                @click=${() => this.toggleExplanation(score.questionUri)}
+                              >
+                                ${explanationVisible ? 'Hide more details' : 'Show more details'}
+                              </button>
+                              ${explanationVisible
+                                ? html`<p class="questionaire-pane-take-final-screen-explanation">${explanation}</p>`
+                                : nothing}
+                            `
+                          : nothing}
                       </article>
                     `
                   })}

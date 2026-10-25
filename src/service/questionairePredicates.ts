@@ -40,6 +40,7 @@ export const questionairePredicates = {
     position: schema('position'),
     // Application-specific quiz vocabulary: question guidance and scoring.
     hint: quiz('hint'),
+    explanation: quiz('explanation'),
     points: quiz('points'),
     rdfType: rdf('type'),
     // Schema.org: linked suggested and accepted answer resources.

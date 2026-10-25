@@ -22,6 +22,7 @@ export interface QuestionaireQuestionOptions {
   questionTypeUri?: string
   image?: string
   hint?: string
+  explanation?: string
   points?: number
   options?: string[]
   correctOption?: string | null

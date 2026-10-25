@@ -4,7 +4,7 @@ import { questionairePredicates } from './questionairePredicates'
 export function readQuestionValue (
   store: LiveStore,
   question: NamedNode,
-  field: 'title' | 'image' | 'hint' | 'points' | 'description' | 'identifier' | 'created' | 'isPartOf' | 'creator' | 'answer' | 'correctOption' | 'rdfType' | 'eduQuestionType'
+  field: 'title' | 'image' | 'hint' | 'explanation' | 'points' | 'description' | 'identifier' | 'created' | 'isPartOf' | 'creator' | 'answer' | 'correctOption' | 'rdfType' | 'eduQuestionType'
 ) {
   if (field === 'correctOption' || field === 'answer') {
     return readQuestionValues(store, question, field)[0] ?? ''

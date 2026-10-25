@@ -29,12 +29,6 @@
   letter-spacing: -0.02em;
 }
 
-.questionaire-pane-take-question-match-hint {
-  margin: 0;
-  color: #64748b;
-  font-size: 15px;
-  line-height: 1.6;
-}
 
 .questionaire-pane-take-question-match-board {
   display: grid;

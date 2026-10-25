@@ -10,6 +10,9 @@ import { questionairePredicates } from '../../../service/questionairePredicates'
 import { getQuestionnaireFormat } from '../../../service/questionaireQuestionQueries'
 import { loadQuestionaireQuestionSummaries, type QuestionaireQuestionSummary } from '../../../service/questionaireQuestionQueries'
 import { shareQuestionnaireResults } from '../../../service/shareQuestionnaireResults'
+import { readQuestionValue } from '../../../service/questionaireQuestionAccessors'
+import { renderFormattedText } from '../../shared/questionaire-pane-formatting'
+import { shuffleDifferent } from '../../../service/shuffle'
 import '../questionaire-pane-take-question-dispatcher/QuestionairePaneTakeQuestionDispatcher'
 import '../questionaire-pane-take-final-screen/QuestionairePaneTakeFinalScreen'
 
@@ -36,6 +39,9 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
 
   @state()
   private accessor questionsLoading = false
+
+  @state()
+  private accessor hintVisible = false
 
   @state()
   private accessor semanticAnswerResults: Record<string, boolean> = {}
@@ -84,7 +90,7 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
       return
     }
 
-    this.questions = questions
+    this.questions = shuffleDifferent(questions)
     this.questionsLoading = false
     const isQuiz = getQuestionnaireFormat(store, subject) === 'quiz'
     if (isQuiz && questions.some((question) => question.typeUri === questionairePredicates.question.questionType.shortAnswer.value)) {
@@ -123,6 +129,7 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
   }
 
   private goPrevious () {
+    this.hintVisible = false
     this.activeQuestionIndex = Math.max(0, this.activeQuestionIndex - 1)
   }
 
@@ -132,6 +139,7 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
       return
     }
 
+    this.hintVisible = false
     this.activeQuestionIndex = Math.min(questions.length - 1, this.activeQuestionIndex + 1)
   }
 
@@ -144,6 +152,7 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
   private restart () {
     this.completed = false
     this.activeQuestionIndex = 0
+    this.hintVisible = false
     this.answersByQuestionUri = {}
     this.semanticAnswerResults = {}
     this.shareStatus = 'idle'
@@ -161,7 +170,13 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
     this.shareStatus = 'sharing'
     this.shareError = ''
     try {
-      await shareQuestionnaireResults(store, acl, subject)
+      const score = calculateQuestionnaireScore(store, subject, this.answersByQuestionUri, this.semanticAnswerResults)
+      await shareQuestionnaireResults(store, acl, subject, {
+        earnedPoints: score.earnedPoints,
+        availablePoints: score.availablePoints,
+        answers: this.answersByQuestionUri,
+        questionUris: this.questions.map((question) => question.question.uri)
+      })
       this.shareStatus = 'shared'
     } catch (error) {
       this.shareStatus = 'error'
@@ -232,9 +247,7 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
     const isFirstQuestion = this.activeQuestionIndex <= 0
     const isLastQuestion = this.activeQuestionIndex >= questions.length - 1
     const answerComplete = this.hasCurrentAnswer(activeQuestion)
-    const currentScore = activeQuestion
-      ? score.questionScores.find((questionScore) => questionScore.questionUri === activeQuestion.question.uri)
-      : undefined
+    const hint = readQuestionValue(store, activeQuestion.question, 'hint')
 
     return html`
       <section class="questionaire-pane-take-question-area-view">
@@ -249,16 +262,26 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
             @questionaire-answer-changed=${(event: CustomEvent<{ questionUri: string, answer: AnswerValue }>) => this.handleAnswerChanged(event)}
             @questionaire-answer-evaluated=${(event: CustomEvent<{ questionUri: string, correct: boolean }>) => this.handleAnswerEvaluated(event)}
           ></questionaire-pane-take-question-dispatcher>
-          ${!isSurvey && answerComplete && currentScore
+          ${hint
             ? html`
-                <p class=${currentScore.correct
-                  ? 'questionaire-pane-take-question-area-view-feedback questionaire-pane-take-question-area-view-feedback--correct'
-                  : 'questionaire-pane-take-question-area-view-feedback questionaire-pane-take-question-area-view-feedback--incorrect'}
-                >
-                  ${currentScore.correct
-                    ? `Correct — ${currentScore.earnedPoints} point${currentScore.earnedPoints === 1 ? '' : 's'} earned.`
-                    : 'Not quite. You can review the correct answer when you finish.'}
-                </p>
+                <div class="questionaire-pane-take-question-area-view-hint">
+                  <button
+                    class="questionaire-pane-take-question-area-view-hint-button"
+                    type="button"
+                    aria-expanded=${String(this.hintVisible)}
+                    aria-controls="questionaire-pane-take-question-hint"
+                    @click=${() => { this.hintVisible = !this.hintVisible }}
+                  >
+                    ${this.hintVisible ? 'Hide hint' : 'Show hint'}
+                  </button>
+                  ${this.hintVisible
+                    ? html`
+                        <p id="questionaire-pane-take-question-hint">
+                          ${renderFormattedText(hint)}
+                        </p>
+                      `
+                    : ''}
+                </div>
               `
             : ''}
           <div class="questionaire-pane-take-question-area-view-navigation">

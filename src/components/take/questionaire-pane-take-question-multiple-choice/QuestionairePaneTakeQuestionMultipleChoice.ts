@@ -58,16 +58,6 @@ export default class QuestionairePaneTakeQuestionMultipleChoice extends WebCompo
     return readQuestionValue(store, question, 'title')
   }
 
-  private getQuestionHint () {
-    const store = this.getStore()
-    const question = this.question
-    if (!store || !question) {
-      return ''
-    }
-
-    return readQuestionValue(store, question, 'hint')
-  }
-
   private getQuestionImage () {
     const store = this.getStore()
     const question = this.question
@@ -154,7 +144,6 @@ export default class QuestionairePaneTakeQuestionMultipleChoice extends WebCompo
 
   render() {
     const title = this.getQuestionTitle()
-    const hint = this.getQuestionHint()
     const image = this.getQuestionImage()
     const options = this.getDisplayedOptions()
 
@@ -163,9 +152,6 @@ export default class QuestionairePaneTakeQuestionMultipleChoice extends WebCompo
         <div class="questionaire-pane-take-question-multiple-choice-type">${this.questionTypeLabel}</div>
         ${image ? html`<img class="questionaire-pane-question-image" src=${image} alt="" />` : ''}
         <h2 class="questionaire-pane-take-question-multiple-choice-title">${renderFormattedText(title || 'Untitled question')}</h2>
-        ${hint
-          ? html`<p class="questionaire-pane-take-question-multiple-choice-hint">${renderFormattedText(hint)}</p>`
-          : html``}
         <div class="questionaire-pane-take-question-multiple-choice-options">
           ${options.map((option) => html`
             <label class="questionaire-pane-take-question-multiple-choice-option ${this.isSelected(option) ? 'questionaire-pane-take-question-multiple-choice-option--selected' : ''}">

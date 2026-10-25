@@ -4,6 +4,7 @@ import { customElement } from 'solid-ui'
 import styles from './QuestionairePaneCreateQuestionOrdering.styles.css'
 import QuestionairePaneCreateQuestionCardBase from '../questionaire-pane-create-question-card-base/QuestionairePaneCreateQuestionCardBase'
 import '../../../shared/QuestionairePaneFormattingToolbar'
+import '../../../shared/QuestionairePaneFormattedTextEditor'
 import { readQuestionValue, readQuestionValues } from '../../../../service/questionaireQuestionAccessors'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
@@ -22,6 +23,9 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
   private accessor draftHint = ''
 
   @state()
+  private accessor draftExplanation = ''
+
+  @state()
   private accessor draftPoints = '1'
 
   @state()
@@ -30,7 +34,26 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
   @state()
   private accessor loadedQuestionUri: string | null = null
 
+  @state()
+  private accessor pendingItemFocusIndex: number | null = null
+
   private draggedItemIndex: number | null = null
+
+  protected updated (changedProperties: Map<PropertyKey, unknown>) {
+    super.updated(changedProperties)
+    if (this.pendingItemFocusIndex === null) {
+      return
+    }
+
+    const input = this.renderRoot.querySelector<HTMLInputElement>(
+      `[data-item-index="${this.pendingItemFocusIndex}"]`
+    )
+    if (input) {
+      input.focus()
+      input.select()
+      this.pendingItemFocusIndex = null
+    }
+  }
 
   protected willUpdate () {
     const question = this.question
@@ -40,6 +63,7 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
 
     this.draftTitle = this.getQuestionTitle()
     this.draftHint = this.getQuestionHint()
+    this.draftExplanation = readQuestionValue(this.getStore()!, question, 'explanation')
     this.draftPoints = String(this.getQuestionPoints())
     this.draftItems = this.getQuestionItems()
     this.loadedQuestionUri = question.uri
@@ -98,12 +122,14 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
 
     const title = this.draftTitle.trim()
     const hint = this.draftHint.trim()
+    const explanation = this.draftExplanation.trim()
     const points = Number.parseInt(this.draftPoints, 10)
     const items = (this.draftItems.length > 0 ? this.draftItems : ['', '', ''])
       .map((item) => item.trim())
 
     await logic.updateQuestionText({ question, title })
     await logic.updateQuestionHint({ question, hint })
+    await logic.updateQuestionExplanation({ question, explanation })
     await logic.updateQuestionPoints({ question, points: Number.isFinite(points) ? points : 0 })
     await logic.updateQuestionItems({ question, items })
 
@@ -120,6 +146,23 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
     const items = this.draftItems.length > 0 ? this.draftItems.slice() : this.getQuestionItems().slice()
     items.push('')
     this.draftItems = items
+    this.pendingItemFocusIndex = items.length - 1
+  }
+
+  private handleItemKeydown (index: number, event: KeyboardEvent) {
+    if (event.key !== 'Enter') {
+      return
+    }
+
+    event.preventDefault()
+    const items = this.draftItems.length > 0 ? this.draftItems.slice() : this.getQuestionItems().slice()
+    if (index === items.length - 1) {
+      items.push('')
+      this.draftItems = items
+      this.pendingItemFocusIndex = items.length - 1
+    } else {
+      this.pendingItemFocusIndex = index + 1
+    }
   }
 
   private handleDragStart (index: number, event: DragEvent) {
@@ -159,6 +202,7 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
 
     const title = this.draftTitle
     const hint = this.draftHint || this.getQuestionHint()
+    const explanation = this.draftExplanation
     const points = this.draftPoints || String(this.getQuestionPoints())
     const items = this.draftItems.length > 0 ? this.draftItems : this.getQuestionItems()
     const questionNumber = this.getQuestionNumber()
@@ -186,15 +230,20 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
         </div>
 
         <div class="questionaire-pane-create-question-ordering-field">
+          <label>More details <span>(optional)</span></label>
+          <textarea class="questionaire-pane-create-question-ordering-input" rows="4" placeholder="Shown after an incorrect answer to explain the concept..." .value=${explanation} @input=${(event: Event) => { this.draftExplanation = (event.currentTarget as HTMLTextAreaElement).value }}></textarea>
+        </div>
+
+        <div class="questionaire-pane-create-question-ordering-field">
           <label>Question</label>
-          <textarea
+          <questionaire-pane-formatted-text-editor
             class="questionaire-pane-create-question-ordering-textarea"
             placeholder="Type your question here..."
             .value=${title}
-            @input=${(event: Event) => {
-              this.draftTitle = (event.currentTarget as HTMLTextAreaElement).value
+            @questionaire-formatted-text-input=${(event: CustomEvent<{ value: string }>) => {
+              this.draftTitle = event.detail.value
             }}
-          ></textarea>
+          ></questionaire-pane-formatted-text-editor>
           <questionaire-pane-formatting-toolbar></questionaire-pane-formatting-toolbar>
         </div>
 
@@ -248,6 +297,7 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
                 ><icon-lucide-grip-vertical></icon-lucide-grip-vertical></button>
                 <span class="questionaire-pane-create-question-ordering-item-badge">${index + 1}</span>
                 <input
+                  data-item-index=${index}
                   class="questionaire-pane-create-question-ordering-item-input"
                   type="text"
                   .value=${item}
@@ -256,6 +306,7 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
                     nextItems[index] = (event.currentTarget as HTMLInputElement).value
                     this.draftItems = nextItems
                   }}
+                  @keydown=${(event: KeyboardEvent) => this.handleItemKeydown(index, event)}
                 />
               </div>
             `)}
@@ -273,6 +324,7 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
         <questionaire-pane-create-question-footer
           .points=${String(points)}
           .statusLabel=${this.draftDirty ? 'Changes not saved' : 'Saved'}
+          .saveDisabled=${!this.draftDirty}
           .saveLabel=${'Save question'}
           @questionaire-question-footer-points-changed=${(event: CustomEvent<{ points: string }>) => {
             this.draftPoints = event.detail.points

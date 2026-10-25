@@ -4,6 +4,7 @@ import { customElement } from 'solid-ui'
 import styles from './QuestionairePaneCreateQuestionMatch.styles.css'
 import QuestionairePaneCreateQuestionCardBase from '../questionaire-pane-create-question-card-base/QuestionairePaneCreateQuestionCardBase'
 import '../../../shared/QuestionairePaneFormattingToolbar'
+import '../../../shared/QuestionairePaneFormattedTextEditor'
 import { readQuestionValue, readQuestionValues } from '../../../../service/questionaireQuestionAccessors'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
@@ -20,6 +21,9 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
 
   @state()
   private accessor draftHint = ''
+
+  @state()
+  private accessor draftExplanation = ''
 
   @state()
   private accessor draftPoints = '1'
@@ -41,6 +45,7 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
 
     this.draftTitle = this.getQuestionTitle()
     this.draftHint = this.getQuestionHint()
+    this.draftExplanation = readQuestionValue(this.getStore()!, question, 'explanation')
     this.draftPoints = String(this.getQuestionPoints())
     this.draftLeftItems = this.getLeftItems()
     this.draftRightItems = this.getRightItems()
@@ -112,12 +117,14 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
 
     const title = this.draftTitle.trim()
     const hint = this.draftHint.trim()
+    const explanation = this.draftExplanation.trim()
     const points = Number.parseInt(this.draftPoints, 10)
     const leftItems = this.draftLeftItems.length > 0 ? this.draftLeftItems : ['', '']
     const rightItems = this.draftRightItems.length > 0 ? this.draftRightItems : ['', '']
 
     await logic.updateQuestionText({ question, title })
     await logic.updateQuestionHint({ question, hint })
+    await logic.updateQuestionExplanation({ question, explanation })
     await logic.updateQuestionPoints({ question, points: Number.isFinite(points) ? points : 0 })
     await logic.updateQuestionMatchPairs({ question, leftItems, rightItems })
 
@@ -144,6 +151,7 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
 
     const title = this.draftTitle
     const hint = this.draftHint || this.getQuestionHint()
+    const explanation = this.draftExplanation
     const points = this.draftPoints || String(this.getQuestionPoints())
     const leftItems = this.draftLeftItems.length > 0 ? this.draftLeftItems : this.getLeftItems()
     const rightItems = this.draftRightItems.length > 0 ? this.draftRightItems : this.getRightItems()
@@ -172,15 +180,20 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
         </div>
 
         <div class="questionaire-pane-create-question-match-field">
+          <label>More details <span>(optional)</span></label>
+          <textarea class="questionaire-pane-create-question-match-input" rows="4" placeholder="Shown after an incorrect answer to explain the concept..." .value=${explanation} @input=${(event: Event) => { this.draftExplanation = (event.currentTarget as HTMLTextAreaElement).value }}></textarea>
+        </div>
+
+        <div class="questionaire-pane-create-question-match-field">
           <label>Question</label>
-          <textarea
+          <questionaire-pane-formatted-text-editor
             class="questionaire-pane-create-question-match-textarea"
             placeholder="Type your question here..."
             .value=${title}
-            @input=${(event: Event) => {
-              this.draftTitle = (event.currentTarget as HTMLTextAreaElement).value
+            @questionaire-formatted-text-input=${(event: CustomEvent<{ value: string }>) => {
+              this.draftTitle = event.detail.value
             }}
-          ></textarea>
+          ></questionaire-pane-formatted-text-editor>
           <questionaire-pane-formatting-toolbar></questionaire-pane-formatting-toolbar>
         </div>
 
@@ -249,6 +262,7 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
         <questionaire-pane-create-question-footer
           .points=${String(points)}
           .statusLabel=${this.draftDirty ? 'Changes not saved' : 'Saved'}
+          .saveDisabled=${!this.draftDirty}
           .saveLabel=${'Save question'}
           @questionaire-question-footer-points-changed=${(event: CustomEvent<{ points: string }>) => {
             this.draftPoints = event.detail.points

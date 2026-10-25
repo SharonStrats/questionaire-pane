@@ -10,16 +10,24 @@ const base = configuredBase === '/'
   ? '/'
   : `/${configuredBase.replace(/^\/+|\/+$/g, '')}/`
 const solidUiDist = resolve(import.meta.dirname, '../solid-ui/dist')
+const webAwesome = resolve(import.meta.dirname, '../solid-ui/node_modules/@awesome.me/webawesome')
 
 export default defineConfig({
   root: '.',
   base,
   plugins: [solidPane({ litDecoratorPaths: ['src/components'] })],
   resolve: {
+    dedupe: ['solid-ui', '@awesome.me/webawesome', 'lit', 'lit-html'],
     alias: [
       { find: /^solid-ui$/, replacement: `${solidUiDist}/index.esm.js` },
+      { find: /^solid-ui\/components\/(.+)$/, replacement: `${solidUiDist}/components/$1/index.esm.js` },
       { find: /^solid-ui\/(.+)$/, replacement: `${solidUiDist}/$1` },
+      { find: /^@awesome\.me\/webawesome$/, replacement: webAwesome },
+      { find: /^@awesome\.me\/webawesome\/(.+)$/, replacement: `${webAwesome}/$1` },
     ],
+  },
+  optimizeDeps: {
+    exclude: ['@awesome.me/webawesome'],
   },
   build: {
     outDir: 'standalone-dist',

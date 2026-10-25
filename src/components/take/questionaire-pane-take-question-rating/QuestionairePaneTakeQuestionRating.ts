@@ -37,16 +37,6 @@ export default class QuestionairePaneTakeQuestionRating extends WebComponent {
     return readQuestionValue(store, question, 'title')
   }
 
-  private getHint () {
-    const store = this.questionaire?.store
-    const question = this.question
-    if (!store || !question) {
-      return ''
-    }
-
-    return readQuestionValue(store, question, 'hint')
-  }
-
   protected willUpdate () {
     const question = this.question
     if (!question || this.loadedQuestionUri === question.uri) {
@@ -73,14 +63,12 @@ export default class QuestionairePaneTakeQuestionRating extends WebComponent {
 
   render() {
     const title = this.getTitle()
-    const hint = this.getHint()
     const values = ['1', '2', '3', '4', '5']
 
     return html`
       <section class="questionaire-pane-take-question-rating">
         <div class="questionaire-pane-take-question-rating-type">Confidence / Rating</div>
         <h2 class="questionaire-pane-take-question-rating-title">${renderFormattedText(title || 'Untitled question')}</h2>
-        ${hint ? html`<p class="questionaire-pane-take-question-rating-hint">${renderFormattedText(hint)}</p>` : html``}
         <div class="questionaire-pane-take-question-rating-options">
           ${values.map((value) => html`
             <button

@@ -2,12 +2,20 @@ import { html } from 'lit'
 import { customElement, WebComponent } from 'solid-ui'
 import styles from './QuestionairePaneFormattingToolbar.styles.css'
 import { applyTextFormat, type TextFormat } from './questionaire-pane-formatting'
+import './QuestionairePaneFormattedTextEditor'
 
 @customElement('questionaire-pane-formatting-toolbar')
 export default class QuestionairePaneFormattingToolbar extends WebComponent {
   static styles = styles
 
   private format (format: TextFormat) {
+    const editor = this.parentElement?.querySelector<HTMLElement>('questionaire-pane-formatted-text-editor') as
+      | (HTMLElement & { formatSelection?: (value: TextFormat) => void })
+      | null
+    if (editor?.formatSelection) {
+      editor.formatSelection(format)
+      return
+    }
     const target = this.parentElement?.querySelector<HTMLTextAreaElement>('textarea, input')
     if (!target || target.selectionStart === target.selectionEnd) return
     const result = applyTextFormat(target.value, target.selectionStart, target.selectionEnd, format)

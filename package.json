@@ -29,8 +29,8 @@
     "postpublish": "git push origin staging",
     "start": "vite",
     "start:standalone": "vite --config vite.standalone.config.mts",
-    "start:standalone:3200": "vite --config vite.standalone.config.mts --port 3200",
-    "watch:standalone:3200": "vite --config vite.standalone.config.mts --port 3200 --open /standalone/index.html"
+    "start:standalone:4200": "vite --config vite.standalone.config.mts --port 4200",
+    "watch:standalone:4200": "vite --config vite.standalone.config.mts --port 4200 --open /standalone/index.html"
   },
   "files": [
     "dist/",
@@ -67,6 +67,7 @@
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^10.0.1",
     "globals": "^17.1.0",
+    "happy-dom": "^21.0.4",
     "solidos-toolkit": "dev",
     "typescript": "^5.9.3"
   },
@@ -75,8 +76,8 @@
     "@lit/context": "^1.1.6",
     "mammoth": "^1.13.0",
     "rdflib": "2.4.1",
-    "solid-logic": "6.0.0-2",
-    "solid-ui": "5.0.0-2",
+    "solid-logic": "6.0.1-5",
+    "solid-ui": "5.0.2-4",
     "vite": "^8.0.16",
     "vitest": "^4.0.18",
     "vitest-axe": "^0.1.0"

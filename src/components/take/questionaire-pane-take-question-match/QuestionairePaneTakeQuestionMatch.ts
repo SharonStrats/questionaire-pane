@@ -47,16 +47,6 @@ export default class QuestionairePaneTakeQuestionMatch extends WebComponent {
     return readQuestionValue(store, question, 'title')
   }
 
-  private getHint () {
-    const store = this.questionaire?.store
-    const question = this.question
-    if (!store || !question) {
-      return ''
-    }
-
-    return readQuestionValue(store, question, 'hint')
-  }
-
   private getLeftItems () {
     const store = this.questionaire?.store
     const question = this.question
@@ -170,7 +160,6 @@ export default class QuestionairePaneTakeQuestionMatch extends WebComponent {
 
   render() {
     const title = this.getTitle()
-    const hint = this.getHint()
     const leftItems = this.getLeftItems()
     const rightItems = this.getDisplayedRightItems()
     const current = this.draftAnswer.length > 0 ? this.draftAnswer : leftItems.map((leftItem) => `${leftItem}|||`)
@@ -180,7 +169,6 @@ export default class QuestionairePaneTakeQuestionMatch extends WebComponent {
       <section class="questionaire-pane-take-question-match">
         <div class="questionaire-pane-take-question-match-type">Match</div>
         <h2 class="questionaire-pane-take-question-match-title">${renderFormattedText(title || 'Untitled question')}</h2>
-        ${hint ? html`<p class="questionaire-pane-take-question-match-hint">${renderFormattedText(hint)}</p>` : html``}
         <div class="questionaire-pane-take-question-match-board">
           <div class="questionaire-pane-take-question-match-column">
             <div class="questionaire-pane-take-question-match-column-label">Fields</div>

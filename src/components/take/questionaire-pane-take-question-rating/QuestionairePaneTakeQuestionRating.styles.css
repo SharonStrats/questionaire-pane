@@ -2,7 +2,6 @@
 .questionaire-pane-take-question-rating { display: flex; flex-direction: column; gap: 16px; }
 .questionaire-pane-take-question-rating-type { display: inline-flex; width: fit-content; padding: 4px 10px; border-radius: 999px; background: #e9d5ff; color: #7c3aed; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
 .questionaire-pane-take-question-rating-title { margin: 0; color: #1e293b; font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
-.questionaire-pane-take-question-rating-hint { margin: 0; color: #64748b; font-size: 15px; line-height: 1.6; }
 .questionaire-pane-take-question-rating-options { display: flex; gap: 10px; flex-wrap: wrap; }
 .questionaire-pane-take-question-rating-option { min-width: 44px; min-height: 44px; border: 1px solid #e2e5ea; border-radius: 12px; background: white; color: #334155; font-weight: 600; cursor: pointer; }
 .questionaire-pane-take-question-rating-option--selected { border-color: #7c3aed; background: #f5f3ff; color: #6d28d9; }

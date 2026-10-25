@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { shuffle } from './shuffle'
+import { shuffle, shuffleDifferent } from './shuffle'
 
 describe('shuffle', () => {
   it('returns a new array without changing the input', () => {
@@ -19,5 +19,11 @@ describe('shuffle', () => {
       .mockReturnValueOnce(0)
 
     expect(shuffle(['one', 'two', 'three'])).toEqual(['two', 'three', 'one'])
+  })
+
+  it('does not leave multiple values in their original order', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99)
+
+    expect(shuffleDifferent([1, 2])).toEqual([2, 1])
   })
 })

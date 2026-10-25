@@ -43,16 +43,6 @@ export default class QuestionairePaneTakeQuestionOrdering extends WebComponent {
     return readQuestionValue(store, question, 'title')
   }
 
-  private getHint () {
-    const store = this.questionaire?.store
-    const question = this.question
-    if (!store || !question) {
-      return ''
-    }
-
-    return readQuestionValue(store, question, 'hint')
-  }
-
   private getItems () {
     const store = this.questionaire?.store
     const question = this.question
@@ -211,14 +201,12 @@ export default class QuestionairePaneTakeQuestionOrdering extends WebComponent {
 
   render() {
     const title = this.getTitle()
-    const hint = this.getHint()
     const items = this.draftAnswer.length > 0 ? this.draftAnswer : this.getItems()
 
     return html`
       <section class="questionaire-pane-take-question-ordering">
         <div class="questionaire-pane-take-question-ordering-type">Ordering</div>
         <h2 class="questionaire-pane-take-question-ordering-title">${renderFormattedText(title || 'Untitled question')}</h2>
-        ${hint ? html`<p class="questionaire-pane-take-question-ordering-hint">${renderFormattedText(hint)}</p>` : html``}
         <div class="questionaire-pane-take-question-ordering-list">
           ${items.map((item, index) => html`
             <div

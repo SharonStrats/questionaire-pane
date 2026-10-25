@@ -43,16 +43,6 @@ export default class QuestionairePaneTakeQuestionTrueFalse extends WebComponent 
     return readQuestionValue(store, question, 'title')
   }
 
-  private getQuestionHint () {
-    const store = this.getStore()
-    const question = this.question
-    if (!store || !question) {
-      return ''
-    }
-
-    return readQuestionValue(store, question, 'hint')
-  }
-
   private getQuestionImage () {
     const store = this.getStore()
     const question = this.question
@@ -85,7 +75,6 @@ export default class QuestionairePaneTakeQuestionTrueFalse extends WebComponent 
 
   render() {
     const title = this.getQuestionTitle()
-    const hint = this.getQuestionHint()
     const image = this.getQuestionImage()
     const selected = this.draftAnswer
 
@@ -94,9 +83,6 @@ export default class QuestionairePaneTakeQuestionTrueFalse extends WebComponent 
         <div class="questionaire-pane-take-question-true-false-type">True / False</div>
         ${image ? html`<img class="questionaire-pane-question-image" src=${image} alt="" />` : ''}
         <h2 class="questionaire-pane-take-question-true-false-title">${renderFormattedText(title || 'Untitled question')}</h2>
-        ${hint
-          ? html`<p class="questionaire-pane-take-question-true-false-hint">${renderFormattedText(hint)}</p>`
-          : html``}
         <div class="questionaire-pane-take-question-true-false-options">
           <button
             class="questionaire-pane-take-question-true-false-option ${selected === 'true' ? 'questionaire-pane-take-question-true-false-option--selected' : ''}"

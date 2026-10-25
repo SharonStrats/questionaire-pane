@@ -38,7 +38,6 @@ export default class QuestionairePaneTakeQuestionDispatcher extends WebComponent
     }
 
     const title = readQuestionValue(store, question, 'title') || 'Untitled question'
-    const hint = readQuestionValue(store, question, 'hint')
     const points = readQuestionValue(store, question, 'points') || '1'
     const typeUri = this.questionTypeUri ?? readQuestionTypeUri(store, question)
     const typeDefinition = getQuestionaireCreateQuestionTypeByUri(typeUri)
@@ -118,7 +117,6 @@ export default class QuestionairePaneTakeQuestionDispatcher extends WebComponent
     return html`
       <section class="questionaire-pane-take-question-dispatcher">
         <h2>${renderFormattedText(title)}</h2>
-        ${hint ? html`<p>${renderFormattedText(hint)}</p>` : html``}
         <p>Question type ${typeDefinition?.label ?? 'Question'} is not yet implemented for taking.</p>
         <p>Points: ${points}</p>
       </section>

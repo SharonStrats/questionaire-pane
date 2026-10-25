@@ -10,3 +10,11 @@ export function shuffle<T> (values: T[]): T[] {
 
   return result
 }
+
+export function shuffleDifferent<T> (values: T[]): T[] {
+  const result = shuffle(values)
+  if (result.length > 1 && result.every((value, index) => value === values[index])) {
+    ;[result[0], result[1]] = [result[1], result[0]]
+  }
+  return result
+}
