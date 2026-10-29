@@ -53,6 +53,11 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
     this.loadedQuestionUri = question.uri
   }
 
+  protected resetDraft () {
+    super.resetDraft()
+    this.loadedQuestionUri = null
+  }
+
   private getQuestionTitle () {
     const store = this.getStore()
     const question = this.question
@@ -209,14 +214,7 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
         </div>
 
         <div class="questionaire-pane-create-question-fill-in-the-blank-field">
-          <div class="questionaire-pane-create-question-fill-in-the-blank-field-header">
-            <label>Question</label>
-            <button class="questionaire-pane-create-question-fill-in-the-blank-insert" type="button" @click=${() => this.insertBlank()}>
-              <span>+</span>
-              <span>Insert blank</span>
-            </button>
-          </div>
-          <questionaire-pane-formatting-toolbar></questionaire-pane-formatting-toolbar>
+          <label>Question</label>
           <questionaire-pane-formatted-text-editor
             class="questionaire-pane-create-question-fill-in-the-blank-textarea"
             placeholder="Type your question here..."
@@ -225,6 +223,13 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
               this.updateQuestionDraftTitle(event.detail.value)
             }}
           ></questionaire-pane-formatted-text-editor>
+          <div class="questionaire-pane-create-question-fill-in-the-blank-question-actions">
+            <questionaire-pane-formatting-toolbar></questionaire-pane-formatting-toolbar>
+            <button class="questionaire-pane-create-question-fill-in-the-blank-insert" type="button" @click=${() => this.insertBlank()}>
+              <span>+</span>
+              <span>Insert blank</span>
+            </button>
+          </div>
           <p class="questionaire-pane-create-question-fill-in-the-blank-note">${blankCount} ${blankCount === 1 ? 'blank' : 'blanks'} detected — fill in the correct answer(s) below</p>
         </div>
 
@@ -267,6 +272,7 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
           .points=${String(points)}
           .statusLabel=${this.draftDirty ? 'Changes not saved' : 'Saved'}
           .saveDisabled=${!this.draftDirty}
+          .cancelDisabled=${!this.draftDirty}
           .saveLabel=${'Save question'}
           @questionaire-question-footer-points-changed=${(event: CustomEvent<{ points: string }>) => {
             this.draftPoints = event.detail.points

@@ -1,4 +1,4 @@
-import { html } from 'lit'
+import { html, type PropertyValues } from 'lit'
 import { consume } from '@lit/context'
 import { property, state } from 'lit/decorators.js'
 import { customElement, WebComponent } from 'solid-ui'
@@ -6,6 +6,7 @@ import { type NamedNode } from 'rdflib'
 import styles from './QuestionairePaneTakeQuestionOrdering.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
 import { readQuestionValue, readQuestionValues } from '../../../service/questionaireQuestionAccessors'
+import { shuffleDifferent } from '../../../service/shuffle'
 import { renderFormattedText } from '../../shared/questionaire-pane-formatting'
 import 'solid-ui/components/button'
 import '~icons/lucide/grip-vertical'
@@ -29,6 +30,7 @@ export default class QuestionairePaneTakeQuestionOrdering extends WebComponent {
   @state()
   private accessor loadedQuestionUri: string | null = null
 
+  private initialAnswerToEmit: string[] | null = null
   private draggedItemIndex: number | null = null
   private dropTargetIndex: number | null = null
   private touchPointerId: number | null = null
@@ -60,12 +62,22 @@ export default class QuestionairePaneTakeQuestionOrdering extends WebComponent {
       return
     }
 
-    this.draftAnswer = this.answer ?? this.getItems()
+    this.draftAnswer = this.answer?.length ? this.answer : shuffleDifferent(this.getItems())
+    this.initialAnswerToEmit = this.answer?.length ? null : this.draftAnswer.slice()
     this.loadedQuestionUri = question.uri
   }
 
-  private syncAnswer (value: string[]) {
-    this.draftAnswer = value
+  protected updated (changedProperties: PropertyValues) {
+    if (!changedProperties.has('question') || !this.question || !this.initialAnswerToEmit) {
+      return
+    }
+
+    const answer = this.initialAnswerToEmit
+    this.initialAnswerToEmit = null
+    this.dispatchAnswer(answer)
+  }
+
+  private dispatchAnswer (value: string[]) {
     const question = this.question
     if (!question) {
       return
@@ -76,6 +88,11 @@ export default class QuestionairePaneTakeQuestionOrdering extends WebComponent {
       composed: true,
       detail: { questionUri: question.uri, answer: value }
     }))
+  }
+
+  private syncAnswer (value: string[]) {
+    this.draftAnswer = value
+    this.dispatchAnswer(value)
   }
 
   private moveItem (index: number, direction: -1 | 1) {

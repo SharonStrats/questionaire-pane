@@ -15,7 +15,12 @@ const webAwesome = resolve(import.meta.dirname, '../solid-ui/node_modules/@aweso
 export default defineConfig({
   root: '.',
   base,
-  plugins: [solidPane({ litDecoratorPaths: ['src/components'] })],
+  plugins: [solidPane({
+    litDecoratorPaths: ['src/components'],
+    sandbox: {
+      subject: 'https://testingsolidos.solidcommunity.net/'
+    }
+  })],
   resolve: {
     dedupe: ['solid-ui', '@awesome.me/webawesome', 'lit', 'lit-html'],
     alias: [

@@ -80,6 +80,11 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends Questi
     this.loadedQuestionUri = question.uri
   }
 
+  protected resetDraft () {
+    super.resetDraft()
+    this.loadedQuestionUri = null
+  }
+
   protected updated () {
     const pendingOptionFocusIndex = this.pendingOptionFocusIndex
     if (pendingOptionFocusIndex === null) {
@@ -378,6 +383,7 @@ export default class QuestionairePaneCreateQuestionMultipleChoice extends Questi
           .points=${String(points)}
           .statusLabel=${this.draftDirty ? 'Changes not saved' : 'Saved'}
           .saveDisabled=${!this.draftDirty}
+          .cancelDisabled=${!this.draftDirty}
           .saveLabel=${'Save question'}
           @questionaire-question-footer-points-changed=${(event: CustomEvent<{ points: string }>) => {
             this.draftPoints = event.detail.points

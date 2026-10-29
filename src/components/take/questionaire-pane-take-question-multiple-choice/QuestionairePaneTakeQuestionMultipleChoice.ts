@@ -6,7 +6,7 @@ import { type NamedNode } from 'rdflib'
 import styles from './QuestionairePaneTakeQuestionMultipleChoice.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
 import { readQuestionValue, readQuestionValues } from '../../../service/questionaireQuestionAccessors'
-import { shuffle } from '../../../service/shuffle'
+import { shuffleDifferent } from '../../../service/shuffle'
 import { renderFormattedText } from '../../shared/questionaire-pane-formatting'
 
 type AnswerValue = string | string[] | null
@@ -80,7 +80,7 @@ export default class QuestionairePaneTakeQuestionMultipleChoice extends WebCompo
     const options = this.getQuestionOptions()
     const signature = options.join('\u0000')
     if (signature !== this.loadedOptionsSignature) {
-      this.shuffledOptions = shuffle(options)
+      this.shuffledOptions = shuffleDifferent(options)
       this.loadedOptionsSignature = signature
     }
     return this.shuffledOptions
@@ -102,7 +102,7 @@ export default class QuestionairePaneTakeQuestionMultipleChoice extends WebCompo
     const options = this.getQuestionOptions()
     const signature = options.join('\u0000')
     if (signature !== this.loadedOptionsSignature) {
-      this.shuffledOptions = shuffle(options)
+      this.shuffledOptions = shuffleDifferent(options)
       this.loadedOptionsSignature = signature
     }
   }

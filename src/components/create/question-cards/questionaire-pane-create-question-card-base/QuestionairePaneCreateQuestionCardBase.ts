@@ -20,11 +20,13 @@ export default abstract class QuestionairePaneCreateQuestionCardBase extends Web
     super.connectedCallback()
     this.addEventListener('input', this.onDraftInput)
     this.addEventListener('click', this.onDraftClick)
+    this.addEventListener('questionaire-question-footer-cancel', this.onDraftCancel)
   }
 
   disconnectedCallback () {
     this.removeEventListener('input', this.onDraftInput)
     this.removeEventListener('click', this.onDraftClick)
+    this.removeEventListener('questionaire-question-footer-cancel', this.onDraftCancel)
     super.disconnectedCallback()
   }
 
@@ -40,6 +42,14 @@ export default abstract class QuestionairePaneCreateQuestionCardBase extends Web
       return
     }
     this.draftDirty = true
+  }
+
+  private onDraftCancel = () => {
+    this.resetDraft()
+  }
+
+  protected resetDraft () {
+    this.draftDirty = false
   }
 
   protected updated (changedProperties: Map<PropertyKey, unknown>) {

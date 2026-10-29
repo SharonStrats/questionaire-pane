@@ -21,6 +21,9 @@ export default class QuestionairePaneCreateQuestionFooter extends WebComponent {
   @property({ type: Boolean, attribute: 'save-disabled' })
   accessor saveDisabled = false
 
+  @property({ type: Boolean, attribute: 'cancel-disabled' })
+  accessor cancelDisabled = false
+
   private handlePointsInput (event: Event) {
     this.dispatchEvent(new CustomEvent('questionaire-question-footer-points-changed', {
       bubbles: true,
@@ -31,6 +34,13 @@ export default class QuestionairePaneCreateQuestionFooter extends WebComponent {
 
   private handleSaveClick () {
     this.dispatchEvent(new CustomEvent('questionaire-question-footer-save', {
+      bubbles: true,
+      composed: true
+    }))
+  }
+
+  private handleCancelClick () {
+    this.dispatchEvent(new CustomEvent('questionaire-question-footer-cancel', {
       bubbles: true,
       composed: true
     }))
@@ -54,15 +64,25 @@ export default class QuestionairePaneCreateQuestionFooter extends WebComponent {
             />
           </div>
         </div>
-        <button
-          class="questionaire-pane-create-question-footer-save"
-          type="button"
-          ?disabled=${this.saveDisabled}
-          @click=${() => this.handleSaveClick()}
-        >
-          <icon-lucide-check></icon-lucide-check>
-          <span>${this.saveLabel}</span>
-        </button>
+        <div class="questionaire-pane-create-question-footer-actions">
+          <button
+            class="questionaire-pane-create-question-footer-cancel"
+            type="button"
+            ?disabled=${this.cancelDisabled}
+            @click=${() => this.handleCancelClick()}
+          >
+            Cancel
+          </button>
+          <button
+            class="questionaire-pane-create-question-footer-save"
+            type="button"
+            ?disabled=${this.saveDisabled}
+            @click=${() => this.handleSaveClick()}
+          >
+            <icon-lucide-check></icon-lucide-check>
+            <span>${this.saveLabel}</span>
+          </button>
+        </div>
       </div>
     `
   }

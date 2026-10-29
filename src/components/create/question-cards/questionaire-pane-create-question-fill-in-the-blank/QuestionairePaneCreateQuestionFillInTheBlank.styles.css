@@ -120,11 +120,16 @@
   font-weight: 500;
 }
 
-.questionaire-pane-create-question-fill-in-the-blank-field-header {
+.questionaire-pane-create-question-fill-in-the-blank-question-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.questionaire-pane-create-question-fill-in-the-blank-question-actions questionaire-pane-formatting-toolbar {
+  flex: 1;
+  min-width: 0;
 }
 
 .questionaire-pane-create-question-fill-in-the-blank-insert {

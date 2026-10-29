@@ -1,4 +1,5 @@
 /// <reference types="unplugin-icons/types/web-components" />
+/// <reference types="vite/client" />
 
 type CSSResultGroup = import('lit').CSSResultGroup
 

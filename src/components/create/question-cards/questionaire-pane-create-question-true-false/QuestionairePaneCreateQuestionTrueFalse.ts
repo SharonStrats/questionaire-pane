@@ -53,6 +53,11 @@ export default class QuestionairePaneCreateQuestionTrueFalse extends Questionair
     this.loadedQuestionUri = question.uri
   }
 
+  protected resetDraft () {
+    super.resetDraft()
+    this.loadedQuestionUri = null
+  }
+
   private getQuestionTitle () {
     const store = this.getStore()
     const question = this.question
@@ -236,6 +241,7 @@ export default class QuestionairePaneCreateQuestionTrueFalse extends Questionair
           .points=${String(points)}
           .statusLabel=${this.draftDirty ? 'Changes not saved' : 'Saved'}
           .saveDisabled=${!this.draftDirty}
+          .cancelDisabled=${!this.draftDirty}
           .saveLabel=${'Save question'}
           @questionaire-question-footer-points-changed=${(event: CustomEvent<{ points: string }>) => {
             this.draftPoints = event.detail.points

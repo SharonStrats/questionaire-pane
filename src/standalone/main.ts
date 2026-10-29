@@ -32,6 +32,17 @@ const store = solidStore as LiveStore
 const app = document.querySelector<HTMLElement>('#app')!
 const loginReturnUrlKey = 'questionaire-pane:login-return-url'
 
+function configureLocalLoginIssuer (): void {
+  if (window.location.hostname !== 'localhost' || window.location.port !== '4200') return
+
+  const configuredIssuer = import.meta.env.VITE_LOGIN_ISSUER?.trim() || 'http://localhost:3100'
+  const currentIssuer = window.localStorage.getItem('loginIssuer')
+
+  if (!currentIssuer || currentIssuer === window.location.origin) {
+    window.localStorage.setItem('loginIssuer', configuredIssuer)
+  }
+}
+
 function isOAuthCallback (url: URL): boolean {
   return ['code', 'state', 'iss'].some(parameter => url.searchParams.has(parameter))
 }
@@ -54,6 +65,8 @@ function restoreLoginReturnUrl (): void {
   const targetUrl = new URL(returnUrl, window.location.origin)
   history.replaceState(null, document.title, `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`)
 }
+
+configureLocalLoginIssuer()
 
 function message (text: string, kind: 'info' | 'error' = 'info'): void {
   app.innerHTML = ''

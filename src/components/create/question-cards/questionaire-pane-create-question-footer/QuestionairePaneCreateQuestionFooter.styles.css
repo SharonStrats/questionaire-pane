@@ -19,6 +19,34 @@
   min-width: 0;
 }
 
+.questionaire-pane-create-question-footer-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.questionaire-pane-create-question-footer-cancel {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #e2e5ea;
+  border-radius: 10px;
+  background: white;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.questionaire-pane-create-question-footer-cancel:hover {
+  background: #f8fafc;
+  color: #1a2235;
+}
+
+.questionaire-pane-create-question-footer-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .questionaire-pane-create-question-footer-status {
   display: inline-flex;
   align-items: center;

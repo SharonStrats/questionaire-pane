@@ -6,7 +6,7 @@ import { type NamedNode } from 'rdflib'
 import styles from './QuestionairePaneTakeQuestionMatch.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
 import { readQuestionValue, readQuestionValues } from '../../../service/questionaireQuestionAccessors'
-import { shuffle } from '../../../service/shuffle'
+import { shuffleDifferent } from '../../../service/shuffle'
 import { renderFormattedText } from '../../shared/questionaire-pane-formatting'
 import '~icons/lucide/grip-vertical'
 import '~icons/lucide/x'
@@ -73,7 +73,7 @@ export default class QuestionairePaneTakeQuestionMatch extends WebComponent {
     const rightItems = this.getRightItems()
     const signature = rightItems.join('\u0000')
     if (signature !== this.loadedRightItemsSignature) {
-      this.shuffledRightItems = shuffle(rightItems)
+      this.shuffledRightItems = shuffleDifferent(rightItems)
       this.loadedRightItemsSignature = signature
     }
     return this.shuffledRightItems
@@ -96,7 +96,7 @@ export default class QuestionairePaneTakeQuestionMatch extends WebComponent {
     const rightItems = this.getRightItems()
     const signature = rightItems.join('\u0000')
     if (signature !== this.loadedRightItemsSignature) {
-      this.shuffledRightItems = shuffle(rightItems)
+      this.shuffledRightItems = shuffleDifferent(rightItems)
       this.loadedRightItemsSignature = signature
     }
   }
