@@ -69,6 +69,13 @@ export default class QuestionairePaneFormattedTextEditor extends WebComponent {
     }))
   }
 
+  protected updated (changedProperties: Map<PropertyKey, unknown>) {
+    if (!changedProperties.has('value')) return
+    const editable = this.editable
+    if (!editable || htmlToValue(editable) === this.value) return
+    editable.innerHTML = valueToHtml(this.value)
+  }
+
   formatSelection (format: TextFormat) {
     const editable = this.editable
     const selection = editable?.ownerDocument.getSelection()
@@ -127,7 +134,6 @@ export default class QuestionairePaneFormattedTextEditor extends WebComponent {
         aria-multiline="true"
         data-placeholder=${this.placeholder}
         style="display:block;width:100%;min-height:96px;padding:16px;box-sizing:border-box;outline:none;white-space:pre-wrap;overflow-wrap:anywhere;"
-        .innerHTML=${valueToHtml(this.value)}
         @input=${this.handleInput}
       ></div>
     `
