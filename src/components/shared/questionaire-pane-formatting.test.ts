@@ -24,6 +24,32 @@ describe('questionaire text formatting', () => {
     container.remove()
   })
 
+  it('inserts text at the active editor selection', async () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    render(html`<questionaire-pane-formatted-text-editor .value=${'Before after'}></questionaire-pane-formatted-text-editor>`, container)
+    const editor = container.firstElementChild as HTMLElement & {
+      insertTextAtSelection: (text: string) => void
+      updateComplete: Promise<void>
+      value: string
+    }
+    await editor.updateComplete
+    const editable = editor.querySelector('[contenteditable="true"]')!
+    const text = editable.firstChild!
+    const selection = document.getSelection()!
+    const range = document.createRange()
+    range.setStart(text, 'Before '.length)
+    range.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(range)
+
+    editor.insertTextAtSelection('[____]')
+
+    expect(editor.value).toBe('Before [____]after')
+    expect(editable.textContent).toBe('Before [____]after')
+    container.remove()
+  })
+
   it('wraps the selected text with the explicit subscript representation', () => {
     expect(applyTextFormat('H2O', 1, 2, 'subscript')).toEqual({
       value: 'H[[sub:2]]O',

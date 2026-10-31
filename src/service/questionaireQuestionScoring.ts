@@ -1,6 +1,9 @@
 import { sym, type LiveStore, type NamedNode } from 'rdflib'
 import { questionairePredicates } from './questionairePredicates'
-import { readQuestionTypeUri as readQuestionTypeUriFromStore } from './questionaireQuestionAccessors'
+import {
+  readQuestionTypeUri as readQuestionTypeUriFromStore,
+  readQuestionValues
+} from './questionaireQuestionAccessors'
 import { getQuestionnaireFormat } from './questionaireQuestionQueries'
 
 export interface QuestionaireAnswerValue {
@@ -126,7 +129,9 @@ export function evaluateQuestionAnswer (
 
   const correctOptionValues = readQuestionValueList(store, question, questionairePredicates.question.correctOption)
   const answerValues = readQuestionValueList(store, question, questionairePredicates.question.answer)
-  const itemValues = readQuestionValueList(store, question, questionairePredicates.question.item)
+  // Ordering questions store their values under schema:hasPart/itemListElement,
+  // rather than as direct schema:item triples on the question.
+  const itemValues = readQuestionValues(store, question, 'item')
   const expected = answerValues.length > 0 ? answerValues : correctOptionValues
 
   if (questionTypeUri === questionairePredicates.question.questionType.multipleChoice.value || questionTypeUri === questionairePredicates.question.questionType.trueFalse.value) {

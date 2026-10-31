@@ -18,7 +18,67 @@ function addMatchPair (
   store.add(st(pair, questionairePredicates.question.targetItem, literal(right), doc))
 }
 
+function addOrderingQuestion (
+  store: LiveStore,
+  questionnaire: NamedNode,
+  question: NamedNode,
+  items: string[]
+) {
+  const indexDoc = questionnaire.doc()
+  const questionDoc = question.doc()
+  const list = sym(`${question.doc().uri}#ordered-items`)
+
+  store.add(st(questionnaire, questionairePredicates.question.rdfType, questionairePredicates.questionnaire.quizType, indexDoc))
+  store.add(st(questionnaire, questionairePredicates.questionnaire.question, question, indexDoc))
+  store.add(st(question, questionairePredicates.question.isPartOf, sym(`${questionnaire.uri.replace(/index\.ttl#this$/, '')}draft.ttl`), questionDoc))
+  store.add(st(question, questionairePredicates.question.eduQuestionType, literal('Ordering'), questionDoc))
+  store.add(st(question, questionairePredicates.question.orderedItems, list, questionDoc))
+
+  // Insert list elements out of order to ensure scoring follows schema:position,
+  // not RDF statement iteration order.
+  items.map((item, index) => ({ item, index })).reverse().forEach(({ item, index }) => {
+    const listItem = sym(`${question.doc().uri}#ordered-item-${index + 1}`)
+    const value = sym(`${question.doc().uri}#ordered-value-${index + 1}`)
+    store.add(st(list, questionairePredicates.question.itemListElement, listItem, questionDoc))
+    store.add(st(listItem, questionairePredicates.question.position, literal(String(index + 1)), questionDoc))
+    store.add(st(listItem, questionairePredicates.question.item, value, questionDoc))
+    store.add(st(value, questionairePredicates.question.answerText, literal(item), questionDoc))
+  })
+}
+
 describe('calculateQuestionnaireScore', () => {
+  it('scores a correctly ordered answer from the persisted item list', () => {
+    const store = graph() as LiveStore
+    const questionnaire = sym('https://pod.example/ordering-questionnaire/index.ttl#this')
+    const question = sym('https://pod.example/ordering-questionnaire/draft/questions/q1.ttl')
+    addOrderingQuestion(store, questionnaire, question, ['First step', 'Second step', 'Final step'])
+
+    const score = calculateQuestionnaireScore(store, questionnaire, {
+      [question.uri]: [' First   step ', 'second step', 'FINAL STEP']
+    })
+
+    expect(score.questionScores[0]).toEqual(expect.objectContaining({
+      correct: true,
+      earnedPoints: 1
+    }))
+  })
+
+  it('rejects an answer with the right items in the wrong order', () => {
+    const store = graph() as LiveStore
+    const questionnaire = sym('https://pod.example/ordering-questionnaire-wrong/index.ttl#this')
+    const question = sym('https://pod.example/ordering-questionnaire-wrong/draft/questions/q1.ttl')
+    addOrderingQuestion(store, questionnaire, question, ['First step', 'Second step', 'Final step'])
+
+    const score = calculateQuestionnaireScore(store, questionnaire, {
+      [question.uri]: ['First step', 'Final step', 'Second step']
+    })
+
+    expect(score.questionScores[0]).toEqual(expect.objectContaining({
+      correct: false,
+      earnedPoints: 0
+    }))
+  })
+
   it('scores every correct match pair when separate source and target triples have a different order', () => {
     const store = graph() as LiveStore
     const questionnaire = sym('https://pod.example/questionnaire/index.ttl#this')

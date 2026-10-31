@@ -128,28 +128,11 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
     this.emitQuestionSaved()
   }
 
-  private updateQuestionTitle (value: string) {
-    this.draftTitle = value
-  }
-
   private insertBlank () {
-    const textarea = this.renderRoot.querySelector<HTMLTextAreaElement>('textarea')
-    if (!textarea) return
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const next = `${textarea.value.slice(0, start)}[____]${textarea.value.slice(end)}`
-    this.draftTitle = next
-    const blankCount = this.getBlankCount(next)
-    if (!this.pointsCustomized) {
-      this.draftPoints = String(blankCount)
-    }
-    this.draftAnswers = this.draftAnswers.concat(
-      Array.from({ length: Math.max(0, blankCount - this.draftAnswers.length) }, () => '')
-    )
-    textarea.value = next
-    textarea.focus()
-    textarea.setSelectionRange(start + 6, start + 6)
-    this.updateQuestionTitle(next)
+    const editor = this.renderRoot.querySelector<HTMLElement & {
+      insertTextAtSelection: (text: string) => void
+    }>('questionaire-pane-formatted-text-editor')
+    editor?.insertTextAtSelection('[____]')
   }
 
   private updateAnswer (index: number, value: string) {
@@ -225,7 +208,12 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
           ></questionaire-pane-formatted-text-editor>
           <div class="questionaire-pane-create-question-fill-in-the-blank-question-actions">
             <questionaire-pane-formatting-toolbar></questionaire-pane-formatting-toolbar>
-            <button class="questionaire-pane-create-question-fill-in-the-blank-insert" type="button" @click=${() => this.insertBlank()}>
+            <button
+              class="questionaire-pane-create-question-fill-in-the-blank-insert"
+              type="button"
+              @mousedown=${(event: MouseEvent) => event.preventDefault()}
+              @click=${() => this.insertBlank()}
+            >
               <span>+</span>
               <span>Insert blank</span>
             </button>

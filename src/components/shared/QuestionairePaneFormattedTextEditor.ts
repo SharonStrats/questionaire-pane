@@ -126,6 +126,30 @@ export default class QuestionairePaneFormattedTextEditor extends WebComponent {
     })
   }
 
+  insertTextAtSelection (text: string) {
+    const editable = this.editable
+    const selection = editable?.ownerDocument.getSelection()
+    if (!editable || !selection) return
+
+    let range: Range
+    if (selection.rangeCount > 0 && editable.contains(selection.getRangeAt(0).commonAncestorContainer)) {
+      range = selection.getRangeAt(0)
+    } else {
+      range = editable.ownerDocument.createRange()
+      range.selectNodeContents(editable)
+      range.collapse(false)
+    }
+
+    range.deleteContents()
+    const inserted = editable.ownerDocument.createTextNode(text)
+    range.insertNode(inserted)
+    range.setStartAfter(inserted)
+    range.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    this.handleInput()
+  }
+
   render () {
     return html`
       <div
@@ -133,7 +157,7 @@ export default class QuestionairePaneFormattedTextEditor extends WebComponent {
         role="textbox"
         aria-multiline="true"
         data-placeholder=${this.placeholder}
-        style="display:block;width:100%;min-height:96px;padding:16px;box-sizing:border-box;outline:none;white-space:pre-wrap;overflow-wrap:anywhere;"
+        style="display:block;width:100%;min-height:96px;box-sizing:border-box;outline:none;white-space:pre-wrap;overflow-wrap:anywhere;"
         @input=${this.handleInput}
       ></div>
     `
