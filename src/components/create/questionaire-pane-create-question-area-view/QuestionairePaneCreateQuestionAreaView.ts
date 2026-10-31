@@ -184,6 +184,16 @@ export default class QuestionairePaneCreateQuestionAreaView extends WebComponent
     void this.refreshQuestions()
   }
 
+  private handleQuestionCancelled (event: CustomEvent<{ questionUri: string }>) {
+    if (this.activeQuestionUri !== event.detail.questionUri) {
+      return
+    }
+
+    this.activeQuestionUri = null
+    this.activeQuestionTypeUri = null
+    this.editorDismissed = true
+  }
+
   render() {
     const questions = this.questions
     const activeQuestion = this.editorDismissed
@@ -210,6 +220,7 @@ export default class QuestionairePaneCreateQuestionAreaView extends WebComponent
                     @questionaire-question-updated=${this.handleQuestionUpdated}
                     @questionaire-question-deleted=${this.handleQuestionDeleted}
                     @questionaire-question-saved=${this.handleQuestionSaved}
+                    @questionaire-question-cancelled=${this.handleQuestionCancelled}
                   ></questionaire-pane-create-question-dispatcher>
                 `
               : html``}

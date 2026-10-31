@@ -46,6 +46,7 @@ export default abstract class QuestionairePaneCreateQuestionCardBase extends Web
 
   private onDraftCancel = () => {
     this.resetDraft()
+    this.emitQuestionCancelled()
   }
 
   protected resetDraft () {
@@ -108,6 +109,15 @@ export default abstract class QuestionairePaneCreateQuestionCardBase extends Web
 
     dispatchQuestionaireQuestionEvent(this, 'questionaire-question-saved', question.uri)
     this.draftDirty = false
+  }
+
+  protected emitQuestionCancelled () {
+    const question = this.question
+    if (!question) {
+      return
+    }
+
+    dispatchQuestionaireQuestionEvent(this, 'questionaire-question-cancelled', question.uri)
   }
 
   protected emitQuestionDeleted () {

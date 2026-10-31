@@ -2,6 +2,7 @@ export type QuestionaireQuestionEventName =
   | 'questionaire-question-updated'
   | 'questionaire-question-saved'
   | 'questionaire-question-deleted'
+  | 'questionaire-question-cancelled'
 
 export function dispatchQuestionaireQuestionEvent (
   target: EventTarget,
