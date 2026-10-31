@@ -75,4 +75,38 @@ describe('questionaire text formatting', () => {
       end: 2
     })
   })
+
+  it('uses the active format for subsequently typed characters and switches modes', async () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    render(html`<questionaire-pane-formatted-text-editor .value=${''}></questionaire-pane-formatted-text-editor>`, container)
+    const editor = container.firstElementChild as HTMLElement & {
+      toggleFormat: (format: 'subscript' | 'superscript') => void
+      isFormatActive: (format: 'subscript' | 'superscript') => boolean
+      updateComplete: Promise<void>
+      value: string
+    }
+    await editor.updateComplete
+    const editable = editor.querySelector('[contenteditable="true"]') as HTMLElement
+    editable.focus()
+    editor.toggleFormat('subscript')
+    expect(editor.isFormatActive('subscript')).toBe(true)
+    expect(editor.isFormatActive('superscript')).toBe(false)
+
+    editable.dispatchEvent(new InputEvent('beforeinput', {
+      bubbles: true,
+      inputType: 'insertText',
+      data: '2',
+      cancelable: true
+    }))
+    expect(editor.value).toBe('[[sub:2]]')
+    expect(editable.querySelector('sub')?.textContent).toBe('2')
+
+    editor.toggleFormat('superscript')
+    expect(editor.isFormatActive('subscript')).toBe(false)
+    expect(editor.isFormatActive('superscript')).toBe(true)
+    editor.toggleFormat('superscript')
+    expect(editor.isFormatActive('superscript')).toBe(false)
+    container.remove()
+  })
 })

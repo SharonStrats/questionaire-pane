@@ -255,15 +255,17 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
           ${answers.slice(0, blankCount).map((answer, index) => html`
             <div class="questionaire-pane-create-question-fill-in-the-blank-answer-row">
               <div class="questionaire-pane-create-question-fill-in-the-blank-answer-badge">Blank ${index + 1}</div>
-              <input
+            <div class="questionaire-pane-create-question-fill-in-the-blank-answer-editor">
+              <questionaire-pane-formatted-text-editor
                 class="questionaire-pane-create-question-fill-in-the-blank-answer-input"
-                type="text"
                 placeholder="Answer"
                 .value=${answer}
-                @input=${(event: Event) => {
-                  this.updateAnswer(index, (event.currentTarget as HTMLInputElement).value)
+                @questionaire-formatted-text-input=${(event: CustomEvent<{ value: string }>) => {
+                  this.updateAnswer(index, event.detail.value)
                 }}
-              />
+              ></questionaire-pane-formatted-text-editor>
+              <questionaire-pane-formatting-toolbar></questionaire-pane-formatting-toolbar>
+            </div>
             </div>
           `)}
           <div class="questionaire-pane-create-question-fill-in-the-blank-note">

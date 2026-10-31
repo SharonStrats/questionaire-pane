@@ -50,6 +50,8 @@ export default class QuestionairePaneFormattedTextEditor extends WebComponent {
   @property({ type: String })
   accessor placeholder = ''
 
+  private activeFormat: TextFormat | null = null
+
   createRenderRoot () {
     return this
   }
@@ -67,6 +69,13 @@ export default class QuestionairePaneFormattedTextEditor extends WebComponent {
       composed: true,
       detail: { value: this.value }
     }))
+  }
+
+  private handleBeforeInput (event: InputEvent) {
+    if (this.activeFormat !== null && event.inputType === 'insertText' && event.data) {
+      event.preventDefault()
+      this.insertTextAtSelection(event.data, this.activeFormat)
+    }
   }
 
   protected updated (changedProperties: Map<PropertyKey, unknown>) {
@@ -126,7 +135,27 @@ export default class QuestionairePaneFormattedTextEditor extends WebComponent {
     })
   }
 
-  insertTextAtSelection (text: string) {
+  toggleFormat (format: TextFormat) {
+    const editable = this.editable
+    const selection = editable?.ownerDocument.getSelection()
+    if (selection && selection.rangeCount > 0 && selection.toString()) {
+      this.formatSelection(format)
+      this.activeFormat = null
+      return
+    }
+    this.activeFormat = this.activeFormat === format ? null : format
+    this.dispatchEvent(new CustomEvent('questionaire-format-changed', {
+      bubbles: true,
+      composed: true,
+      detail: { format: this.activeFormat }
+    }))
+  }
+
+  isFormatActive (format: TextFormat) {
+    return this.activeFormat === format
+  }
+
+  insertTextAtSelection (text: string, format: TextFormat | null = null) {
     const editable = this.editable
     const selection = editable?.ownerDocument.getSelection()
     if (!editable || !selection) return
@@ -141,7 +170,13 @@ export default class QuestionairePaneFormattedTextEditor extends WebComponent {
     }
 
     range.deleteContents()
-    const inserted = editable.ownerDocument.createTextNode(text)
+    const inserted = format === null
+      ? editable.ownerDocument.createTextNode(text)
+      : (() => {
+          const element = editable.ownerDocument.createElement(format === 'subscript' ? 'sub' : 'sup')
+          element.textContent = text
+          return element
+        })()
     range.insertNode(inserted)
     range.setStartAfter(inserted)
     range.collapse(true)
@@ -159,6 +194,7 @@ export default class QuestionairePaneFormattedTextEditor extends WebComponent {
         data-placeholder=${this.placeholder}
         style="display:block;width:100%;min-height:96px;box-sizing:border-box;outline:none;white-space:pre-wrap;overflow-wrap:anywhere;"
         @input=${this.handleInput}
+        @beforeinput=${this.handleBeforeInput}
       ></div>
     `
   }
