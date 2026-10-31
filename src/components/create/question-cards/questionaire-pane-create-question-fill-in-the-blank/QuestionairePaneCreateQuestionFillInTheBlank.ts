@@ -8,6 +8,7 @@ import '../../../shared/QuestionairePaneFormattedTextEditor'
 import { readQuestionValue, readQuestionValues } from '../../../../service/questionaireQuestionAccessors'
 import '../questionaire-pane-create-question-header/QuestionairePaneCreateQuestionHeader'
 import '../questionaire-pane-create-question-footer/QuestionairePaneCreateQuestionFooter'
+import '../questionaire-pane-create-question-image-upload/QuestionairePaneCreateQuestionImageUpload'
 import '~icons/lucide/chevron-down'
 import '~icons/lucide/info'
 
@@ -23,6 +24,9 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
 
   @state()
   private accessor draftExplanation = ''
+
+  @state()
+  private accessor draftImage = ''
 
   @state()
   private accessor draftPoints = '1'
@@ -47,6 +51,7 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
     this.draftTitle = title
     this.draftHint = this.getQuestionHint()
     this.draftExplanation = readQuestionValue(this.getStore()!, question, 'explanation')
+    this.draftImage = readQuestionValue(this.getStore()!, question, 'image')
     this.draftPoints = String(storedPoints)
     this.pointsCustomized = storedPoints !== this.getBlankCount(title)
     this.draftAnswers = this.getQuestionAnswers()
@@ -115,12 +120,14 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
     const title = this.draftTitle.trim()
     const hint = this.draftHint.trim()
     const explanation = this.draftExplanation.trim()
+    const image = this.draftImage.trim()
     const points = Number.parseInt(this.draftPoints, 10)
     const answers = this.draftAnswers.map((answer) => answer.trim())
 
     await logic.updateQuestionText({ question, title })
     await logic.updateQuestionHint({ question, hint })
     await logic.updateQuestionExplanation({ question, explanation })
+    await logic.updateQuestionImage({ question, image })
     await logic.updateQuestionPoints({ question, points: Number.isFinite(points) ? points : 0 })
     await logic.updateQuestionAnswers({ question, answers: answers.filter((answer) => answer.length > 0) })
 
@@ -195,6 +202,15 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
           <label>More details <span>(optional)</span></label>
           <textarea class="questionaire-pane-create-question-fill-in-the-blank-input" rows="4" placeholder="Shown after an incorrect answer to explain the concept..." .value=${explanation} @input=${(event: Event) => { this.draftExplanation = (event.currentTarget as HTMLTextAreaElement).value }}></textarea>
         </div>
+
+        <questionaire-pane-create-question-image-upload
+          .question=${question}
+          .image=${this.draftImage}
+          @questionaire-question-image-changed=${(event: CustomEvent<{ image: string }>) => {
+            this.draftImage = event.detail.image
+            this.emitQuestionChanged()
+          }}
+        ></questionaire-pane-create-question-image-upload>
 
         <div class="questionaire-pane-create-question-fill-in-the-blank-field">
           <label>Question</label>

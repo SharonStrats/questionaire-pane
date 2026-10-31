@@ -496,7 +496,12 @@ export function createQuestionaireMutations (store: LiveStore): QuestionaireMuta
       await createDocumentIfMissing(store, publishedQuestionDoc, questionTurtle)
       const image = store.any(sourceQuestion, questionImage, undefined, sourceQuestionDoc)
       if (image?.termType === 'NamedNode' && image.value.startsWith(`${baseUrl}images/`)) {
-        const imageResponse = await fetcher.webOperation('GET', image.value)
+        // webOperation consumes successful response bodies as text before
+        // returning them, so use the raw authenticated fetch for binary data.
+        const imageResponse = await fetcher._fetch(image.value, {
+          method: 'GET',
+          credentials: 'include'
+        })
         if (!imageResponse.ok) {
           throw new Error(`Unable to read questionnaire image ${image.value}`)
         }

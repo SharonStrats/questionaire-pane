@@ -5,6 +5,7 @@ import { WebComponent } from 'solid-ui'
 import { questionaireContext, type QuestionaireContext } from '../../../../context'
 import { createQuestionaireLogic } from '../../../../service/questionaireLogic'
 import { dispatchQuestionaireQuestionEvent } from '../../../../service/questionaireQuestionEvents'
+import { isDraftButtonClick } from './questionairePaneDraftEvents'
 
 export default abstract class QuestionairePaneCreateQuestionCardBase extends WebComponent {
   @consume({ context: questionaireContext, subscribe: true })
@@ -20,12 +21,14 @@ export default abstract class QuestionairePaneCreateQuestionCardBase extends Web
     super.connectedCallback()
     this.addEventListener('input', this.onDraftInput)
     this.addEventListener('click', this.onDraftClick)
+    this.addEventListener('questionaire-question-footer-points-changed', this.onDraftChange)
     this.addEventListener('questionaire-question-footer-cancel', this.onDraftCancel)
   }
 
   disconnectedCallback () {
     this.removeEventListener('input', this.onDraftInput)
     this.removeEventListener('click', this.onDraftClick)
+    this.removeEventListener('questionaire-question-footer-points-changed', this.onDraftChange)
     this.removeEventListener('questionaire-question-footer-cancel', this.onDraftCancel)
     super.disconnectedCallback()
   }
@@ -35,12 +38,12 @@ export default abstract class QuestionairePaneCreateQuestionCardBase extends Web
   }
 
   private onDraftClick = (event: Event) => {
-    const target = event.target
-    if (!(target instanceof HTMLButtonElement) ||
-        target.disabled ||
-        target.closest('questionaire-pane-create-question-footer, questionaire-pane-create-question-header')) {
-      return
+    if (isDraftButtonClick(event)) {
+      this.draftDirty = true
     }
+  }
+
+  private onDraftChange = () => {
     this.draftDirty = true
   }
 
