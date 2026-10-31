@@ -127,6 +127,32 @@
   color: #047857 !important;
 }
 
+.questionaire-pane-take-final-screen-explanation-button {
+  margin-top: 10px;
+  padding: 6px 10px;
+  border: 1px solid #c7d2fe;
+  border-radius: 7px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.questionaire-pane-take-final-screen-explanation-button:hover {
+  background: #e0e7ff;
+}
+
+.questionaire-pane-take-final-screen-explanation {
+  margin: 10px 0 0 !important;
+  padding: 10px;
+  border-left: 3px solid #818cf8;
+  border-radius: 0 7px 7px 0;
+  background: #f8faff;
+  color: #475569 !important;
+}
+
 .questionaire-pane-take-final-screen-share {
   display: flex;
   align-items: center;

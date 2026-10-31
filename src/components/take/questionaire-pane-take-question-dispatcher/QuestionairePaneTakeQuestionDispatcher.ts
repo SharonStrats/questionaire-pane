@@ -13,6 +13,7 @@ import '../questionaire-pane-take-question-ordering/QuestionairePaneTakeQuestion
 import '../questionaire-pane-take-question-match/QuestionairePaneTakeQuestionMatch'
 import '../questionaire-pane-take-question-rating/QuestionairePaneTakeQuestionRating'
 import '../questionaire-pane-take-question-true-false/QuestionairePaneTakeQuestionTrueFalse'
+import { normalizeTextResponseAnswer } from '../../../service/questionaireAnswerFormatting'
 
 @customElement('questionaire-pane-take-question-dispatcher')
 export default class QuestionairePaneTakeQuestionDispatcher extends WebComponent {
@@ -79,7 +80,7 @@ export default class QuestionairePaneTakeQuestionDispatcher extends WebComponent
       return html`
         <questionaire-pane-take-question-text-response
           .question=${question}
-          .answer=${typeof this.answer === 'string' ? this.answer : ''}
+          .answer=${normalizeTextResponseAnswer(this.answer)}
           .multiline=${false}
           .questionTypeLabel=${'Fill in the Blank'}
           .questionTypeDescription=${'Type the missing word or phrase.'}

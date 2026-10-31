@@ -4,6 +4,7 @@ import { customElement, WebComponent } from 'solid-ui'
 import type { LiveStore, NamedNode } from 'rdflib'
 import styles from './QuestionairePaneTakeFinalScreen.styles.css'
 import { questionairePredicates } from '../../../service/questionairePredicates'
+import { formatReviewAnswer } from '../../../service/questionaireAnswerFormatting'
 import { readQuestionValue, readQuestionValues } from '../../../service/questionaireQuestionAccessors'
 import type { QuestionaireQuestionSummary } from '../../../service/questionaireQuestionQueries'
 import type { QuestionaireQuestionScore } from '../../../service/questionaireQuestionScoring'
@@ -71,11 +72,6 @@ export default class QuestionairePaneTakeFinalScreen extends WebComponent {
     return readQuestionValues(this.store, question, 'correctOption')
   }
 
-  private formatAnswer (answer: string | string[] | null): string {
-    if (Array.isArray(answer)) return answer.filter(Boolean).join(' → ')
-    return answer?.trim() || 'No answer'
-  }
-
   private toggleExplanation (questionUri: string) {
     const visible = new Set(this.visibleExplanations)
     if (visible.has(questionUri)) {
@@ -122,16 +118,17 @@ export default class QuestionairePaneTakeFinalScreen extends WebComponent {
                     const summary = this.questionSummaries.find((item) => item.question.uri === score.questionUri)
                     const correctAnswers = summary ? this.getCorrectAnswers(summary.question, score) : []
                     const explanation = summary && this.store
-                      ? readQuestionValue(this.store, summary.question, 'explanation')
+                      ? readQuestionValue(this.store, summary.question, 'explanation').trim()
                       : ''
                     const explanationVisible = this.visibleExplanations.has(score.questionUri)
+                    const explanationId = `questionaire-pane-take-final-screen-explanation-${encodeURIComponent(score.questionUri)}`
                     return html`
                       <article class="questionaire-pane-take-final-screen-review-item">
                         <div class="questionaire-pane-take-final-screen-review-heading">
                           <span class="questionaire-pane-take-final-screen-review-status">Review</span>
                           <strong>${summary?.title || 'Question'}</strong>
                         </div>
-                        <p><span>Your answer:</span> ${this.formatAnswer(this.answers[score.questionUri] ?? null)}</p>
+                        <p><span>Your answer:</span> ${formatReviewAnswer(this.answers[score.questionUri] ?? null, score.questionTypeUri)}</p>
                         <p class="questionaire-pane-take-final-screen-correct-answer">
                           <span>Correct answer:</span> ${correctAnswers.length ? correctAnswers.join(' · ') : 'See the question instructions.'}
                         </p>
@@ -141,12 +138,13 @@ export default class QuestionairePaneTakeFinalScreen extends WebComponent {
                                 type="button"
                                 class="questionaire-pane-take-final-screen-explanation-button"
                                 aria-expanded=${String(explanationVisible)}
+                                aria-controls=${explanationId}
                                 @click=${() => this.toggleExplanation(score.questionUri)}
                               >
-                                ${explanationVisible ? 'Hide more details' : 'Show more details'}
+                                ${explanationVisible ? 'Hide details' : 'More details'}
                               </button>
                               ${explanationVisible
-                                ? html`<p class="questionaire-pane-take-final-screen-explanation">${explanation}</p>`
+                                ? html`<p id=${explanationId} class="questionaire-pane-take-final-screen-explanation">${explanation}</p>`
                                 : nothing}
                             `
                           : nothing}

@@ -94,6 +94,33 @@
   font: inherit;
 }
 
+.questionaire-pane-take-question-text-response-formatted-blank {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: min(100%, 220px);
+  gap: 4px;
+  vertical-align: middle;
+}
+
+.questionaire-pane-take-question-text-response-blank-editor {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 12px;
+  border: 1px solid #d8b4d8;
+  border-radius: 8px;
+  background: white;
+  color: #1a2235;
+  font: inherit;
+}
+
+.questionaire-pane-take-question-text-response-blank-editor:focus-within {
+  outline: none;
+  border-color: #6c5ce7;
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.15);
+}
+
 .questionaire-pane-take-question-text-response-blank:focus {
   outline: none;
   border-color: #6c5ce7;

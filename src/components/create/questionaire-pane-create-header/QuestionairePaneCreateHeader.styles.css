@@ -154,7 +154,10 @@
 }
 
 .questionaire-pane-create-header-title-input {
-  width: min(320px, 100%);
+  width: min(420px, 100%);
+  min-width: min(240px, 100%);
+  flex: 1 1 420px;
+  box-sizing: border-box;
   margin: 0;
   border: 0;
   border-radius: 0;

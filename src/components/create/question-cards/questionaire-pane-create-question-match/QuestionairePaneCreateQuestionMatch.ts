@@ -37,6 +37,25 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
   @state()
   private accessor loadedQuestionUri: string | null = null
 
+  @state()
+  private accessor pendingPairFocusIndex: number | null = null
+
+  protected updated (changedProperties: Map<PropertyKey, unknown>) {
+    super.updated(changedProperties)
+    if (this.pendingPairFocusIndex === null) {
+      return
+    }
+
+    const input = this.renderRoot.querySelector<HTMLInputElement>(
+      `[data-pair-index="${this.pendingPairFocusIndex}"][data-pair-side="left"]`
+    )
+    if (input) {
+      input.focus()
+      input.select()
+      this.pendingPairFocusIndex = null
+    }
+  }
+
   protected willUpdate () {
     const question = this.question
     if (!question || this.loadedQuestionUri === question.uri) {
@@ -144,7 +163,27 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
     nextRight.push('')
     this.draftLeftItems = nextLeft
     this.draftRightItems = nextRight
+    this.pendingPairFocusIndex = nextLeft.length - 1
+  }
 
+  private handlePairKeydown (index: number, event: KeyboardEvent) {
+    if (event.key !== 'Enter') {
+      return
+    }
+
+    event.preventDefault()
+    const leftItems = this.draftLeftItems.length > 0 ? this.draftLeftItems.slice() : this.getLeftItems().slice()
+    const rightItems = this.draftRightItems.length > 0 ? this.draftRightItems.slice() : this.getRightItems().slice()
+    if (index === leftItems.length - 1) {
+      leftItems.push('')
+      rightItems.push('')
+      this.draftLeftItems = leftItems
+      this.draftRightItems = rightItems
+      this.pendingPairFocusIndex = leftItems.length - 1
+      return
+    }
+
+    this.pendingPairFocusIndex = index + 1
   }
 
   render() {
@@ -229,8 +268,11 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
                   <input
                     class="questionaire-pane-create-question-match-pair-input"
                     type="text"
+                    data-pair-side="left"
+                    data-pair-index=${index}
                     placeholder="Left item"
                     .value=${leftItem}
+                    @keydown=${(event: KeyboardEvent) => this.handlePairKeydown(index, event)}
                     @input=${(event: Event) => {
                       const nextLeftItems = leftItems.slice()
                       nextLeftItems[index] = (event.currentTarget as HTMLInputElement).value
@@ -240,8 +282,11 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
                   <input
                     class="questionaire-pane-create-question-match-pair-input"
                     type="text"
+                    data-pair-side="right"
+                    data-pair-index=${index}
                     placeholder="Right item"
                     .value=${rightItem}
+                    @keydown=${(event: KeyboardEvent) => this.handlePairKeydown(index, event)}
                     @input=${(event: Event) => {
                       const nextRightItems = rightItems.slice()
                       nextRightItems[index] = (event.currentTarget as HTMLInputElement).value

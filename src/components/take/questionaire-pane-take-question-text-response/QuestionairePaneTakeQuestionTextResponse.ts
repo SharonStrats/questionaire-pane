@@ -9,6 +9,8 @@ import { readQuestionValue, readQuestionValues } from '../../../service/question
 import { loadQuizAiService } from '../../../service/quizAiService'
 import { getQuestionnaireFormat } from '../../../service/questionaireQuestionQueries'
 import { renderFormattedText } from '../../shared/questionaire-pane-formatting'
+import '../../shared/QuestionairePaneFormattingToolbar'
+import '../../shared/QuestionairePaneFormattedTextEditor'
 
 @customElement('questionaire-pane-take-question-text-response')
 export default class QuestionairePaneTakeQuestionTextResponse extends WebComponent {
@@ -84,6 +86,17 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
     return this.questionTypeLabel === 'Fill in the Blank'
   }
 
+  private hasFormattedBlankAnswers () {
+    const store = this.questionaire?.store
+    const question = this.question
+    if (!store || !question) {
+      return false
+    }
+
+    return readQuestionValues(store, question, 'answer')
+      .some((answer) => /\[\[(sub|sup):/.test(answer))
+  }
+
   private syncAnswer (value: string) {
     this.draftAnswer = value
     const question = this.question
@@ -118,6 +131,7 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
   private renderFillInTheBlank (text: string) {
     const parts = text.split(/(\[_{2,}\]|_{3,})/)
     let blankIndex = 0
+    const formattedAnswers = this.hasFormattedBlankAnswers()
 
     return parts.map((part) => {
       if (!/^(\[_{2,}\]|_{3,})$/.test(part)) {
@@ -125,6 +139,21 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
       }
 
       const index = blankIndex++
+      if (formattedAnswers) {
+        return html`
+          <span class="questionaire-pane-take-question-text-response-formatted-blank">
+            <questionaire-pane-formatted-text-editor
+              class="questionaire-pane-take-question-text-response-blank-editor"
+              role="textbox"
+              aria-label=${`Blank ${index + 1}`}
+              .value=${this.draftBlankAnswers[index] ?? ''}
+              @questionaire-formatted-text-input=${(event: CustomEvent<{ value: string }>) => this.syncBlankAnswer(index, event.detail.value)}
+            ></questionaire-pane-formatted-text-editor>
+            <questionaire-pane-formatting-toolbar></questionaire-pane-formatting-toolbar>
+          </span>
+        `
+      }
+
       return html`
         <input
           class="questionaire-pane-take-question-text-response-blank"
