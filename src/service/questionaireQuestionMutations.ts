@@ -13,6 +13,7 @@ import {
 } from './questionaireTypes'
 import { questionairePredicates } from './questionairePredicates'
 import { nextPublishedVersion } from './publishedVersion'
+import { nextQuestionNumber } from './questionaireQuestionNumbering'
 
 const dct = Namespace('http://purl.org/dc/terms/')
 const schema = Namespace('https://schema.org/')
@@ -259,10 +260,10 @@ export function createQuestionaireMutations (store: LiveStore): QuestionaireMuta
     await createContainerIfMissing(store, draftQuestionsUri)
     await fetcher.load(draftDoc)
 
-    const existingQuestionCount = store
+    const existingQuestionUris = store
       .statementsMatching(draft, questionPredicate, undefined, draftDoc)
-      .length
-    const questionNumber = existingQuestionCount + 1
+      .map((statement) => statement.object.value)
+    const questionNumber = nextQuestionNumber(existingQuestionUris)
     const questionIdentifier = `q${questionNumber}`
     const question = sym(`${draftQuestionsUri}q${questionNumber}.ttl`)
     const questionDoc = question.doc()
