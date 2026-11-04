@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { html, render } from 'lit'
 import './QuestionairePaneFormattedTextEditor'
-import { applyTextFormat } from './questionaire-pane-formatting'
+import { applyTextFormat, renderFormattedText } from './questionaire-pane-formatting'
 
 describe('questionaire text formatting', () => {
   it('supports a compact single-line mode', async () => {
@@ -68,6 +68,57 @@ describe('questionaire text formatting', () => {
     container.remove()
   })
 
+  it('formats the selected DOM text and keeps the formatted value', async () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    render(html`<questionaire-pane-formatted-text-editor .value=${'H2O'}></questionaire-pane-formatted-text-editor>`, container)
+    const editor = container.firstElementChild as HTMLElement & {
+      formatSelection: (format: 'subscript' | 'superscript') => void
+      updateComplete: Promise<void>
+      value: string
+    }
+    await editor.updateComplete
+    const text = editor.querySelector('[contenteditable="true"]')!.firstChild!
+    const selection = document.getSelection()!
+    const range = document.createRange()
+    range.setStart(text, 1)
+    range.setEnd(text, 2)
+    selection.removeAllRanges()
+    selection.addRange(range)
+
+    editor.formatSelection('subscript')
+    await editor.updateComplete
+
+    expect(editor.value).toBe('H[[sub:2]]O')
+    expect(editor.querySelector('sub')?.textContent).toBe('2')
+    container.remove()
+  })
+
+  it('removes formatting when the same selected formatted text is toggled again', async () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    render(html`<questionaire-pane-formatted-text-editor .value=${'H[[sub:2]]O'}></questionaire-pane-formatted-text-editor>`, container)
+    const editor = container.firstElementChild as HTMLElement & {
+      formatSelection: (format: 'subscript' | 'superscript') => void
+      updateComplete: Promise<void>
+      value: string
+    }
+    await editor.updateComplete
+    const text = editor.querySelector('sub')!.firstChild!
+    const selection = document.getSelection()!
+    const range = document.createRange()
+    range.selectNodeContents(text)
+    selection.removeAllRanges()
+    selection.addRange(range)
+
+    editor.formatSelection('subscript')
+    await editor.updateComplete
+
+    expect(editor.value).toBe('H2O')
+    expect(editor.querySelector('sub')).toBeNull()
+    container.remove()
+  })
+
   it('wraps the selected text with the explicit subscript representation', () => {
     expect(applyTextFormat('H2O', 1, 2, 'subscript')).toEqual({
       value: 'H[[sub:2]]O',
@@ -91,6 +142,32 @@ describe('questionaire text formatting', () => {
       value: 'plain',
       start: 2,
       end: 2
+    })
+
+    it('renders persisted formatting as semantic subscript and superscript elements', () => {
+      const container = document.createElement('div')
+      document.body.append(container)
+      render(html`${renderFormattedText('H[[sub:2]]O and x[[sup:2]]')}`, container)
+
+      expect(container.querySelector('sub')?.textContent).toBe('2')
+      expect(container.querySelector('sup')?.textContent).toBe('2')
+      container.remove()
+    })
+
+    it('round-trips persisted markup through the editor serialization', async () => {
+      const container = document.createElement('div')
+      document.body.append(container)
+      render(html`<questionaire-pane-formatted-text-editor .value=${'H[[sub:2]]O'}></questionaire-pane-formatted-text-editor>`, container)
+      const editor = container.firstElementChild as HTMLElement & {
+        updateComplete: Promise<void>
+        value: string
+      }
+      await editor.updateComplete
+      const editable = editor.querySelector('[contenteditable="true"]') as HTMLElement
+      expect(editable.querySelector('sub')?.textContent).toBe('2')
+      editable.dispatchEvent(new Event('input', { bubbles: true }))
+      expect(editor.value).toBe('H[[sub:2]]O')
+      container.remove()
     })
   })
 

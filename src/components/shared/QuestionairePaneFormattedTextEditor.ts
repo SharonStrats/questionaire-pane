@@ -42,6 +42,69 @@ function htmlToValue (root: Node): string {
   return result
 }
 
+function valueToDisplayOffset (value: string, valueOffset: number) {
+  let displayOffset = 0
+  let cursor = 0
+  const pattern = /\[\[(sub|sup):([\s\S]*?)\]\]/g
+  for (const match of value.matchAll(pattern)) {
+    const index = match.index ?? 0
+    if (valueOffset <= index) return displayOffset + Math.max(0, valueOffset - cursor)
+    displayOffset += index - cursor
+    const content = match[2] ?? ''
+    const contentStart = index + 6
+    if (valueOffset <= contentStart + content.length) {
+      return displayOffset + Math.max(0, valueOffset - contentStart)
+    }
+    displayOffset += content.length
+    cursor = index + match[0].length
+  }
+  return displayOffset + Math.max(0, valueOffset - cursor)
+}
+
+function displayToValueOffset (value: string, displayOffset: number) {
+  let visibleOffset = 0
+  let cursor = 0
+  const pattern = /\[\[(sub|sup):([\s\S]*?)\]\]/g
+  for (const match of value.matchAll(pattern)) {
+    const index = match.index ?? 0
+    const plainLength = index - cursor
+    if (displayOffset <= visibleOffset + plainLength) {
+      return cursor + Math.max(0, displayOffset - visibleOffset)
+    }
+    visibleOffset += plainLength
+    const content = match[2] ?? ''
+    if (displayOffset <= visibleOffset + content.length) {
+      return index + 6 + Math.max(0, displayOffset - visibleOffset)
+    }
+    visibleOffset += content.length
+    cursor = index + match[0].length
+  }
+  return cursor + Math.max(0, displayOffset - visibleOffset)
+}
+
+function textOffset (root: Node, target: Node, targetOffset: number) {
+  const document = root.ownerDocument
+  if (!document) return 0
+  const range = document.createRange()
+  range.setStart(root, 0)
+  range.setEnd(target, targetOffset)
+  return range.toString().length
+}
+
+function textNodeAtOffset (root: Node, targetOffset: number) {
+  const walker = root.ownerDocument?.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  if (!walker) return null
+  let offset = 0
+  let node: Text | null
+  while ((node = walker.nextNode() as Text | null)) {
+    if (targetOffset <= offset + node.data.length) {
+      return { node, offset: targetOffset - offset }
+    }
+    offset += node.data.length
+  }
+  return null
+}
+
 @customElement('questionaire-pane-formatted-text-editor')
 export default class QuestionairePaneFormattedTextEditor extends WebComponent {
   @property({ type: String })
@@ -99,10 +162,13 @@ export default class QuestionairePaneFormattedTextEditor extends WebComponent {
     const selection = editable?.ownerDocument.getSelection()
     if (!editable || !selection || selection.rangeCount === 0 || !selection.toString()) return
 
-    const selected = selection.toString()
-    const start = this.value.indexOf(selected)
-    if (start < 0) return
-    const result = applyTextFormat(this.value, start, start + selected.length, format)
+    const range = selection.getRangeAt(0)
+    if (!editable.contains(range.commonAncestorContainer)) return
+    const displayStart = textOffset(editable, range.startContainer, range.startOffset)
+    const displayEnd = textOffset(editable, range.endContainer, range.endOffset)
+    const start = displayToValueOffset(this.value, displayStart)
+    const end = displayToValueOffset(this.value, displayEnd)
+    const result = applyTextFormat(this.value, start, end, format)
     this.value = result.value
     this.requestUpdate()
     void this.updateComplete.then(() => {
@@ -110,29 +176,11 @@ export default class QuestionairePaneFormattedTextEditor extends WebComponent {
       if (!nextEditable) return
       nextEditable.focus()
       const range = nextEditable.ownerDocument.createRange()
-      const walker = nextEditable.ownerDocument.createTreeWalker(nextEditable, NodeFilter.SHOW_TEXT)
-      let offset = 0
-      let startNode: Text | null = null
-      let endNode: Text | null = null
-      let startOffset = 0
-      let endOffset = 0
-      let node: Text | null
-      while ((node = walker.nextNode() as Text | null)) {
-        const nextOffset = offset + node.data.length
-        if (!startNode && result.start >= offset && result.start <= nextOffset) {
-          startNode = node
-          startOffset = result.start - offset
-        }
-        if (result.end >= offset && result.end <= nextOffset) {
-          endNode = node
-          endOffset = result.end - offset
-          break
-        }
-        offset = nextOffset
-      }
-      if (startNode && endNode) {
-        range.setStart(startNode, startOffset)
-        range.setEnd(endNode, endOffset)
+      const startPoint = textNodeAtOffset(nextEditable, valueToDisplayOffset(this.value, result.start))
+      const endPoint = textNodeAtOffset(nextEditable, valueToDisplayOffset(this.value, result.end))
+      if (startPoint && endPoint) {
+        range.setStart(startPoint.node, startPoint.offset)
+        range.setEnd(endPoint.node, endPoint.offset)
         selection.removeAllRanges()
         selection.addRange(range)
       }
