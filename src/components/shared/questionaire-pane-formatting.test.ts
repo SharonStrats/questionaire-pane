@@ -6,6 +6,24 @@ import './QuestionairePaneFormattedTextEditor'
 import { applyTextFormat } from './questionaire-pane-formatting'
 
 describe('questionaire text formatting', () => {
+  it('supports a compact single-line mode', async () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    render(html`<questionaire-pane-formatted-text-editor single-line></questionaire-pane-formatted-text-editor>`, container)
+    const editor = container.firstElementChild as HTMLElement & { updateComplete: Promise<void> }
+    await editor.updateComplete
+
+    const editable = editor.querySelector('[contenteditable="true"]') as HTMLElement
+    expect(editable.getAttribute('aria-multiline')).toBe('false')
+    expect(editable.classList.contains('single-line')).toBe(true)
+    expect(editable.getAttribute('style')).toContain('min-height: 0')
+
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    editable.dispatchEvent(enter)
+    expect(enter.defaultPrevented).toBe(true)
+    container.remove()
+  })
+
   it('does not replace editable contents when input updates the value', async () => {
     const container = document.createElement('div')
     document.body.append(container)

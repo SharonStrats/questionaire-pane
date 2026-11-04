@@ -50,6 +50,9 @@ export default class QuestionairePaneFormattedTextEditor extends WebComponent {
   @property({ type: String })
   accessor placeholder = ''
 
+  @property({ type: Boolean, attribute: 'single-line' })
+  accessor singleLine = false
+
   private activeFormat: TextFormat | null = null
 
   createRenderRoot () {
@@ -75,6 +78,12 @@ export default class QuestionairePaneFormattedTextEditor extends WebComponent {
     if (this.activeFormat !== null && event.inputType === 'insertText' && event.data) {
       event.preventDefault()
       this.insertTextAtSelection(event.data, this.activeFormat)
+    }
+  }
+
+  private handleKeyDown (event: KeyboardEvent) {
+    if (this.singleLine && event.key === 'Enter') {
+      event.preventDefault()
     }
   }
 
@@ -190,11 +199,15 @@ export default class QuestionairePaneFormattedTextEditor extends WebComponent {
       <div
         contenteditable="true"
         role="textbox"
-        aria-multiline="true"
+        aria-multiline=${String(!this.singleLine)}
         data-placeholder=${this.placeholder}
-        style="display:block;width:100%;min-height:96px;box-sizing:border-box;outline:none;white-space:pre-wrap;overflow-wrap:anywhere;"
+        class=${this.singleLine ? 'single-line' : ''}
+        style=${this.singleLine
+          ? 'display:block;width:100%;min-height:0;box-sizing:border-box;outline:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+          : 'display:block;width:100%;min-height:96px;box-sizing:border-box;outline:none;white-space:pre-wrap;overflow-wrap:anywhere;'}
         @input=${this.handleInput}
         @beforeinput=${this.handleBeforeInput}
+        @keydown=${this.handleKeyDown}
       ></div>
     `
   }

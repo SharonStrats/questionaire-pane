@@ -258,6 +258,7 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
             <div class="questionaire-pane-create-question-fill-in-the-blank-answer-editor">
               <questionaire-pane-formatted-text-editor
                 class="questionaire-pane-create-question-fill-in-the-blank-answer-input"
+                single-line
                 placeholder="Answer"
                 .value=${answer}
                 @questionaire-formatted-text-input=${(event: CustomEvent<{ value: string }>) => {
