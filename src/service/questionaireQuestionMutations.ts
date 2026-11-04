@@ -426,6 +426,7 @@ export function createQuestionaireMutations (store: LiveStore): QuestionaireMuta
 
     const questionStatements = [...store.statementsMatching(draft, quizQuestion, undefined, draftDoc)]
     const title = store.any(index, questionairePredicates.questionnaire.title, undefined, indexDoc)
+    const description = store.any(draft, questionairePredicates.questionnaire.description, undefined, draftDoc)
     const creator = store.any(index, questionairePredicates.questionnaire.creator, undefined, indexDoc)
     const questionLinks: NamedNode[] = []
 
@@ -523,6 +524,9 @@ export function createQuestionaireMutations (store: LiveStore): QuestionaireMuta
       scratch.add(snapshot, questionairePredicates.questionnaire.status, literal('Published'), snapshotDoc)
       if (title) {
         scratch.add(snapshot, questionairePredicates.questionnaire.title, title, snapshotDoc)
+      }
+      if (description) {
+        scratch.add(snapshot, questionairePredicates.questionnaire.description, description, snapshotDoc)
       }
       if (creator) {
         scratch.add(snapshot, dct('creator'), creator, snapshotDoc)

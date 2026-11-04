@@ -23,6 +23,7 @@ import '~icons/lucide/clock-3'
 import '~icons/lucide/list'
 import '~icons/lucide/star'
 import '~icons/lucide/share-2'
+import '~icons/lucide/info'
 import AccessControlModal from 'solid-ui/components/access-control-modal'
 
 function isNamedNode (term: unknown): term is NamedNode {
@@ -56,6 +57,15 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
 
   @state()
   private accessor publishError = ''
+
+  @state()
+  private accessor instructionsOpen = false
+
+  @state()
+  private accessor instructionsDraft = ''
+
+  @state()
+  private accessor savingInstructions = false
 
   @state()
   private accessor draftStats = { count: 0, points: 0, minutes: 0 }
@@ -169,6 +179,44 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
     const currentTitle = readQuestionValue(store, subject, 'title')
     this.titleDraft = currentTitle
     this.editingTitle = true
+  }
+
+  private openInstructions () {
+    const questionaire = this.questionaire ?? { store: null, subject: null }
+    const store = questionaire.store
+    const subject = questionaire.subject
+    if (!store || !subject) return
+
+    const baseUrl = subject.doc().uri.replace(/index\.ttl$/, '')
+    const draft = sym(`${baseUrl}draft.ttl`)
+    this.instructionsDraft = readQuestionValue(store, draft, 'description')
+    this.instructionsOpen = true
+  }
+
+  private closeInstructions () {
+    if (this.savingInstructions) return
+    this.instructionsOpen = false
+  }
+
+  private async saveInstructions () {
+    const questionaire = this.questionaire ?? { store: null, subject: null }
+    const store = questionaire.store
+    const subject = questionaire.subject
+    if (!store || !subject) return
+
+    this.savingInstructions = true
+    try {
+      const baseUrl = subject.doc().uri.replace(/index\.ttl$/, '')
+      await createQuestionaireLogic(store).updateQuestionnaireDescription({
+        baseUrl,
+        description: this.instructionsDraft
+      })
+      this.instructionsOpen = false
+    } catch (error) {
+      this.publishError = error instanceof Error ? error.message : String(error)
+    } finally {
+      this.savingInstructions = false
+    }
   }
 
   private cancelTitleEdit () {
@@ -434,6 +482,14 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
                     >
                       <icon-lucide-pencil></icon-lucide-pencil>
                     </button>
+                    <button
+                      class="questionaire-pane-create-header-instructions"
+                      type="button"
+                      aria-label="Edit questionnaire instructions"
+                      @click=${() => this.openInstructions()}
+                    >
+                      <icon-lucide-info></icon-lucide-info>
+                    </button>
                   `}
             </div>
             <div class="questionaire-pane-create-header-stats" aria-label="Questionnaire summary">
@@ -516,6 +572,34 @@ export default class QuestionairePaneCreateHeader extends WebComponent {
           </button>
         </div>
       </div>
+      ${this.instructionsOpen
+        ? html`
+            <div class="questionaire-pane-create-header-instructions-overlay" role="dialog" aria-modal="true" aria-labelledby="questionaire-instructions-title">
+              <section class="questionaire-pane-create-header-instructions-dialog">
+                <div class="questionaire-pane-create-header-instructions-dialog-header">
+                  <div>
+                    <p class="questionaire-pane-create-header-instructions-kicker">Questionnaire instructions</p>
+                    <h2 id="questionaire-instructions-title">Help participants get started</h2>
+                  </div>
+                  <button type="button" aria-label="Close instructions" ?disabled=${this.savingInstructions} @click=${() => this.closeInstructions()}>×</button>
+                </div>
+                <textarea
+                  aria-label="Questionnaire instructions"
+                  rows="6"
+                  .value=${this.instructionsDraft}
+                  ?disabled=${this.savingInstructions}
+                  @input=${(event: Event) => { this.instructionsDraft = (event.currentTarget as HTMLTextAreaElement).value }}
+                ></textarea>
+                <div class="questionaire-pane-create-header-instructions-actions">
+                  <button type="button" ?disabled=${this.savingInstructions} @click=${() => this.closeInstructions()}>Cancel</button>
+                  <button type="button" ?disabled=${this.savingInstructions} @click=${() => { void this.saveInstructions() }}>
+                    ${this.savingInstructions ? 'Saving…' : 'Save instructions'}
+                  </button>
+                </div>
+              </section>
+            </div>
+          `
+        : ''}
     `
   }
 }
