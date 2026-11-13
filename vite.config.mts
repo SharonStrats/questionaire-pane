@@ -6,6 +6,7 @@ import { defineConfig } from "vitest/config"
 // watch loop to a single ESM output and skip generated d.ts work so the pane
 // does not retrigger itself or downstream watchers on each tick.
 const isWatch = process.argv.includes("--watch")
+const isVitest = Boolean(process.env.VITEST)
 
 const build = buildConfig({ entry: "src/index.ts" })
 if (isWatch && build && Array.isArray(build.rolldownOptions?.output)) {
@@ -39,7 +40,13 @@ const plugins = (await flattenPlugins(
 export default defineConfig({
   build,
   plugins,
+  test: {
+    setupFiles: ["./vitest.setup.ts"],
+  },
   resolve: {
-    tsconfigPaths: true,
+    // The workspace type alias points at solid-ui's declarations. Vitest
+    // should use solid-ui's package exports instead, because the linked
+    // workspace build does not emit declarations for its JavaScript modules.
+    tsconfigPaths: !isVitest,
   },
 })

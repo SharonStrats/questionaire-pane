@@ -3,9 +3,21 @@
 This package keeps the Mashlib `PaneDefinition` at `src/index.ts` and also
 ships a browser app. Run `npm install`, then `npm run start:standalone` and
 open the printed URL. To use the standard local questionnaire port, run
-`npm run start:standalone:3200` and open `http://localhost:3200/standalone/`.
-For live-reload development, use `npm run watch:standalone:3200`; it opens the
+`npm run start:standalone:4200` and open `http://localhost:4200/standalone/`.
+For live-reload development, use `npm run watch:standalone:4200`; it opens the
 same URL automatically.
+In standalone Vite development, short-answer sidecar grading is explicitly
+configured to `http://localhost:5001` by default. Override it with
+`VITE_QUIZ_SIDECAR_ENDPOINT`, for example:
+
+```sh
+VITE_QUIZ_SIDECAR_ENDPOINT=http://localhost:5001 npm run watch:standalone:4200
+```
+
+Start the sidecar separately from `extrarepos/solid-ai-sidecar`. Configure its
+`CORS_ORIGINS` to include `http://localhost:4200`, the questionnaire standalone
+origin. The browser client sends no provider API key; credentials remain
+server-side.
 Build the app with `npm run build:standalone`; the static output is
 `standalone-dist/`. `npm run build` remains the pane/library build.
 

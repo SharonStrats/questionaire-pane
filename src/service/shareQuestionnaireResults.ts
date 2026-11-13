@@ -1,8 +1,8 @@
 import { authn } from 'solid-logic'
 import { graph, literal, Namespace, serialize, sym, type LiveStore, type NamedNode } from 'rdflib'
-import { questionairePredicates } from './questionairePredicates'
+import { questionairePredicates } from './predicates'
 import type { QuestionaireAcl } from '../context'
-import { createContainerIfMissing, createDocumentIfMissing, ensureTrailingSlash } from './questionaireTypes'
+import { createContainerIfMissing, createDocumentIfMissing, ensureTrailingSlash } from './types'
 
 const HTTP_SCHEMES = new Set(['http:', 'https:'])
 const dct = Namespace('http://purl.org/dc/terms/')
@@ -18,6 +18,7 @@ export interface ShareQuestionnaireResultsOptions {
   questionUris: string[]
   user?: NamedNode | null
   storage?: NamedNode | null
+  shareWithCreator?: boolean
 }
 
 export interface SharedQuestionnaireResults {
@@ -85,9 +86,9 @@ function resultDocuments (container: NamedNode, user: NamedNode, questionnaire: 
   ]
 }
 
-export async function shareQuestionnaireResults (
+export async function persistQuestionnaireResults (
   store: LiveStore,
-  acl: QuestionaireAcl,
+  acl: QuestionaireAcl | null,
   questionnaire: NamedNode,
   options: ShareQuestionnaireResultsOptions
 ): Promise<SharedQuestionnaireResults> {
@@ -128,16 +129,30 @@ export async function shareQuestionnaireResults (
     await createDocumentIfMissing(store, document.document, document.data)
   }
 
-  const plan = await acl.planGrantContainerContents(
-    resultContainer,
-    { type: 'agent', iri: creator.value },
-    ['Read']
-  )
-  const response = await acl.applyPlan(plan)
-  if (!response.ok) {
-    throw new Error(`Unable to share questionnaire results: HTTP ${response.status}`)
+  if (options.shareWithCreator) {
+    if (!acl) {
+      throw new Error('Unable to share questionnaire results because ACL services are not configured.')
+    }
+    const plan = await acl.planGrantContainerContents(
+      resultContainer,
+      { type: 'agent', iri: creator.value },
+      ['Read']
+    )
+    const response = await acl.applyPlan(plan)
+    if (!response.ok) {
+      throw new Error(`Unable to share questionnaire results: HTTP ${response.status}`)
+    }
   }
   return { resultContainer }
+}
+
+export async function shareQuestionnaireResults (
+  store: LiveStore,
+  acl: QuestionaireAcl,
+  questionnaire: NamedNode,
+  options: ShareQuestionnaireResultsOptions
+): Promise<SharedQuestionnaireResults> {
+  return persistQuestionnaireResults(store, acl, questionnaire, { ...options, shareWithCreator: true })
 }
 
 async function findStorage (store: LiveStore, user: NamedNode): Promise<NamedNode | null> {

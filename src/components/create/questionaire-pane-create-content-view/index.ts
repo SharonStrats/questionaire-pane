@@ -1,4 +1,0 @@
-import QuestionairePaneCreateContentView from './QuestionairePaneCreateContentView'
-
-export { QuestionairePaneCreateContentView }
-export default QuestionairePaneCreateContentView

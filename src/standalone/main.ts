@@ -5,9 +5,11 @@ import 'solid-ui/components/account'
 import 'solid-ui/components/provider'
 import 'solid-ui/theme.css'
 import questionairePane from '../index'
+import { configureQuizAiService } from '../service/quizAiService'
+import { getDevelopmentSidecarEndpoint } from './quizSidecarConfig'
 import '../components/provider/QuestionaireProvider'
-import '../components/create/questionaire-pane-create-main-view/QuestionairePaneCreateMainView'
-import '../components/take/questionaire-pane-take-main-view/QuestionairePaneTakeMainView'
+import '../components/create/main-view/MainView'
+import '../components/take/main-view/MainView'
 import '../components/standalone/questionaire-home/QuestionaireHome'
 import '../questionairePane.css'
 import './standalone.css'
@@ -16,21 +18,39 @@ import { replaceViewWithRestorableContent } from './viewNavigation'
 import {
   addToTypeIndex,
   crawlQuestionnaireContainers,
+  discoverInboxSharedQuestionnaires,
   ensureQuestionnaireWorkspace,
   entriesFromSubjects,
   discoverSharedQuestionnaires,
   isPublishedQuestionnaire,
+  loadQuestionnaireMetrics,
+  loadStoredQuestionnaireUris,
   loadTypeIndexes,
   ownPublishedQuestionnaires,
   publishedQuestionnaireForTake,
   questionnaireClass,
   questionnairesInWorkspace,
-  type QuestionnaireIndexStatus
+  storeSharedQuestionnaire,
+  type QuestionnaireIndexStatus,
+  type SharedQuestionnaireEntry
 } from './library'
+import { createContainerIfMissing } from '../service/types'
+import PodQuestionnaireDialog from './PodQuestionnaireDialog'
+
+declare global {
+  interface Window {
+    SolidLogic?: {
+      authSession: typeof authSession
+    }
+  }
+}
 
 const store = solidStore as LiveStore
 const app = document.querySelector<HTMLElement>('#app')!
 const loginReturnUrlKey = 'questionaire-pane:login-return-url'
+const authRestoreTimeoutMs = 10_000
+
+window.SolidLogic = { authSession }
 
 function configureLocalLoginIssuer (): void {
   if (window.location.hostname !== 'localhost' || window.location.port !== '4200') return
@@ -40,6 +60,19 @@ function configureLocalLoginIssuer (): void {
 
   if (!currentIssuer || currentIssuer === window.location.origin) {
     window.localStorage.setItem('loginIssuer', configuredIssuer)
+  }
+}
+
+function configureDevelopmentQuizSidecar (): void {
+  const endpoint = getDevelopmentSidecarEndpoint({
+    dev: import.meta.env.DEV,
+    configuredEndpoint: import.meta.env.VITE_QUIZ_SIDECAR_ENDPOINT
+  })
+  if (endpoint) {
+    configureQuizAiService({
+      sidecarEndpoint: endpoint,
+      quizImportEndpoint: import.meta.env.VITE_QUIZ_IMPORT_ENDPOINT?.trim() || undefined
+    })
   }
 }
 
@@ -67,6 +100,7 @@ function restoreLoginReturnUrl (): void {
 }
 
 configureLocalLoginIssuer()
+configureDevelopmentQuizSidecar()
 
 function message (text: string, kind: 'info' | 'error' = 'info'): void {
   app.innerHTML = ''
@@ -76,7 +110,25 @@ function message (text: string, kind: 'info' | 'error' = 'info'): void {
   app.appendChild(element)
 }
 
+async function checkUserWithoutBlockingStartup (): Promise<void> {
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      authn.checkUser(),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error('Authentication restore timed out.')), authRestoreTimeoutMs)
+      })
+    ])
+  } catch (error) {
+    console.warn('Unable to restore the previous Solid session during startup.', error)
+  } finally {
+    if (timeout) clearTimeout(timeout)
+  }
+}
+
 function renderQuestionnaire (subject: NamedNode): void {
+  document.querySelector<HTMLElement>('#PageHeader')?.removeAttribute('hidden')
+  app.classList.remove('app-home')
   app.innerHTML = ''
   const provider = document.createElement('questionaire-provider') as HTMLElement & { store?: LiveStore, subject?: NamedNode, acl?: typeof solidLogicSingleton.acl }
   provider.store = store
@@ -154,10 +206,13 @@ async function renderContainerPicker (me: NamedNode, initialUrl?: string): Promi
   choose.type = 'button'
   choose.className = 'primary'
   choose.textContent = 'Create here'
+  const createFolder = document.createElement('button')
+  createFolder.type = 'button'
+  createFolder.textContent = 'Create folder'
   const cancel = document.createElement('button')
   cancel.type = 'button'
   cancel.textContent = 'Cancel'
-  controls.append(back, choose, cancel)
+  controls.append(back, choose, createFolder, cancel)
   section.append(location, controls, status, list)
   const restorePreviousView = replaceViewWithRestorableContent(app, section, () => {
     void start().catch((error: unknown) => {
@@ -174,6 +229,7 @@ async function renderContainerPicker (me: NamedNode, initialUrl?: string): Promi
     location.textContent = `Current folder: ${currentUrl}`
     back.disabled = !parentContainerUrl(currentUrl)
     choose.disabled = false
+    createFolder.disabled = true
     try {
       children = await loadContainerChildren(currentUrl)
       canCreate = true
@@ -197,6 +253,7 @@ async function renderContainerPicker (me: NamedNode, initialUrl?: string): Promi
     } finally {
       loading = false
       choose.disabled = loading
+      createFolder.disabled = loading
     }
   }
 
@@ -231,6 +288,41 @@ async function renderContainerPicker (me: NamedNode, initialUrl?: string): Promi
       })
     }
   })
+  createFolder.addEventListener('click', () => {
+    if (loading || !canCreate) return
+
+    const enteredName = window.prompt('Folder name:')
+    if (enteredName === null) {
+      status.className = 'info'
+      status.textContent = 'Folder creation cancelled.'
+      return
+    }
+
+    const name = enteredName.trim()
+    if (!name) {
+      status.className = 'error'
+      status.textContent = 'Please enter a folder name.'
+      return
+    }
+
+    createFolder.disabled = true
+    choose.disabled = true
+    void (async () => {
+      const folderUrl = `${currentUrl}${encodeURIComponent(name)}/`
+      const created = await createContainerIfMissing(store, folderUrl)
+      currentUrl = folderUrl
+      await refresh()
+      status.className = created ? 'info' : 'error'
+      status.textContent = created
+        ? 'Folder created. You can now create the questionnaire here.'
+        : 'That folder already exists. You can create the questionnaire here.'
+    })().catch((caught: unknown) => {
+      status.className = 'error'
+      status.textContent = caught instanceof Error ? caught.message : 'Unable to create the folder.'
+      createFolder.disabled = false
+      choose.disabled = false
+    })
+  })
   cancel.addEventListener('click', restorePreviousView)
   await refresh()
 }
@@ -241,6 +333,22 @@ async function openSubject (uri: string): Promise<void> {
   if (!store.fetcher) throw new Error('Unable to load questionnaire: no Solid fetcher is available.')
   await store.fetcher.load(subject.doc())
   renderQuestionnaire(subject)
+}
+
+async function openQuestionnaireDialog (me: NamedNode): Promise<void> {
+  const advertisedStorage = store.any(me, storagePredicate) as NamedNode | undefined
+  const storageUrl = advertisedStorage?.termType === 'NamedNode'
+    ? advertisedStorage.uri
+    : await findStorageContainer(me)
+  if (!storageUrl) throw new Error('Your Pod profile does not advertise a storage container.')
+  const dialog = new PodQuestionnaireDialog()
+  dialog.store = store
+  dialog.storageUrl = storageUrl
+  dialog.onSelect = (subject: NamedNode) => {
+    void openSubject(subject.uri).catch(error => message(error instanceof Error ? error.message : 'Unable to open questionnaire.', 'error'))
+  }
+  dialog.onClose = () => dialog.remove()
+  document.body.appendChild(dialog)
 }
 
 async function openSharedSubject (uri: string): Promise<void> {
@@ -267,6 +375,8 @@ async function createQuestionnaire (baseUrl: string, me: NamedNode, name?: strin
 }
 
 async function renderLibrary (me: NamedNode): Promise<void> {
+  document.querySelector<HTMLElement>('#PageHeader')?.setAttribute('hidden', '')
+  app.classList.add('app-home')
   app.innerHTML = ''
   const home = document.createElement('questionaire-home') as HTMLElement & {
     entries: ReturnType<typeof entriesFromSubjects>
@@ -278,6 +388,11 @@ async function renderLibrary (me: NamedNode): Promise<void> {
     statusKind: 'info' | 'error'
   }
   app.appendChild(home)
+  home.addEventListener('questionaire-home-choose', () => {
+    void openQuestionnaireDialog(me).catch((error: unknown) => {
+      setStatus(error instanceof Error ? error.message : 'Unable to search your Pod.', 'error')
+    })
+  })
 
   let workspaceUrl = ''
   let subjects: NamedNode[] = []
@@ -328,18 +443,47 @@ async function renderLibrary (me: NamedNode): Promise<void> {
     }
   }
   renderEntries()
+  void Promise.all(home.entries.map(async entry => {
+    try {
+      const metrics = await loadQuestionnaireMetrics(store, entry.subject)
+      const current = home.entries.find(candidate => candidate.subject.uri === entry.subject.uri)
+      if (current) {
+        current.questionCount = metrics.questionCount
+        home.entries = [...home.entries]
+      }
+    } catch {
+      // Keep the initially discovered entry visible when metric documents are unavailable.
+    }
+  }))
   home.publishedEntries = await ownPublishedQuestionnaires(store, subjects)
   try {
-    const people = await solidLogicSingleton.directory.search({
-      user: me,
-      sources: ['contacts', 'friends'],
-      maxFoafDistance: 1
-    })
-    home.sharedEntries = await discoverSharedQuestionnaires(store, people)
+    home.sharedEntries = await discoverInboxSharedQuestionnaires(store, me)
+    const storedUris = workspaceUrl ? await loadStoredQuestionnaireUris(store, workspaceUrl) : new Set<string>()
+    home.sharedEntries = home.sharedEntries.map(entry => ({
+      ...entry,
+      stored: storedUris.has(entry.subject.uri)
+    }))
   } catch {
-    // Shared questionnaires are optional: keep the personal library usable if discovery fails.
     home.sharedEntries = []
   }
+  void (async () => {
+    try {
+      const people = await solidLogicSingleton.directory.search({
+        user: me,
+        sources: ['contacts', 'friends'],
+        maxFoafDistance: 1
+      })
+      const publicEntries = await discoverSharedQuestionnaires(store, people)
+      const merged = new Map(home.sharedEntries.map(entry => [entry.subject.uri, entry]))
+      publicEntries.forEach(entry => {
+        const existing = merged.get(entry.subject.uri)
+        merged.set(entry.subject.uri, existing ? { ...entry, stored: existing.stored, notification: existing.notification } : entry)
+      })
+      home.sharedEntries = [...merged.values()]
+    } catch {
+      // Public discovery is optional; direct inbox shares remain visible.
+    }
+  })()
 
   home.addEventListener('questionaire-home-create', () => {
     if (workspaceUrl) void renderContainerPicker(me, workspaceUrl).catch((error: unknown) => {
@@ -352,6 +496,17 @@ async function renderLibrary (me: NamedNode): Promise<void> {
       const open = home.section === 'shared' ? openSharedSubject : openSubject
       void open(subject.uri).catch(error => message(error instanceof Error ? error.message : 'Unable to open questionnaire.', 'error'))
     }
+  })
+  home.addEventListener('questionaire-home-store', (event) => {
+    const entry = (event as CustomEvent<SharedQuestionnaireEntry>).detail
+    if (!entry?.subject || !workspaceUrl) return
+    void storeSharedQuestionnaire(store, me, workspaceUrl, entry).then(() => {
+      home.sharedEntries = home.sharedEntries.map(candidate =>
+        candidate.subject.uri === entry.subject.uri ? { ...candidate, stored: true } : candidate
+      )
+    }).catch(error => {
+      message(error instanceof Error ? error.message : 'Unable to store this questionnaire.', 'error')
+    })
   })
   home.addEventListener('questionaire-home-add-index', (event) => {
     const detail = (event as CustomEvent<{ subject: NamedNode, kind: keyof QuestionnaireIndexStatus }>).detail
@@ -409,10 +564,17 @@ async function renderLibrary (me: NamedNode): Promise<void> {
 async function start (): Promise<void> {
   const header = document.querySelector<HTMLElement>('#PageHeader')
   if (header && !header.querySelector('solid-ui-provider')) {
-    header.innerHTML = '<solid-ui-provider><solid-ui-account></solid-ui-account></solid-ui-provider>'
+    header.innerHTML = `
+      <div class="page-header-inner">
+        <a class="page-brand" href="/" aria-label="Solid home">S</a>
+        <div class="page-header-spacer"></div>
+        <button class="page-header-icon" type="button" aria-label="Bookmarks">♡</button>
+        <solid-ui-provider><solid-ui-account></solid-ui-account></solid-ui-provider>
+      </div>
+    `
   }
   rememberLoginReturnUrl()
-  await authn.checkUser()
+  await checkUserWithoutBlockingStartup()
   restoreLoginReturnUrl()
   const contract = parseStandaloneUrl(window.location.href)
   if (contract.subject) {

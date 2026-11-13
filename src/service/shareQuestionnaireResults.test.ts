@@ -1,7 +1,7 @@
 import { graph, sym } from 'rdflib'
 import { describe, expect, it, vi } from 'vitest'
-import { questionairePredicates } from './questionairePredicates'
-import { shareQuestionnaireResults } from './shareQuestionnaireResults'
+import { questionairePredicates } from './predicates'
+import { persistQuestionnaireResults, shareQuestionnaireResults } from './shareQuestionnaireResults'
 
 const creator = sym('https://creator.example/profile#me')
 const user = sym('https://taker.example/profile#me')
@@ -33,6 +33,27 @@ function fixture () {
 }
 
 describe('shareQuestionnaireResults', () => {
+  it('persists a private result without granting the creator access', async () => {
+    const { store, acl, options } = fixture()
+
+    const result = await persistQuestionnaireResults(store, null, questionnaire, options)
+
+    expect(result.resultContainer.uri).toMatch(/^https:\/\/taker\.example\/storage\/questionnaire-results\//)
+    expect(acl.planGrantContainerContents).not.toHaveBeenCalled()
+    expect(store.fetcher._fetch).toHaveBeenCalled()
+
+    const documentWrites = store.fetcher.webOperation.mock.calls
+    const indexWrite = documentWrites.find(([method, uri]) =>
+      method === 'PUT' && uri === `${result.resultContainer.uri}index.ttl`
+    )
+    const responseWrite = documentWrites.find(([method, uri]) =>
+      method === 'PUT' && uri === `${result.resultContainer.uri}responses/r1.ttl`
+    )
+    expect(indexWrite?.[2].data).toContain('quiz:questionnaire')
+    expect(indexWrite?.[2].data).toContain('quiz:response')
+    expect(responseWrite?.[2].data).toContain('Answer')
+  })
+
   it('grants the published results folder and its contents to the questionnaire creator', async () => {
     const { store, acl, plan, options } = fixture()
 

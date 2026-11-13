@@ -5,11 +5,11 @@
 import { literal, type LiveStore } from 'rdflib'
 import { icons, ns } from 'solid-ui'
 import { createQuestionaireLogic } from './service/questionaireLogic'
-import { questionairePredicates } from './service/questionairePredicates'
+import { questionairePredicates } from './service/predicates'
 import { disco } from './namespaces'
 import './components/provider/QuestionaireProvider'
-import './components/create/questionaire-pane-create-main-view/QuestionairePaneCreateMainView'
-import './components/take/questionaire-pane-take-main-view/QuestionairePaneTakeMainView'
+import './components/create/main-view/MainView'
+import './components/take/main-view/MainView'
 import './questionairePane.css'
 
 export default {

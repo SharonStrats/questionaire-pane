@@ -1,0 +1,21 @@
+:host { display: block; }
+
+[contenteditable="true"] {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+}
+
+[contenteditable="true"].single-line {
+  min-height: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[contenteditable="true"]:not(.single-line) {
+  min-height: 96px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
