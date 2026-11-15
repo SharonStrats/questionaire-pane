@@ -49,6 +49,9 @@ export default class QuestionaireHome extends WebComponent {
   @property({ attribute: false })
   accessor statusKind: 'info' | 'error' = 'info'
 
+  @property({ attribute: false })
+  accessor liveGameEndpoint = ''
+
   private dispatchAction (name: string, detail?: unknown): void {
     this.dispatchEvent(new CustomEvent(name, {
       bubbles: true,
@@ -215,6 +218,12 @@ export default class QuestionaireHome extends WebComponent {
               Store for me
             </button>
           ` : nothing}
+          ${this.liveGameEndpoint && entry.kind === 'quiz' ? html`
+            <button class="questionaire-home-live-button" type="button"
+              @click=${() => this.dispatchAction('questionaire-home-play-together', entry)}>
+              Play together
+            </button>
+          ` : nothing}
           <button class="questionaire-home-take-button" type="button"
             @click=${() => this.dispatchAction('questionaire-home-open', entry.subject)}>
             Take ${type} →
@@ -334,6 +343,7 @@ export default class QuestionaireHome extends WebComponent {
               </div>
               ${!showingShared ? html`
                 <div class="questionaire-home-heading-actions">
+                  ${this.renderButton('Generate study cards', cardFolderIcon, 'questionaire-home-generate-cards')}
                   ${this.renderButton('Choose from my Pod', folderIcon, 'questionaire-home-choose')}
                   ${this.renderButton('Create questionnaire', plusIcon, 'questionaire-home-create', true)}
                 </div>

@@ -7,10 +7,23 @@ import { icons, ns } from 'solid-ui'
 import { createQuestionaireLogic } from './service/questionaireLogic'
 import { questionairePredicates } from './service/predicates'
 import { disco } from './namespaces'
+import { configureQuizAiService } from './service/quizAiService'
 import './components/provider/QuestionaireProvider'
 import './components/create/main-view/MainView'
 import './components/take/main-view/MainView'
 import './questionairePane.css'
+
+const configuredAiEndpoint = typeof import.meta.env?.VITE_SOLID_APP_SERVICES_ENDPOINT === 'string'
+  ? import.meta.env.VITE_SOLID_APP_SERVICES_ENDPOINT.trim()
+  : typeof import.meta.env?.VITE_QUIZ_SIDECAR_ENDPOINT === 'string'
+    ? import.meta.env.VITE_QUIZ_SIDECAR_ENDPOINT.trim()
+    : ''
+if (configuredAiEndpoint) {
+  configureQuizAiService({
+    sidecarEndpoint: configuredAiEndpoint,
+    quizImportEndpoint: configuredAiEndpoint
+  })
+}
 
 export default {
   icon: icons.iconBase + 'noun_Document_998605.svg',

@@ -1,12 +1,14 @@
 import { sym, type LiveStore, type NamedNode } from 'rdflib'
 import { ensureTrailingSlash } from './types'
 import { questionairePredicates } from './predicates'
-import { readQuestionTypeUri } from './questionAccessors'
+import { readQuestionTypeUri, readQuestionValues } from './questionAccessors'
 
 export interface QuestionaireQuestionSummary {
   question: NamedNode
   title: string
   typeUri: string
+  options: string[]
+  correctOptions: string[]
 }
 
 export async function loadQuestionaireQuestionSummaries (store: LiveStore, subject: NamedNode): Promise<QuestionaireQuestionSummary[]> {
@@ -34,7 +36,9 @@ export async function loadQuestionaireQuestionSummaries (store: LiveStore, subje
       return {
         question,
         title: store.any(question, questionairePredicates.question.title, undefined, question.doc())?.value ?? '',
-        typeUri: readQuestionTypeUri(store, question)
+        typeUri: readQuestionTypeUri(store, question),
+        options: readQuestionValues(store, question, 'option'),
+        correctOptions: readQuestionValues(store, question, 'correctOption')
       }
     })
   )

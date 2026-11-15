@@ -50,6 +50,25 @@ describe('questionnaire Pod crawling', () => {
     await expect(questionnairesInWorkspace(store, workspace.uri)).resolves.toEqual([questionnaire])
   })
 
+  it('continues crawling nested folders when the workspace root has a questionnaire', async () => {
+    const store = graph() as any
+    const workspace = sym('https://pod.example/Questionnaires/')
+    const rootQuestionnaire = sym('https://pod.example/Questionnaires/index.ttl#this')
+    const nestedFolder = sym('https://pod.example/Questionnaires/Personal/')
+    const nestedQuestionnaire = sym('https://pod.example/Questionnaires/Personal/index.ttl#this')
+
+    store.add(st(workspace, ldp('contains'), nestedFolder, workspace.doc()))
+    store.add(st(workspace, ldp('contains'), sym('https://pod.example/Questionnaires/index.ttl'), workspace.doc()))
+    store.add(st(rootQuestionnaire, rdf('type'), disco('Questionnaire'), rootQuestionnaire.doc()))
+    store.add(st(nestedQuestionnaire, rdf('type'), disco('Questionnaire'), nestedQuestionnaire.doc()))
+    store.fetcher = { load: vi.fn().mockResolvedValue(undefined) }
+
+    await expect(questionnairesInWorkspace(store, workspace.uri)).resolves.toEqual([
+      rootQuestionnaire,
+      nestedQuestionnaire
+    ])
+  })
+
   describe('questionnaire share notifications', () => {
     it('only exposes an inbox share after resolving its published questionnaire', async () => {
       const store = graph() as any

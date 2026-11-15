@@ -1,5 +1,11 @@
 :host { display: block; }
 
+questionaire-pane-formatted-text-editor:focus-within {
+  border-color: #e2e5ea !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
 [contenteditable="true"] {
   display: block;
   width: 100%;

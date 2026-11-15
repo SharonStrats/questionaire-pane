@@ -21,9 +21,25 @@ class PodQuestionnaireDialog extends DialogComponent<void> {
     .status { color: #6b7280; font-size: var(--solid-ui-font-size-sm, 0.875rem); }
     .error { color: #a33; font-size: var(--solid-ui-font-size-sm, 0.875rem); }
     ul { display: grid; max-height: min(55vh, 480px); gap: 0; overflow-y: auto; padding: 0; list-style: none; }
-    solid-ui-button.folder, solid-ui-button.questionnaire { display: flex; width: 100%; color: #1a2235; font-size: var(--solid-ui-font-size-sm, 0.875rem); text-align: left; }
-    solid-ui-button.folder { font-weight: 400; }
-    .folder icon-lucide-folder { width: 1rem; height: 1rem; color: #a56a00; }
+    solid-ui-button.folder, solid-ui-button.questionnaire {
+      --solid-ui-button-font-weight: 400;
+      --solid-ui-button-border-color: var(--solid-ui-color-gray-200, #cbd5e1);
+      --solid-ui-button-justify-content: flex-start;
+      --solid-ui-button-text-align: left;
+      display: flex;
+      width: 100%;
+      color: #1a2235;
+      font-size: var(--solid-ui-font-size-sm, 0.875rem);
+      text-align: left;
+    }
+    .folder icon-lucide-folder {
+      width: 1rem;
+      height: 1rem;
+      color: var(--solid-ui-color-gray-500, #6a7282);
+      fill: rgba(224, 231, 255, 0.5);
+      stroke: var(--solid-ui-color-gray-500, #6a7282);
+      stroke-width: 1.25px;
+    }
     .questionnaire icon-lucide-external-link { width: 1.25rem; height: 1.25rem; }
     solid-ui-button.close { display: inline-flex; width: 2.5rem; height: 2.5rem; }
     .close icon-lucide-x { display: block; width: 1.5rem; height: 1.5rem; }

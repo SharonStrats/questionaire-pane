@@ -246,6 +246,34 @@
   height: 16px;
 }
 
+.questionaire-pane-create-question-ordering-item-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.questionaire-pane-create-question-ordering-item-delete:hover {
+  color: #ef4444;
+}
+
+.questionaire-pane-create-question-ordering-item-delete:focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.questionaire-pane-create-question-ordering-item-delete icon-lucide-trash-2 {
+  width: 16px;
+  height: 16px;
+}
+
 .questionaire-pane-create-question-ordering-item-badge {
   display: inline-flex;
   align-items: center;

@@ -8,11 +8,25 @@ For live-reload development, use `npm run watch:standalone:4200`; it opens the
 same URL automatically.
 In standalone Vite development, short-answer sidecar grading is explicitly
 configured to `http://localhost:5001` by default. Override it with
-`VITE_QUIZ_SIDECAR_ENDPOINT`, for example:
+`VITE_SOLID_APP_SERVICES_ENDPOINT` (or the legacy
+`VITE_QUIZ_SIDECAR_ENDPOINT`), for example:
 
 ```sh
-VITE_QUIZ_SIDECAR_ENDPOINT=http://localhost:5001 npm run watch:standalone:4200
+VITE_SOLID_APP_SERVICES_ENDPOINT=http://localhost:5000 npm run watch:standalone:4200
 ```
+
+The standalone home can expose live multiplayer quizzes when
+`VITE_QUIZ_GAME_ENDPOINT` points to the Socket.IO realtime service:
+
+```sh
+VITE_QUIZ_GAME_ENDPOINT=http://localhost:5100 npm run watch:standalone:4200
+```
+
+The realtime service is a prototype and currently keeps lobby state in memory.
+It should be run with an origin allow-list that includes the standalone app.
+Do not use it for public games until authenticated connection tickets,
+authoritative scoring, reconnect handling, rate limits, room expiry, and Pod
+result persistence are implemented.
 
 Start the sidecar separately from `extrarepos/solid-ai-sidecar`. Configure its
 `CORS_ORIGINS` to include `http://localhost:4200`, the questionnaire standalone

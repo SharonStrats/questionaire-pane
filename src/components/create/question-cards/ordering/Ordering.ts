@@ -11,6 +11,7 @@ import '../footer/Footer'
 import '~icons/lucide/chevron-down'
 import '~icons/lucide/info'
 import '~icons/lucide/grip-vertical'
+import '~icons/lucide/trash-2'
 
 @customElement('questionaire-pane-create-question-ordering')
 export default class QuestionairePaneCreateQuestionOrdering extends QuestionairePaneCreateQuestionCardBase {
@@ -129,8 +130,7 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
     const hint = this.draftHint.trim()
     const explanation = this.draftExplanation.trim()
     const points = Number.parseInt(this.draftPoints, 10)
-    const items = (this.draftItems.length > 0 ? this.draftItems : ['', '', ''])
-      .map((item) => item.trim())
+    const items = this.draftItems.map((item) => item.trim())
 
     await logic.updateQuestionText({ question, title })
     await logic.updateQuestionHint({ question, hint })
@@ -152,6 +152,12 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
     items.push('')
     this.draftItems = items
     this.pendingItemFocusIndex = items.length - 1
+  }
+
+  private deleteItem (index: number) {
+    const items = this.draftItems.slice()
+    items.splice(index, 1)
+    this.draftItems = items
   }
 
   private handleItemKeydown (index: number, event: KeyboardEvent) {
@@ -209,7 +215,7 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
     const hint = this.draftHint || this.getQuestionHint()
     const explanation = this.draftExplanation
     const points = this.draftPoints || String(this.getQuestionPoints())
-    const items = this.draftItems.length > 0 ? this.draftItems : this.getQuestionItems()
+    const items = this.loadedQuestionUri === question.uri ? this.draftItems : this.getQuestionItems()
     const questionNumber = this.getQuestionNumber()
 
     return html`
@@ -313,6 +319,15 @@ export default class QuestionairePaneCreateQuestionOrdering extends Questionaire
                   }}
                   @keydown=${(event: KeyboardEvent) => this.handleItemKeydown(index, event)}
                 />
+                <button
+                  class="questionaire-pane-create-question-ordering-item-delete"
+                  type="button"
+                  aria-label=${`Delete item ${index + 1}`}
+                  title="Delete item"
+                  @click=${() => this.deleteItem(index)}
+                >
+                  <icon-lucide-trash-2></icon-lucide-trash-2>
+                </button>
               </div>
             `)}
           </div>

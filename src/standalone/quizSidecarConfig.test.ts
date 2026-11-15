@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getDevelopmentSidecarEndpoint } from './quizSidecarConfig'
+import { getAppServicesEndpoint, getDevelopmentSidecarEndpoint } from './quizSidecarConfig'
 
 describe('standalone quiz sidecar configuration', () => {
   it('defaults development watch mode to the local sidecar', () => {
@@ -18,5 +18,20 @@ describe('standalone quiz sidecar configuration', () => {
       dev: false,
       configuredEndpoint: 'http://localhost:5001'
     })).toBeUndefined()
+  })
+
+  it('prefers the generic app-services endpoint over the legacy sidecar endpoint', () => {
+    expect(getAppServicesEndpoint({
+      dev: false,
+      appServicesEndpoint: ' https://services.example.test ',
+      legacySidecarEndpoint: 'https://legacy.example.test'
+    })).toBe('https://services.example.test')
+  })
+
+  it('keeps the legacy endpoint working when the generic endpoint is absent', () => {
+    expect(getAppServicesEndpoint({
+      dev: false,
+      legacySidecarEndpoint: 'https://legacy.example.test'
+    })).toBe('https://legacy.example.test')
   })
 })

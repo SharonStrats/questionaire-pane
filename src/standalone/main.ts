@@ -6,11 +6,17 @@ import 'solid-ui/components/provider'
 import 'solid-ui/theme.css'
 import questionairePane from '../index'
 import { configureQuizAiService } from '../service/quizAiService'
-import { getDevelopmentSidecarEndpoint } from './quizSidecarConfig'
+import { DocumentGenerationClient } from '../service/documentGenerationClient'
+import { createStudyCardReviews, duplicateStudyCardReviewIds, summarizeStudyCardReviews, updateStudyCardReview, type StudyCardReview } from '../service/studyCardReview'
+import { serializeStudyDeck } from '../service/studyCardRdf'
+import { saveAcceptedStudyDeck } from '../service/studyDeckPersistence'
+import { serializeSolidMemoDeck } from '../service/solidMemoAdapter'
+import { getAppServicesEndpoint } from './quizSidecarConfig'
 import '../components/provider/QuestionaireProvider'
 import '../components/create/main-view/MainView'
 import '../components/take/main-view/MainView'
 import '../components/standalone/questionaire-home/QuestionaireHome'
+import '../components/standalone/live-quiz/LiveQuiz'
 import '../questionairePane.css'
 import './standalone.css'
 import { isHttpUrl, parseStandaloneUrl } from './url'
@@ -63,10 +69,11 @@ function configureLocalLoginIssuer (): void {
   }
 }
 
-function configureDevelopmentQuizSidecar (): void {
-  const endpoint = getDevelopmentSidecarEndpoint({
+function configureQuizSidecar (): void {
+  const endpoint = getAppServicesEndpoint({
     dev: import.meta.env.DEV,
-    configuredEndpoint: import.meta.env.VITE_QUIZ_SIDECAR_ENDPOINT
+    appServicesEndpoint: import.meta.env.VITE_SOLID_APP_SERVICES_ENDPOINT,
+    legacySidecarEndpoint: import.meta.env.VITE_QUIZ_SIDECAR_ENDPOINT
   })
   if (endpoint) {
     configureQuizAiService({
@@ -100,7 +107,7 @@ function restoreLoginReturnUrl (): void {
 }
 
 configureLocalLoginIssuer()
-configureDevelopmentQuizSidecar()
+configureQuizSidecar()
 
 function message (text: string, kind: 'info' | 'error' = 'info'): void {
   app.innerHTML = ''
@@ -374,6 +381,30 @@ async function createQuestionnaire (baseUrl: string, me: NamedNode, name?: strin
   renderQuestionnaire(created.newInstance)
 }
 
+function renderLiveQuiz (me: NamedNode, entry: { subject: NamedNode, title: string, questionCount: number }, endpoint: string): void {
+  document.querySelector<HTMLElement>('#PageHeader')?.setAttribute('hidden', '')
+  app.classList.add('app-home')
+  const section = document.createElement('section')
+  section.className = 'questionnaire-create'
+  const back = document.createElement('button')
+  back.type = 'button'
+  back.textContent = 'Back to questionnaires'
+  back.addEventListener('click', () => { void renderLibrary(me) })
+  const liveQuiz = document.createElement('questionaire-live-quiz') as HTMLElement & {
+    endpoint: string
+    quizUri: string
+    questionCount: number
+    store: typeof store
+  }
+  liveQuiz.endpoint = endpoint
+  liveQuiz.quizUri = entry.subject.uri
+  liveQuiz.questionCount = entry.questionCount
+  liveQuiz.store = store
+  section.append(back, liveQuiz)
+  app.innerHTML = ''
+  app.appendChild(section)
+}
+
 async function renderLibrary (me: NamedNode): Promise<void> {
   document.querySelector<HTMLElement>('#PageHeader')?.setAttribute('hidden', '')
   app.classList.add('app-home')
@@ -386,8 +417,10 @@ async function renderLibrary (me: NamedNode): Promise<void> {
     workspaceReady: boolean
     status: string
     statusKind: 'info' | 'error'
+    liveGameEndpoint: string
   }
   app.appendChild(home)
+  home.liveGameEndpoint = import.meta.env.VITE_QUIZ_GAME_ENDPOINT?.trim() || ''
   home.addEventListener('questionaire-home-choose', () => {
     void openQuestionnaireDialog(me).catch((error: unknown) => {
       setStatus(error instanceof Error ? error.message : 'Unable to search your Pod.', 'error')
@@ -401,10 +434,150 @@ async function renderLibrary (me: NamedNode): Promise<void> {
     home.entries = entriesFromSubjects(store, subjects, statuses)
   }
 
+  function renderDocumentGeneration (me: NamedNode, endpoint: string): void {
+    const section = document.createElement('section')
+    section.className = 'questionnaire-create'
+    section.innerHTML = '<h1>Generate study cards</h1><p>Select a document to preview cards before anything is saved to your Pod.</p>'
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.pdf,.docx,.md,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/markdown,text/plain'
+    const generate = document.createElement('button')
+    generate.type = 'button'
+    generate.className = 'primary'
+    generate.textContent = 'Generate preview'
+    generate.disabled = true
+    const back = document.createElement('button')
+    back.type = 'button'
+    back.textContent = 'Back to questionnaires'
+    const confirmSave = document.createElement('button')
+    confirmSave.type = 'button'
+    confirmSave.textContent = 'Confirm accepted cards'
+    confirmSave.disabled = true
+    const exportMemo = document.createElement('button')
+    exportMemo.type = 'button'
+    exportMemo.textContent = 'Export Solid Memo RDF'
+    exportMemo.disabled = true
+    const status = document.createElement('p')
+    status.className = 'info'
+    const preview = document.createElement('div')
+    let reviews: StudyCardReview[] = []
+    section.append(input, document.createElement('br'), generate, back, confirmSave, exportMemo, status, preview)
+    app.innerHTML = ''
+    app.classList.add('app-home')
+    app.appendChild(section)
+    input.addEventListener('change', () => {
+      generate.disabled = !input.files?.length
+      status.textContent = input.files?.[0]?.name ?? ''
+    })
+    back.addEventListener('click', () => { void renderLibrary(me) })
+    const renderReview = (): void => {
+      const summary = summarizeStudyCardReviews(reviews)
+      const duplicateIds = duplicateStudyCardReviewIds(reviews)
+      status.textContent = `${summary.accepted} accepted · ${summary.pending} pending · ${summary.rejected} rejected.${duplicateIds.size ? ` ${duplicateIds.size} duplicate card${duplicateIds.size === 1 ? '' : 's'} detected; review before saving.` : ''} Nothing has been saved.`
+      confirmSave.disabled = summary.accepted === 0
+      exportMemo.disabled = summary.accepted === 0
+      preview.innerHTML = reviews.map((review, index) =>
+        `<article class="questionnaire-result" data-card-id="${review.id}">
+          <strong>Card ${index + 1} · ${review.status}${duplicateIds.has(review.id) ? ' · duplicate' : ''}</strong>
+          <label>Front <input data-card-field="front" value="${escapeHtml(review.card.front)}"></label>
+          <label>Back <input data-card-field="back" value="${escapeHtml(review.card.back)}"></label>
+          <small>Source: ${escapeHtml(review.card.sourceReference)}</small>
+          <div class="registration-controls">
+            <button type="button" data-card-action="accept">${review.status === 'accepted' ? 'Accepted' : 'Accept'}</button>
+            <button type="button" data-card-action="reject">${review.status === 'rejected' ? 'Rejected' : 'Reject'}</button>
+          </div>
+        </article>`
+      ).join('')
+    }
+    preview.addEventListener('input', event => {
+      const target = event.target as HTMLInputElement
+      const card = target.closest<HTMLElement>('[data-card-id]')
+      const field = target.dataset.cardField
+      if (!card || (field !== 'front' && field !== 'back')) return
+      reviews = updateStudyCardReview(reviews, card.dataset.cardId!, {
+        card: { [field]: target.value } as Partial<StudyCardReview['card']>
+      })
+    })
+    preview.addEventListener('click', event => {
+      const target = event.target as HTMLElement
+      const action = target.dataset.cardAction
+      const card = target.closest<HTMLElement>('[data-card-id]')
+      if (!card || (action !== 'accept' && action !== 'reject')) return
+      reviews = updateStudyCardReview(reviews, card.dataset.cardId!, { status: action === 'accept' ? 'accepted' : 'rejected' })
+      renderReview()
+    })
+    confirmSave.addEventListener('click', () => {
+      if (!window.confirm('Save the accepted study cards to your Pod? This will create a new study deck.')) return
+      const file = input.files?.[0]
+      const title = file?.name ?? 'Generated study cards'
+      const turtle = serializeStudyDeck(title, reviews, file?.name)
+      const output = document.createElement('pre')
+      output.className = 'questionnaire-result'
+      output.textContent = turtle
+      preview.prepend(output)
+      status.textContent = 'Confirmation received. Saving accepted cards to your Pod…'
+      confirmSave.disabled = true
+      void findStorageContainer(me).then(storageUrl => {
+        if (!storageUrl) throw new Error('Your Pod profile does not advertise a storage container.')
+        return saveAcceptedStudyDeck(store, storageUrl, title, reviews, file?.name)
+      }).then(document => {
+        status.textContent = `Saved accepted cards to ${document.uri}`
+      }).catch(error => {
+        status.className = 'error'
+        status.textContent = error instanceof Error ? error.message : 'Unable to save study cards.'
+        confirmSave.disabled = false
+      })
+    })
+    exportMemo.addEventListener('click', () => {
+      const file = input.files?.[0]
+      const output = document.createElement('pre')
+      output.className = 'questionnaire-result'
+      output.textContent = serializeSolidMemoDeck(file?.name ?? 'Generated study cards', reviews)
+      preview.prepend(output)
+      status.textContent = 'Solid Memo RDF export preview is ready. No additional Pod write was performed.'
+    })
+    generate.addEventListener('click', () => {
+      const file = input.files?.[0]
+      if (!file) return
+      generate.disabled = true
+      status.textContent = 'Extracting document and generating cards…'
+      preview.innerHTML = ''
+      void (async () => {
+        const client = new DocumentGenerationClient({ endpoint })
+        const document = await client.extract(file)
+        const result = await client.generateFlashcards(document)
+        reviews = createStudyCardReviews(result.cards)
+        renderReview()
+      })().catch(error => {
+        status.className = 'error'
+        status.textContent = error instanceof Error ? error.message : 'Unable to generate study cards.'
+      }).finally(() => { generate.disabled = false })
+    })
+  }
+
+  function escapeHtml (value: string): string {
+    return value.replace(/[&<>"']/g, character => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', [String.fromCharCode(34)]: '&quot;', [String.fromCharCode(39)]: '&#39;'
+    })[character]!)
+  }
+
   const setStatus = (text: string, kind: 'info' | 'error' = 'info'): void => {
     home.status = text
     home.statusKind = kind
   }
+
+  home.addEventListener('questionaire-home-generate-cards', () => {
+    const endpoint = getAppServicesEndpoint({
+      dev: import.meta.env.DEV,
+      appServicesEndpoint: import.meta.env.VITE_SOLID_APP_SERVICES_ENDPOINT,
+      legacySidecarEndpoint: import.meta.env.VITE_QUIZ_SIDECAR_ENDPOINT
+    })
+    if (!endpoint) {
+      setStatus('Configure the application-services endpoint to generate study cards.', 'error')
+      return
+    }
+    renderDocumentGeneration(me, endpoint)
+  })
 
   setStatus('Preparing your Questionnaires workspace…')
   try {
@@ -496,6 +669,11 @@ async function renderLibrary (me: NamedNode): Promise<void> {
       const open = home.section === 'shared' ? openSharedSubject : openSubject
       void open(subject.uri).catch(error => message(error instanceof Error ? error.message : 'Unable to open questionnaire.', 'error'))
     }
+  })
+  home.addEventListener('questionaire-home-play-together', (event) => {
+    const entry = (event as CustomEvent<{ subject: NamedNode, title: string, questionCount: number }>).detail
+    if (!entry?.subject || !home.liveGameEndpoint) return
+    renderLiveQuiz(me, entry, home.liveGameEndpoint)
   })
   home.addEventListener('questionaire-home-store', (event) => {
     const entry = (event as CustomEvent<SharedQuestionnaireEntry>).detail

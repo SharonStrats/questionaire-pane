@@ -31,7 +31,8 @@ describe('questionnaire fill-in-the-blank taker rendering', () => {
     document.body.append(container)
     await element.updateComplete
 
-    const editor = element.querySelector('questionaire-pane-formatted-text-editor') as HTMLElement & {
+    const root = element.shadowRoot ?? element
+    const editor = root.querySelector('questionaire-pane-formatted-text-editor') as HTMLElement & {
       updateComplete: Promise<void>
     }
     expect(editor).toBeTruthy()

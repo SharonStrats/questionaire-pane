@@ -75,6 +75,14 @@ h1 { margin: 8px 0 10px; font-size: 36px; font-weight: 400; letter-spacing: -0.9
 }
 .questionaire-home-button img { width: 12px; height: 12px; }
 .questionaire-home-button--primary { border-color: #6c5ce7; color: #fff; background: #6c5ce7; }
+.questionaire-home-live-button {
+  padding: 8px 12px;
+  border: 1px solid #6c5ce7;
+  border-radius: 8px;
+  color: #6c5ce7;
+  background: #fff;
+  font-size: 10px;
+}
 .questionaire-home-heading-actions { gap: 8px; }
 .questionaire-home-workspace-banner {
   display: flex;

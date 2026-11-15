@@ -400,8 +400,9 @@ export async function questionnairesInWorkspace (store: LiveStore, workspaceUrl:
       .filter(term => /\/index\.ttl$/.test(term.uri))
       .map(index => sym(`${index.uri}#this`))
   ]
+  const candidatesByUri = new Map(candidates.map(candidate => [candidate.uri, candidate]))
   const questionnaires: NamedNode[] = []
-  await Promise.all(candidates.map(async subject => {
+  await Promise.all(Array.from(candidatesByUri.values()).map(async subject => {
     try {
       await load(store, subject)
       if (store.holds(subject, rdf('type'), questionnaireClass, subject.doc())) questionnaires.push(subject)
@@ -409,32 +410,38 @@ export async function questionnairesInWorkspace (store: LiveStore, workspaceUrl:
       // A workspace may hold arbitrary folders; they are not questionnaire packages.
     }
   }))
-  if (!questionnaires.length) {
-    const crawl = await crawlQuestionnaireContainers(
-      [container.uri],
-      async url => {
-        const nestedContainer = sym(trailingSlash(url))
-        await load(store, nestedContainer)
-        const nestedChildren = namedNodes(store.each(nestedContainer, ldp('contains')))
-          .filter(term => term.uri.endsWith('/'))
-          .map(term => term.uri)
-        const subject = sym(`${nestedContainer.uri}index.ttl#this`)
-        try {
-          await load(store, subject)
-          return {
-            children: nestedChildren,
-            questionnaire: store.holds(subject, rdf('type'), questionnaireClass, subject.doc()) ? subject : undefined
-          }
-        } catch {
-          return { children: nestedChildren }
+  const uniqueQuestionnaires = new Map(questionnaires.map(subject => [subject.uri, subject]))
+  questionnaires.splice(0, questionnaires.length, ...uniqueQuestionnaires.values())
+  const found = new Set(uniqueQuestionnaires.keys())
+  const crawl = await crawlQuestionnaireContainers(
+    [container.uri],
+    async url => {
+      const nestedContainer = sym(trailingSlash(url))
+      await load(store, nestedContainer)
+      const nestedChildren = namedNodes(store.each(nestedContainer, ldp('contains')))
+        .filter(term => term.uri.endsWith('/'))
+        .map(term => term.uri)
+      const subject = sym(`${nestedContainer.uri}index.ttl#this`)
+      try {
+        await load(store, subject)
+        return {
+          children: nestedChildren,
+          questionnaire: store.holds(subject, rdf('type'), questionnaireClass, subject.doc()) ? subject : undefined
         }
-      },
-      subject => questionnaires.push(subject),
-      { maxContainers: 100, concurrency: 8, timeoutMs: 2_000 }
-    )
-    if (crawl.warnings.length && questionnaires.length === 0) {
-      return []
-    }
+      } catch {
+        return { children: nestedChildren }
+      }
+    },
+    subject => {
+      if (!found.has(subject.uri)) {
+        found.add(subject.uri)
+        questionnaires.push(subject)
+      }
+    },
+    { maxContainers: 100, concurrency: 8, timeoutMs: 2_000 }
+  )
+  if (crawl.warnings.length && questionnaires.length === 0) {
+    return []
   }
   return questionnaires
 }
