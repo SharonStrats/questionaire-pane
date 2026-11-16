@@ -229,8 +229,21 @@ export default class QuestionaireHome extends WebComponent {
     )
   }
 
+  private get inboxUnreadCount () {
+    return this.sharedEntries.filter(entry => entry.notification && !entry.stored).length + this.chatInboxNotifications.length
+  }
+
+  private renderHeaderCountBadge (count: number, kind: 'friends' | 'inbox') {
+    if (count <= 0) return nothing
+    return html`
+      <span class="questionaire-home-header-badge questionaire-home-header-badge--${kind}" aria-hidden="true">
+        ${count > 99 ? '99+' : count}
+      </span>
+    `
+  }
+
   private renderSidebar (showingShared: boolean) {
-    const unreadCount = this.sharedEntries.filter(entry => entry.notification && !entry.stored).length + this.chatInboxNotifications.length
+    const unreadCount = this.inboxUnreadCount
     const selectHome = () => { this.activeNav = 'home'; this.section = 'mine'; this.dispatchAction('questionaire-home-scroll-top') }
     const selectFriends = () => { this.activeNav = 'friends'; this.friendsOpen = true; this.dispatchAction('questionaire-home-open-friends') }
     const selectInbox = () => { this.activeNav = 'inbox'; this.section = 'shared'; this.dispatchAction('questionaire-home-refresh-inbox') }
@@ -247,14 +260,6 @@ export default class QuestionaireHome extends WebComponent {
             </button>
             <solid-ui-menu-item ?selected=${this.activeNav === 'home'} @solid-ui-select=${selectHome}>
               <icon-lucide-house slot="left-icon" aria-hidden="true"></icon-lucide-house>Home
-            </solid-ui-menu-item>
-            <solid-ui-menu-item ?selected=${this.activeNav === 'friends'} @solid-ui-select=${selectFriends}>
-              <icon-lucide-users slot="left-icon" aria-hidden="true"></icon-lucide-users>Friends
-              ${this.friendCount ? html`<span slot="right-icon" class="questionaire-home-mobile-menu-count questionaire-home-mobile-menu-count--friends">${this.friendCount}</span>` : nothing}
-            </solid-ui-menu-item>
-            <solid-ui-menu-item ?selected=${showingShared || this.activeNav === 'inbox'} @solid-ui-select=${selectInbox}>
-              <icon-lucide-inbox slot="left-icon" aria-hidden="true"></icon-lucide-inbox>Inbox
-              ${unreadCount ? html`<span slot="right-icon" class="questionaire-home-mobile-menu-count questionaire-home-mobile-menu-count--inbox">${unreadCount}</span>` : nothing}
             </solid-ui-menu-item>
             <solid-ui-menu-item ?selected=${this.activeNav === 'quizzes'} @solid-ui-select=${selectQuizzes}>
               <icon-lucide-folder slot="left-icon" aria-hidden="true"></icon-lucide-folder>My quizzes
@@ -943,6 +948,7 @@ export default class QuestionaireHome extends WebComponent {
     const hasQuizzesToTake = !showingShared && this.quizzesToTake.length > 0
     const showEmptyHome = !showingShared && !showingMyQuizzes && entries.length === 0 && !hasQuizzesToTake
     const companion = this.pokemonProgress?.pokemon ?? pokemonForPoints(0)
+    const inboxCount = this.inboxUnreadCount
     return html`
       <div class="questionaire-home-shell questionaire-home-shell--redesigned">
         ${this.renderSidebar(showingShared)}
@@ -957,12 +963,20 @@ export default class QuestionaireHome extends WebComponent {
               </label>
               <div class="questionaire-home-header-actions">
                 <button class="questionaire-home-header-icon" type="button"
-                  aria-label="Open friends" @click=${() => { this.friendsOpen = true; this.dispatchAction('questionaire-home-open-friends') }}>
+                  aria-label=${this.friendCount
+                    ? `Open friends, ${this.friendCount} ${this.friendCount === 1 ? 'friend' : 'friends'}`
+                    : 'Open friends'}
+                  @click=${() => { this.friendsOpen = true; this.dispatchAction('questionaire-home-open-friends') }}>
                   <icon-lucide-users aria-hidden="true"></icon-lucide-users>
+                  ${this.renderHeaderCountBadge(this.friendCount, 'friends')}
                 </button>
                 <button class="questionaire-home-header-icon" type="button"
-                  aria-label="Open inbox" @click=${() => { this.inboxOpen = true; this.dispatchAction('questionaire-home-refresh-inbox') }}>
+                  aria-label=${inboxCount
+                    ? `Open inbox, ${inboxCount} ${inboxCount === 1 ? 'item' : 'items'}`
+                    : 'Open inbox'}
+                  @click=${() => { this.inboxOpen = true; this.dispatchAction('questionaire-home-refresh-inbox') }}>
                   <icon-lucide-inbox aria-hidden="true"></icon-lucide-inbox>
+                  ${this.renderHeaderCountBadge(inboxCount, 'inbox')}
                 </button>
                 <button class="questionaire-home-header-icon" type="button"
                   aria-label="Chat with friends" title="Chat with friends"

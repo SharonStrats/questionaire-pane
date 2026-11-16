@@ -36,6 +36,13 @@ export default class QuestionairePaneCreateSidebar extends WebComponent {
     }))
   }
 
+  private handleMobileQuestionChange (event: Event) {
+    const questionUri = (event.currentTarget as HTMLSelectElement).value
+    if (questionUri) {
+      this.selectQuestion(questionUri)
+    }
+  }
+
   private addQuestion (questionTypeUri: string) {
     this.dispatchEvent(new CustomEvent('questionaire-add-question', {
       bubbles: true,
@@ -56,6 +63,23 @@ export default class QuestionairePaneCreateSidebar extends WebComponent {
     return html`
       <aside class="questionaire-pane-create-sidebar">
         <div class="questionaire-pane-create-sidebar-heading">Question cards</div>
+        <label class="questionaire-pane-create-sidebar-mobile-selector">
+          <span>Choose a question</span>
+          <select
+            aria-label="Choose a question"
+            .value=${this.selectedQuestionUri ?? ''}
+            @change=${this.handleMobileQuestionChange}
+          >
+            ${this.questions.map((question, index) => {
+              const typeDefinition = getQuestionaireCreateQuestionTypeByUri(question.typeUri)
+              return html`
+                <option value=${question.question.uri}>
+                  ${index + 1}. ${question.title || 'Untitled question'} (${typeDefinition?.label ?? 'Question'})
+                </option>
+              `
+            })}
+          </select>
+        </label>
         <div class="questionaire-pane-create-sidebar-list">
           ${this.questions.map((question, index) => {
             const typeDefinition = getQuestionaireCreateQuestionTypeByUri(question.typeUri)
