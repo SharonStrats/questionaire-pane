@@ -1,17 +1,21 @@
 import { html, nothing } from 'lit'
 import { property } from 'lit/decorators.js'
+import { state } from 'lit/decorators.js'
 import { customElement, WebComponent } from 'solid-ui'
 import type { LiveStore, NamedNode } from 'rdflib'
 import { sym } from 'rdflib'
-import { LiveQuizClient, type LiveQuizState } from '../../../service/liveQuizClient'
+import { LiveQuizClient, type LiveQuizChatMessage, type LiveQuizState } from '../../../service/liveQuizClient'
 import { loadQuestionaireQuestionSummaries, type QuestionaireQuestionSummary } from '../../../service/questionQueries'
 import styles from './LiveQuiz.styles.css'
+import '~icons/lucide/message-circle-more'
 
 export interface LiveQuizClientLike {
   connect: () => Promise<void>
   disconnect: () => void
   onState: (listener: (state: LiveQuizState) => void) => () => void
   onError: (listener: (message: string) => void) => () => void
+  onChatMessage: (listener: (message: LiveQuizChatMessage) => void) => () => void
+  sendChatMessage: (content: string) => void
   createGame: (input: { name: string, quizUri: string, questionCount: number }) => void
   joinGame: (input: { name: string, lobbyId: string }) => void
   startGame: () => void
@@ -44,13 +48,18 @@ export default class LiveQuiz extends WebComponent {
   private client?: LiveQuizClientLike
   private removeStateListener?: () => void
   private removeErrorListener?: () => void
+  private removeChatListener?: () => void
   private state?: LiveQuizState
+  private chatMessages: LiveQuizChatMessage[] = []
   private error = ''
   private mode: 'create' | 'join' = 'create'
   private isHost = false
   private connected = false
   private submittedQuestionIndex: number | null = null
   private questionSummaries: QuestionaireQuestionSummary[] = []
+
+  @state()
+  private accessor chatOpen = false
 
   disconnectedCallback (): void {
     this.removeListeners()
@@ -62,8 +71,10 @@ export default class LiveQuiz extends WebComponent {
   private removeListeners (): void {
     this.removeStateListener?.()
     this.removeErrorListener?.()
+    this.removeChatListener?.()
     this.removeStateListener = undefined
     this.removeErrorListener = undefined
+    this.removeChatListener = undefined
   }
 
   private async connect (): Promise<LiveQuizClientLike | undefined> {
@@ -87,6 +98,10 @@ export default class LiveQuiz extends WebComponent {
     })
     this.removeErrorListener = client.onError(message => {
       this.error = message
+      this.requestUpdate()
+    })
+    this.removeChatListener = client.onChatMessage(message => {
+      this.chatMessages = [...this.chatMessages, message].slice(-100)
       this.requestUpdate()
     })
     try {
@@ -197,6 +212,41 @@ export default class LiveQuiz extends WebComponent {
     this.requestUpdate()
   }
 
+  private sendChatMessage (event: SubmitEvent): void {
+    event.preventDefault()
+    const form = event.currentTarget as HTMLFormElement
+    const input = form.elements.namedItem('message') as HTMLInputElement
+    this.client?.sendChatMessage(input.value)
+    input.value = ''
+  }
+
+  private renderChat () {
+    if (!this.state || !this.connected) return nothing
+    if (!this.chatOpen) {
+      return html`
+        <button class="live-quiz-chat-toggle" type="button" aria-label="Open room chat" @click=${() => { this.chatOpen = true }}>
+          <icon-lucide-message-circle-more aria-hidden="true"></icon-lucide-message-circle-more>
+          <span>Chat with friends</span>
+          ${this.chatMessages.length ? html`<b>${this.chatMessages.length}</b>` : nothing}
+        </button>
+      `
+    }
+    return html`
+      <section class="live-quiz-chat" aria-label="Room chat">
+        <div class="live-quiz-chat-heading"><h3>Room chat</h3><button type="button" @click=${() => { this.chatOpen = false }}>Close</button><span>${this.chatMessages.length} message${this.chatMessages.length === 1 ? '' : 's'}</span></div>
+        <ol aria-live="polite">
+          ${this.chatMessages.map(message => html`
+            <li><strong>${message.senderName}</strong><span>${message.content}</span></li>
+          `)}
+        </ol>
+        <form @submit=${this.sendChatMessage}>
+          <input name="message" maxlength="500" autocomplete="off" placeholder="Say something to the room">
+          <button class="primary" type="submit">Send</button>
+        </form>
+      </section>
+    `
+  }
+
   private renderCreateForm () {
     return html`
       <form class="live-quiz-form" @submit=${this.createGame}>
@@ -302,6 +352,7 @@ export default class LiveQuiz extends WebComponent {
         ${this.mode === 'create' ? this.renderCreateForm() : this.renderJoinForm()}
         ${this.error ? html`<p class="live-quiz-error" role="alert">${this.error}<button type="button" @click=${this.clearError}>Dismiss</button></p>` : nothing}
         ${this.renderLobby()}
+        ${this.renderChat()}
         ${this.connected ? html`<p class="live-quiz-connected">Connected to live quiz service.</p>` : nothing}
       </section>
     `

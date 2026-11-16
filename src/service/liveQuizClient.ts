@@ -12,11 +12,21 @@ export interface LiveQuizPlayer {
 export interface LiveQuizState {
   lobbyId: string
   quizUri: string
+  gameType?: 'quiz' | 'study-cards'
+  deckUri?: string
   questionCount: number
   currentQuestionIndex: number | null
   status: 'waiting' | 'playing' | 'finished'
   hostPlayerId: string
   players: LiveQuizPlayer[]
+}
+
+export interface LiveQuizChatMessage {
+  id: string
+  senderId: string
+  senderName: string
+  content: string
+  timestamp: number
 }
 
 type LiveQuizSocket = Pick<Socket, 'connect' | 'disconnect' | 'emit' | 'on' | 'off' | 'once'>
@@ -68,8 +78,26 @@ export class LiveQuizClient {
     return () => this.socket.off('gameError', handler)
   }
 
+  onChatMessage (listener: (message: LiveQuizChatMessage) => void): () => void {
+    this.socket.on('chatMessage', listener)
+    return () => this.socket.off('chatMessage', listener)
+  }
+
+  sendChatMessage (content: string): void {
+    const message = content.trim()
+    if (message) this.socket.emit('sendChatMessage', { content: message })
+  }
+
+  joinChatRoom (input: { name: string, roomId: string }): void {
+    this.socket.emit('joinChatRoom', input)
+  }
+
   createGame (input: { name: string, webId?: string, quizUri: string, questionCount: number }): void {
     this.socket.emit('createGame', input)
+  }
+
+  createStudyGame (input: { name: string, webId?: string, deckUri: string, questionCount: number }): void {
+    this.socket.emit('createGame', { ...input, gameType: 'study-cards' })
   }
 
   joinGame (input: { name: string, webId?: string, lobbyId: string }): void {

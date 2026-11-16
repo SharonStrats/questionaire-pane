@@ -57,3 +57,25 @@
 .questionaire-pane-take-starter-view-start:hover {
   background: #5b4fd6;
 }
+
+@media (max-width: 640px) {
+  .questionaire-pane-take-starter-view {
+    padding: 28px 16px 40px;
+  }
+
+  .questionaire-pane-take-starter-view-card {
+    padding: 26px 20px;
+  }
+
+  .questionaire-pane-take-starter-view-card h2 {
+    font-size: 25px;
+  }
+
+  .questionaire-pane-take-starter-view-description {
+    font-size: 14px;
+  }
+
+  .questionaire-pane-take-starter-view-start {
+    min-height: 44px;
+  }
+}

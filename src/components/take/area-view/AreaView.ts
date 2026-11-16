@@ -2,6 +2,8 @@ import { html } from 'lit'
 import { consume } from '@lit/context'
 import { state } from 'lit/decorators.js'
 import { customElement, WebComponent } from 'solid-ui'
+import type { NamedNode } from 'rdflib'
+import { authn } from 'solid-logic'
 import styles from './AreaView.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
 import { calculateQuestionnaireScore } from '../../../service/questionScoring'
@@ -10,10 +12,14 @@ import { loadQuizAiService } from '../../../service/quizAiService'
 import { questionairePredicates } from '../../../service/predicates'
 import { getQuestionnaireFormat } from '../../../service/questionQueries'
 import { loadQuestionaireQuestionSummaries, type QuestionaireQuestionSummary } from '../../../service/questionQueries'
-import { persistQuestionnaireResults } from '../../../service/shareQuestionnaireResults'
+import {
+  persistQuestionnaireResults,
+  sharePersistedQuestionnaireResults
+} from '../../../service/shareQuestionnaireResults'
 import { readQuestionValue } from '../../../service/questionAccessors'
 import { renderFormattedText } from '../../shared/formatting'
 import { shuffleDifferent } from '../../../service/shuffle'
+import { showPokemonLevelUp } from '../../standalone/pokemon-level-up/PokemonLevelUpDialog'
 import '../dispatcher/Dispatcher'
 import '../final-screen/FinalScreen'
 
@@ -56,6 +62,7 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
   @state()
   private accessor shareError = ''
 
+  private savedResultContainer?: NamedNode
   private questionsRefreshToken = 0
   private questionsKey = ''
 
@@ -74,6 +81,14 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
     const nextKey = subject.doc().uri
     if (nextKey !== this.questionsKey) {
       this.questionsKey = nextKey
+      this.activeQuestionIndex = 0
+      this.answersByQuestionUri = {}
+      this.semanticAnswerResults = {}
+      this.answerEvaluations = {}
+      this.completed = false
+      this.shareStatus = 'idle'
+      this.shareError = ''
+      this.savedResultContainer = undefined
       void this.refreshQuestions()
     }
   }
@@ -146,8 +161,10 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
   }
 
   private goNext (questions: QuestionaireQuestionSummary[]) {
+    if (this.completed) return
     if (this.activeQuestionIndex >= questions.length - 1) {
       this.completed = true
+      void this.saveResults(false)
       return
     }
 
@@ -174,18 +191,43 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
     this.shareStatus = shareWithCreator ? 'sharing' : 'saving'
     this.shareError = ''
     try {
+      if (shareWithCreator && acl && this.savedResultContainer) {
+        await sharePersistedQuestionnaireResults(store, acl, subject, this.savedResultContainer)
+        this.shareStatus = 'shared'
+        return
+      }
+
       const score = calculateQuestionnaireScore(store, subject, this.answersByQuestionUri, this.semanticAnswerResults, this.answerEvaluations)
-      await persistQuestionnaireResults(store, acl, subject, {
+      const saved = await persistQuestionnaireResults(store, acl, subject, {
         earnedPoints: score.earnedPoints,
         availablePoints: score.availablePoints,
         answers: this.answersByQuestionUri,
-        questionUris: this.questions.map((question) => question.question.uri)
+        questionUris: this.questions.map((question) => question.question.uri),
+        shareWithCreator
       })
+      this.savedResultContainer = saved.resultContainer
       this.shareStatus = shareWithCreator ? 'shared' : 'saved'
+      if (saved.pokemonProgress) {
+        this.dispatchEvent(new CustomEvent('pokemon-progress-changed', {
+          detail: saved.pokemonProgress, bubbles: true, composed: true
+        }))
+        const user = authn.currentUser()
+        if (user) {
+          void showPokemonLevelUp(store, user, saved.pokemonProgress).catch(error => {
+            console.error('Unable to show Pokemon level-up choices', error)
+          })
+        }
+      }
+      if (saved.pokemonProgressError) {
+        this.shareError = `Your quiz result was saved, but Pokemon progress is unavailable right now: ${saved.pokemonProgressError}`
+      }
     } catch (error) {
       this.shareStatus = 'error'
       this.shareError = error instanceof Error ? error.message : String(error)
-      console.error('Unable to share questionnaire results', error)
+      console.error(
+        shareWithCreator ? 'Unable to share questionnaire results' : 'Unable to save questionnaire results',
+        error
+      )
     }
 
   }
@@ -235,6 +277,7 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
               .shareStatus=${this.shareStatus}
               .shareError=${this.shareError}
               .resultStatus=${this.shareStatus}
+              .resultsSaved=${Boolean(this.savedResultContainer)}
               @questionaire-take-save-results=${() => { void this.saveResults(false) }}
               @questionaire-take-share-results=${() => { void this.saveResults(true) }}
               @questionaire-take-cancel=${() => this.cancelTaking()}

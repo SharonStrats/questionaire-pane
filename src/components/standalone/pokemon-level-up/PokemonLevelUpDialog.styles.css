@@ -1,0 +1,32 @@
+:host { display: block; }
+solid-ui-dialog-content { display: block; position: relative; min-width: min(430px, 80vw); max-width: 580px; }
+h1 { margin: 0; font-size: 1.2rem; color: #5341aa; }
+p { color: #344054; line-height: 1.5; }
+.choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 20px 0; }
+.choices solid-ui-button { width: 100%; --solid-ui-button-padding: 10px; }
+.choices img { display: block; max-width: 100%; height: auto; image-rendering: pixelated; }
+.choices span { display: block; overflow-wrap: anywhere; font-size: .85rem; }
+.hint { font-size: .8rem; color: #667085; }
+.actions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
+.error { color: #b42318; }
+.celebration { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.firework { position: absolute; top: 25%; left: calc(15% + var(--burst) * 23%); }
+.firework:nth-child(even) { top: 65%; }
+.firework span {
+  position: absolute; width: 5px; height: 5px; border-radius: 50%; background: var(--color);
+  opacity: 0; animation: firework 1.4s ease-out calc(var(--burst) * .18s) 1 both;
+}
+@keyframes firework {
+  0% { opacity: 0; transform: rotate(var(--angle)) translateX(0); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--angle)) translateX(95px) scale(.3); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .celebration { display: none; }
+  .firework span { animation: none; }
+}
+@media (max-width: 420px) {
+  solid-ui-dialog-content { min-width: min(430px, calc(100vw - 32px)); box-sizing: border-box; }
+  .choices { grid-template-columns: 1fr; gap: 8px; }
+  .choices solid-ui-button { --solid-ui-button-padding: 8px; }
+}

@@ -1,7 +1,11 @@
 import { graph, sym } from 'rdflib'
 import { describe, expect, it, vi } from 'vitest'
 import { questionairePredicates } from './predicates'
-import { persistQuestionnaireResults, shareQuestionnaireResults } from './shareQuestionnaireResults'
+import {
+  persistQuestionnaireResults,
+  sharePersistedQuestionnaireResults,
+  shareQuestionnaireResults
+} from './shareQuestionnaireResults'
 
 const creator = sym('https://creator.example/profile#me')
 const user = sym('https://taker.example/profile#me')
@@ -66,6 +70,22 @@ describe('shareQuestionnaireResults', () => {
     )
     expect(acl.applyPlan).toHaveBeenCalledWith(plan)
     expect(store.fetcher._fetch).toHaveBeenCalled()
+  })
+
+  it('shares an existing result without creating another result copy', async () => {
+    const { store, acl, plan } = fixture()
+    const resultContainer = sym('https://taker.example/storage/questionnaire-results/saved/')
+
+    await sharePersistedQuestionnaireResults(store, acl, questionnaire, resultContainer)
+
+    expect(acl.planGrantContainerContents).toHaveBeenCalledWith(
+      resultContainer,
+      { type: 'agent', iri: creator.value },
+      ['Read']
+    )
+    expect(acl.applyPlan).toHaveBeenCalledWith(plan)
+    expect(store.fetcher._fetch).not.toHaveBeenCalled()
+    expect(store.fetcher.webOperation).not.toHaveBeenCalled()
   })
 
   it.each([

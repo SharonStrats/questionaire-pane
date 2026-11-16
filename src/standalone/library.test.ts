@@ -1,7 +1,22 @@
 import { graph, literal, Namespace, st, sym } from 'rdflib'
 import { describe, expect, it, vi } from 'vitest'
 import { disco } from '../namespaces'
-import { crawlQuestionnaireContainers, discoverInboxSharedQuestionnaires, discoverSharedQuestionnaires, loadTypeIndexes, ownPublishedQuestionnaires, publishedQuestionnaireForTake, questionnairesInWorkspace, sendQuestionnaireShareNotification } from './library'
+import {
+  crawlQuestionnaireContainers,
+  discoverInboxSharedQuestionnaires,
+  discoverInboxSharedStudyDecks,
+  discoverSharedQuestionnaires,
+  loadStoredQuestionnaireUris,
+  loadStoredStudyDeckUris,
+  loadTypeIndexes,
+  ownPublishedQuestionnaires,
+  publishedQuestionnaireForTake,
+  questionnairesInWorkspace,
+  sendQuestionnaireShareNotification,
+  sendStudyDeckShareNotification,
+  storeSharedQuestionnaire,
+  storeSharedStudyDeck
+} from './library'
 
 const solid = (name: string) => sym(`http://www.w3.org/ns/solid/terms#${name}`)
 const rdf = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
@@ -50,6 +65,84 @@ describe('questionnaire Pod crawling', () => {
     await expect(questionnairesInWorkspace(store, workspace.uri)).resolves.toEqual([questionnaire])
   })
 
+  describe('shared study-card decks', () => {
+    const quiz = Namespace('https://sharonstrats.github.io/solidnext-vocab/vocab/quiz#')
+
+    it('discovers shared deck notifications and reads their deck metadata', async () => {
+      const store = graph() as any
+      const me = sym('https://recipient.example/profile/card#me')
+      const inbox = sym('https://recipient.example/inbox/')
+      const notification = sym('https://recipient.example/inbox/deck-share')
+      const deckDocument = sym('https://sender.example/study-decks/biology/index.ttl')
+      const deck = sym(`${deckDocument.uri}#deck`)
+      const sender = sym('https://sender.example/profile/card#me')
+      store.add(st(me, ldp('inbox'), inbox, me.doc()))
+      store.add(st(inbox, ldp('contains'), notification, inbox.doc()))
+      store.add(st(notification, rdf('type'), quiz('StudyDeckShare'), notification.doc()))
+      store.add(st(notification, quiz('sharedStudyDeck'), deckDocument, notification.doc()))
+      store.add(st(notification, quiz('sharedBy'), sender, notification.doc()))
+      store.add(st(deck, quiz('name'), literal('Biology'), deckDocument))
+      store.add(st(deck, quiz('studyCard'), sym(`${deckDocument.uri}#card-1`), deckDocument))
+      store.fetcher = { load: vi.fn().mockResolvedValue(undefined) }
+
+      await expect(discoverInboxSharedStudyDecks(store, me)).resolves.toEqual([{
+        uri: deckDocument.uri,
+        title: 'Biology',
+        cardCount: 1,
+        notification,
+        sharedBy: { uri: sender.uri, label: 'profile' }
+      }])
+    })
+
+    it('stores the original deck URI in the recipient-owned learning library', async () => {
+      const store = graph() as any
+      const me = sym('https://recipient.example/profile/card#me')
+      const workspace = 'https://recipient.example/Questionnaires/'
+      const deck = sym('https://sender.example/study-decks/biology/index.ttl')
+      const update = vi.fn().mockResolvedValue(undefined)
+      const webOperation = vi.fn().mockResolvedValue(new Response('', { status: 201 }))
+      store.fetcher = { load: vi.fn().mockResolvedValue(undefined), webOperation }
+      store.updater = { update }
+
+      await storeSharedStudyDeck(store, me, workspace, {
+        uri: deck.uri,
+        title: 'Biology',
+        cardCount: 1,
+        notification: sym('https://recipient.example/inbox/share'),
+        sharedBy: { uri: 'https://sender.example/profile/card#me', label: 'Sender' }
+      })
+
+      expect(webOperation).toHaveBeenCalledWith(
+        'PUT',
+        `${workspace}learning-library.ttl`,
+        expect.objectContaining({ headers: { 'If-None-Match': '*' } })
+      )
+      expect(update.mock.calls[0][1]).toEqual(expect.arrayContaining([
+        expect.objectContaining({ predicate: quiz('sharedStudyDeck'), object: deck })
+      ]))
+      store.add(st(sym(`${workspace}learning-library.ttl#saved`), quiz('sharedStudyDeck'), deck, sym(`${workspace}learning-library.ttl`)))
+      await expect(loadStoredStudyDeckUris(store, workspace)).resolves.toEqual(new Set([deck.uri]))
+    })
+
+    it('posts a typed study-deck inbox notification and surfaces failed delivery', async () => {
+      const store = graph() as any
+      const sender = sym('https://sender.example/profile/card#me')
+      const recipient = sym('https://recipient.example/profile/card#me')
+      const deck = sym('https://sender.example/study-decks/biology/index.ttl')
+      const inbox = sym('https://recipient.example/inbox/')
+      const webOperation = vi.fn().mockResolvedValue(new Response('', { status: 201 }))
+      store.add(st(recipient, ldp('inbox'), inbox, recipient.doc()))
+      store.fetcher = { load: vi.fn().mockResolvedValue(undefined), webOperation }
+
+      await sendStudyDeckShareNotification(store, sender, recipient, deck)
+      expect(webOperation.mock.calls[0][2].data).toContain('quiz:StudyDeckShare')
+      expect(webOperation.mock.calls[0][2].data).toContain(deck.uri)
+      webOperation.mockResolvedValueOnce(new Response('', { status: 403 }))
+      await expect(sendStudyDeckShareNotification(store, sender, recipient, deck))
+        .rejects.toThrow('HTTP 403')
+    })
+  })
+
   it('continues crawling nested folders when the workspace root has a questionnaire', async () => {
     const store = graph() as any
     const workspace = sym('https://pod.example/Questionnaires/')
@@ -67,6 +160,61 @@ describe('questionnaire Pod crawling', () => {
       rootQuestionnaire,
       nestedQuestionnaire
     ])
+  })
+
+  describe('saved questionnaire registry', () => {
+    it('returns the saved questionnaire targets from the registry file', async () => {
+      const store = graph() as any
+      const registry = sym('https://pod.example/Questionnaires/shared-questionnaires.ttl')
+      const item = sym(`${registry.uri}#saved-quiz`)
+      const questionnaire = sym('https://friend.example/quiz/published/index.ttl#this')
+      const predicate = sym('https://sharonstrats.github.io/solidnext-vocab/vocab/quiz#sharedQuestionnaire')
+      store.add(st(item, predicate, questionnaire, registry.doc()))
+      store.fetcher = { load: vi.fn().mockResolvedValue(undefined) }
+
+      await expect(loadStoredQuestionnaireUris(store, 'https://pod.example/Questionnaires/'))
+        .resolves.toEqual(new Set([questionnaire.uri]))
+    })
+
+    it('treats a missing registry as empty but surfaces other fetch failures', async () => {
+      const store = graph() as any
+      store.fetcher = { load: vi.fn().mockRejectedValue(Object.assign(new Error('Fetch failed'), { status: 404 })) }
+      await expect(loadStoredQuestionnaireUris(store, 'https://pod.example/Questionnaires/'))
+        .resolves.toEqual(new Set())
+
+      store.fetcher.load.mockRejectedValueOnce(Object.assign(new Error('Forbidden'), { status: 403 }))
+      await expect(loadStoredQuestionnaireUris(store, 'https://pod.example/Questionnaires/'))
+        .rejects.toThrow('Forbidden')
+    })
+
+    it('saves new questionnaire references to the shared learning library', async () => {
+      const store = graph() as any
+      const me = sym('https://pod.example/profile/card#me')
+      const subject = sym('https://friend.example/quiz/published/index.ttl#this')
+      const webOperation = vi.fn().mockResolvedValue(new Response('', { status: 201 }))
+      const update = vi.fn().mockResolvedValue(undefined)
+      store.fetcher = { load: vi.fn().mockResolvedValue(undefined), webOperation }
+      store.updater = { update }
+
+      await storeSharedQuestionnaire(store, me, 'https://pod.example/Questionnaires/', {
+        subject,
+        title: 'Quiz',
+        description: '',
+        kind: 'quiz',
+        questionCount: 1,
+        indexes: { public: false, private: false },
+        sharedBy: { uri: 'https://friend.example/profile/card#me', label: 'Friend' }
+      })
+
+      expect(webOperation).toHaveBeenCalledWith(
+        'PUT',
+        'https://pod.example/Questionnaires/learning-library.ttl',
+        expect.objectContaining({ headers: { 'If-None-Match': '*' } })
+      )
+      expect(update.mock.calls[0][1]).toEqual(expect.arrayContaining([
+        expect.objectContaining({ predicate: sym('https://sharonstrats.github.io/solidnext-vocab/vocab/quiz#sharedQuestionnaire'), object: subject })
+      ]))
+    })
   })
 
   describe('questionnaire share notifications', () => {
@@ -128,6 +276,24 @@ describe('questionnaire Pod crawling', () => {
       }))
       expect(webOperation.mock.calls[0][2].data).toContain(questionnaire.uri)
       expect(webOperation.mock.calls[0][2].data).toContain(sender.uri)
+    })
+
+    it('surfaces failed questionnaire notification delivery', async () => {
+      const store = graph() as any
+      const sender = sym('https://sender.example/profile/card#me')
+      const recipient = sym('https://recipient.example/profile/card#me')
+      const questionnaire = sym('https://sender.example/questionnaires/published/index.ttl#this')
+      const inbox = sym('https://recipient.example/inbox/')
+      const webOperation = vi.fn().mockResolvedValue(new Response('', { status: 403 }))
+
+      store.add(st(recipient, ldp('inbox'), inbox, recipient.doc()))
+      store.fetcher = {
+        load: vi.fn().mockResolvedValue(undefined),
+        webOperation
+      }
+
+      await expect(sendQuestionnaireShareNotification(store, sender, recipient, questionnaire))
+        .rejects.toThrow('Unable to send questionnaire notification: HTTP 403')
     })
 
     it('fails explicitly when the recipient has no advertised inbox', async () => {

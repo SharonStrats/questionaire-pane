@@ -1,47 +1,80 @@
 import { authn, authSession, solidLogicSingleton, store as solidStore } from 'solid-logic'
 import { Namespace, sym, type LiveStore, type NamedNode } from 'rdflib'
-import { ns } from 'solid-ui'
+import { ns, showDialog, utils } from 'solid-ui'
 import 'solid-ui/components/account'
 import 'solid-ui/components/provider'
 import 'solid-ui/theme.css'
+import '~icons/lucide/arrow-left'
+import '~icons/lucide/check'
+import '~icons/lucide/sparkles'
+import '~icons/lucide/upload'
+import '~icons/lucide/message-circle-more'
 import questionairePane from '../index'
 import { configureQuizAiService } from '../service/quizAiService'
 import { DocumentGenerationClient } from '../service/documentGenerationClient'
 import { createStudyCardReviews, duplicateStudyCardReviewIds, summarizeStudyCardReviews, updateStudyCardReview, type StudyCardReview } from '../service/studyCardReview'
 import { serializeStudyDeck } from '../service/studyCardRdf'
 import { saveAcceptedStudyDeck } from '../service/studyDeckPersistence'
-import { serializeSolidMemoDeck } from '../service/solidMemoAdapter'
+import { updatePokemonProgress } from '../service/pokemonProgress'
+import { loadStudyLearningProgress, recordStudyCardOutcome, studyDeckMetrics } from '../service/studyLearningProgress'
+import { showPokemonLevelUp } from '../components/standalone/pokemon-level-up/PokemonLevelUpDialog'
+import '../components/standalone/study-session-setup/StudySessionSetup'
+import { LiveQuizClient, type LiveQuizChatMessage } from '../service/liveQuizClient'
 import { getAppServicesEndpoint } from './quizSidecarConfig'
 import '../components/provider/QuestionaireProvider'
 import '../components/create/main-view/MainView'
 import '../components/take/main-view/MainView'
 import '../components/standalone/questionaire-home/QuestionaireHome'
 import '../components/standalone/live-quiz/LiveQuiz'
+import '../components/standalone/live-quiz/LiveStudyCards'
+import '../components/standalone/english-practice/EnglishPractice'
 import '../questionairePane.css'
 import './standalone.css'
 import { isHttpUrl, parseStandaloneUrl } from './url'
+import { accountRegistrationUrl } from './accountLinks'
 import { replaceViewWithRestorableContent } from './viewNavigation'
 import {
   addToTypeIndex,
   crawlQuestionnaireContainers,
   discoverInboxSharedQuestionnaires,
+  discoverInboxSharedStudyDecks,
+  findQuestionnaireWorkspace,
   ensureQuestionnaireWorkspace,
   entriesFromSubjects,
   discoverSharedQuestionnaires,
   isPublishedQuestionnaire,
   loadQuestionnaireMetrics,
   loadStoredQuestionnaireUris,
+  loadStoredStudyDeckUris,
+  migrateQuestionnaireShareNotifications,
   loadTypeIndexes,
   ownPublishedQuestionnaires,
   publishedQuestionnaireForTake,
   questionnaireClass,
   questionnairesInWorkspace,
   storeSharedQuestionnaire,
+  storeSharedStudyDeck,
+  type SharedStudyDeckEntry,
   type QuestionnaireIndexStatus,
   type SharedQuestionnaireEntry
 } from './library'
 import { createContainerIfMissing } from '../service/types'
+import {
+  hasUndeferredPokemonChoice,
+  loadPokemonProgress,
+  quizAveragesFromProgress,
+  resumeDeferredPokemonChoices,
+  type PokemonProgress
+} from '../service/pokemonProgress'
 import PodQuestionnaireDialog from './PodQuestionnaireDialog'
+import PodFileDialog from './PodFileDialog'
+import StudyCardConfirmDialog from './StudyCardConfirmDialog'
+import { addFriend, loadFriendSummaries, searchContactsAndFriends, searchWebIds, type FriendSummary, type WebIdSearchResult } from '../service/socialFriends'
+import { FriendChatClient } from '../service/friendChatClient'
+import type FriendChatDialog from '../components/standalone/friend-chat/FriendChatDialog'
+import '../components/standalone/friend-chat/FriendChatDialog'
+import QuestionnaireShareDialog from '../components/standalone/questionnaire-share/QuestionnaireShareDialog'
+import { loadChatInboxNotifications, sendChatInboxNotifications, type ChatInboxNotification } from '../service/chatNotifications'
 
 declare global {
   interface Window {
@@ -52,9 +85,27 @@ declare global {
 }
 
 const store = solidStore as LiveStore
+let friendChatClient: FriendChatClient | undefined
+let friendChatDialog: FriendChatDialog | undefined
+let unsubscribeChatHome: (() => void) | undefined
+
+function setChatFriends (friends: FriendSummary[]): void {
+  friendChatClient?.setFriends(friends)
+  if (friendChatDialog) {
+    friendChatDialog.friends = friends
+    friendChatDialog.requestUpdate()
+  }
+}
 const app = document.querySelector<HTMLElement>('#app')!
 const loginReturnUrlKey = 'questionaire-pane:login-return-url'
 const authRestoreTimeoutMs = 10_000
+
+function getQuizGameEndpoint (): string {
+  const configured = import.meta.env.VITE_QUIZ_GAME_ENDPOINT?.trim()
+  if (configured) return configured
+  if (import.meta.env.DEV) return 'http://localhost:5100'
+  return window.location.origin
+}
 
 window.SolidLogic = { authSession }
 
@@ -110,11 +161,76 @@ configureLocalLoginIssuer()
 configureQuizSidecar()
 
 function message (text: string, kind: 'info' | 'error' = 'info'): void {
+  app.classList.remove('app-home', 'app-loading', 'app-welcome')
   app.innerHTML = ''
   const element = document.createElement(kind === 'error' ? 'p' : 'p')
   element.className = kind
   element.textContent = text
   app.appendChild(element)
+}
+
+function renderWelcome (): void {
+  ensurePageHeaderProvider()
+  document.querySelector<HTMLElement>('#PageHeader')?.removeAttribute('hidden')
+  app.classList.remove('app-home', 'app-loading')
+  app.classList.add('app-welcome')
+  app.innerHTML = `
+    <div class="welcome-layout">
+      <section class="welcome-card" aria-labelledby="welcome-heading">
+        <p class="welcome-eyebrow"><span aria-hidden="true">✦</span> Solid Learn</p>
+        <div class="welcome-grid">
+          <div class="welcome-copy">
+            <p class="welcome-kicker">A home for your learning</p>
+            <h1 id="welcome-heading">Your learning deserves a place to grow.</h1>
+            <p class="welcome-description">
+              Log in to continue, or create a Solid account to get your own Pod:
+              a personal place to store quizzes, answers, and study materials.
+              Your Pod keeps your work together, and you choose what you share.
+            </p>
+            <div class="welcome-actions">
+              <solid-ui-provider class="welcome-auth-provider">
+                <solid-ui-login-button>
+                  <button class="welcome-button welcome-button-primary" type="button" slot="trigger">Log in</button>
+                </solid-ui-login-button>
+              </solid-ui-provider>
+              <a class="welcome-button welcome-button-secondary" href="${accountRegistrationUrl}"
+                target="_blank" rel="noopener noreferrer">Create an account</a>
+            </div>
+            <p class="welcome-note">Already have a published questionnaire link? Open it directly.</p>
+          </div>
+          <div class="welcome-visual" aria-hidden="true">
+            <div class="welcome-pod-card">
+              <div class="welcome-pod-heading">
+                <span class="welcome-pod-mark">S</span>
+                <div><strong>Your Pod</strong><small>Your personal space</small></div>
+                <span class="welcome-pod-status">YOURS</span>
+              </div>
+              <div class="welcome-pod-items">
+                <div class="welcome-pod-item">
+                  <span class="welcome-pod-item-icon welcome-pod-item-icon--quiz">Q</span>
+                  <div><strong>Quizzes</strong><small>Create and keep learning</small></div>
+                </div>
+                <div class="welcome-pod-item">
+                  <span class="welcome-pod-item-icon welcome-pod-item-icon--cards">✦</span>
+                  <div><strong>Study cards</strong><small>Save what you want to remember</small></div>
+                </div>
+                <div class="welcome-pod-item">
+                  <span class="welcome-pod-item-icon welcome-pod-item-icon--progress">↗</span>
+                  <div><strong>Your progress</strong><small>Pick up where you left off</small></div>
+                </div>
+              </div>
+              <p class="welcome-pod-footer"><span></span> Stored in your own Pod</p>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="welcome-benefits" aria-label="Your learning space">
+        <article><span>01</span><div><h2>Save your learning</h2><p>Keep quizzes and study materials in one place.</p></div></article>
+        <article><span>02</span><div><h2>Continue anytime</h2><p>Log in to return to your work and progress.</p></div></article>
+        <article><span>03</span><div><h2>Share on your terms</h2><p>Choose what you share with other people.</p></div></article>
+      </section>
+    </div>
+  `
 }
 
 async function checkUserWithoutBlockingStartup (): Promise<void> {
@@ -134,8 +250,9 @@ async function checkUserWithoutBlockingStartup (): Promise<void> {
 }
 
 function renderQuestionnaire (subject: NamedNode): void {
+  ensurePageHeaderProvider()
   document.querySelector<HTMLElement>('#PageHeader')?.removeAttribute('hidden')
-  app.classList.remove('app-home')
+  app.classList.remove('app-home', 'app-loading', 'app-welcome')
   app.innerHTML = ''
   const provider = document.createElement('questionaire-provider') as HTMLElement & { store?: LiveStore, subject?: NamedNode, acl?: typeof solidLogicSingleton.acl }
   provider.store = store
@@ -150,6 +267,24 @@ function renderQuestionnaire (subject: NamedNode): void {
 interface PodContainer {
   url: string
   label: string
+}
+
+interface StudyDeckSummary {
+  uri: string
+  title: string
+  cardCount: number
+  completedCardCount: number
+  score?: number
+}
+
+function fileTitle (filename: string): string {
+  return filename.replace(/\.[^.]+$/, '') || 'Generated study cards'
+}
+
+function escapeHtml (value: string): string {
+  return value.replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', [String.fromCharCode(34)]: '&quot;', [String.fromCharCode(39)]: '&#39;'
+  })[character]!)
 }
 
 const storagePredicate = sym('http://www.w3.org/ns/pim/space#storage')
@@ -184,6 +319,410 @@ async function findStorageContainer (me: NamedNode): Promise<string | undefined>
   await store.fetcher.load(me.doc())
   const storage = store.any(me, storagePredicate)
   return storage?.termType === 'NamedNode' ? (storage as NamedNode).uri : undefined
+}
+
+const quizVocabulary = Namespace('https://sharonstrats.github.io/solidnext-vocab/vocab/quiz#')
+
+async function loadStudyDecks (
+  storageUrl: string,
+  user: NamedNode,
+  workspaceUrl: string
+): Promise<StudyDeckSummary[]> {
+  let folders: PodContainer[]
+  try {
+    folders = await loadContainerChildren(`${storageUrl.replace(/\/+$/, '')}/study-decks/`)
+  } catch (error) {
+    const failure = error as { status?: number, response?: { status?: number } }
+    if (failure.status === 404 || failure.response?.status === 404) return []
+    throw error
+  }
+  const ownedDeckUris = new Set(folders.map(folder => `${folder.url.replace(/\/+$/, '')}/index.ttl`))
+  const deckUris = new Set(ownedDeckUris)
+  if (workspaceUrl) {
+    for (const uri of await loadStoredStudyDeckUris(store, workspaceUrl)) deckUris.add(uri)
+  }
+  const decks: StudyDeckSummary[] = []
+  for (const uri of deckUris) {
+    const segments = uri.split('/').filter(Boolean)
+    const folderLabel = segments[segments.length - 2] ?? 'Study cards'
+    let title: string
+    let cardUris: string[]
+    try {
+      await store.fetcher?.load(sym(uri))
+      const deck = sym(`${uri}#deck`)
+      title = store.any(deck, quizVocabulary('name'))?.value || folderLabel
+      const cardTerms = store.each(deck, quizVocabulary('studyCard'))
+      const cards = cardTerms.filter((card): card is NamedNode => card.termType === 'NamedNode')
+      if (cards.length !== cardTerms.length) throw new Error('The deck contains an invalid study-card reference.')
+      cardUris = cards.map(card => card.uri)
+    } catch (error) {
+      if (!ownedDeckUris.has(uri)) {
+        throw new Error(`Unable to load shared study cards at ${uri}: ${error instanceof Error ? error.message : String(error)}`)
+      }
+      continue
+    }
+    const progress = await loadStudyLearningProgress(store, user, storageUrl, uri)
+    decks.push({ uri, title, cardCount: cardUris.length, ...studyDeckMetrics(progress, cardUris) })
+  }
+  return decks.sort((left, right) => left.title.localeCompare(right.title))
+}
+
+async function renderStudyDeck (me: NamedNode, uri: string): Promise<void> {
+  if (!store.fetcher) throw new Error('Unable to open study cards: no Solid fetcher is available.')
+  await store.fetcher.load(sym(uri))
+  const deck = sym(`${uri}#deck`)
+  const title = store.any(deck, quizVocabulary('name'))?.value || 'Study cards'
+  const cards = store.each(deck, quizVocabulary('studyCard'))
+    .filter((card): card is NamedNode => card.termType === 'NamedNode')
+    .map(card => ({
+      uri: card.uri,
+      front: store.any(card, quizVocabulary('front'))?.value ?? '',
+      back: store.any(card, quizVocabulary('back'))?.value ?? ''
+    }))
+  const section = document.createElement('section')
+  section.className = 'study-card-player'
+  const chatRoomId = `study-${[...uri].reduce((hash, character) => (hash * 31 + character.charCodeAt(0)) >>> 0, 7).toString(16)}`
+  const chatPanel = createStudyChatPanel(getQuizGameEndpoint(), chatRoomId)
+  const back = document.createElement('button')
+  back.type = 'button'
+  back.className = 'study-card-player-back'
+  back.innerHTML = '<icon-lucide-arrow-left aria-hidden="true"></icon-lucide-arrow-left><span>Back to decks</span>'
+  back.setAttribute('aria-label', 'Back to questionnaires')
+  back.addEventListener('click', () => { chatPanel.cleanup(); void renderLibrary(me) })
+  const liveButton = document.createElement('button')
+  liveButton.type = 'button'
+  liveButton.className = 'study-card-live-button'
+  liveButton.textContent = 'Play together'
+  const livePanel = document.createElement('div')
+  livePanel.hidden = true
+  const liveStudy = document.createElement('questionaire-live-study-cards') as HTMLElement & {
+    endpoint: string
+    deckUri: string
+    title: string
+    cards: { front: string, back: string }[]
+    store: typeof store
+  }
+  liveStudy.endpoint = getQuizGameEndpoint()
+  liveStudy.deckUri = uri
+  liveStudy.title = title
+  liveStudy.cards = cards
+  liveStudy.store = store
+  liveButton.addEventListener('click', () => {
+    livePanel.hidden = !livePanel.hidden
+    liveButton.textContent = livePanel.hidden ? 'Play together' : 'Close live game'
+  })
+  livePanel.append(liveStudy)
+  const content = document.createElement('div')
+  const status = document.createElement('p')
+  status.className = 'study-card-prompt'
+  status.setAttribute('role', 'status')
+  const retry = document.createElement('button')
+  retry.type = 'button'
+  retry.textContent = 'Retry saving progress'
+  retry.hidden = true
+  const setup = document.createElement('questionaire-study-session-setup') as HTMLElement & {
+    cards: typeof cards
+    progress?: Awaited<ReturnType<typeof loadStudyLearningProgress>>
+    loading: boolean
+    error: string
+  }
+  setup.cards = cards
+  setup.loading = true
+  content.append(setup)
+  section.append(back, liveButton, livePanel, content, status, retry, chatPanel.element)
+  app.innerHTML = ''
+  app.append(section)
+  let learningProgress: Awaited<ReturnType<typeof loadStudyLearningProgress>>
+  try {
+    const storageUrl = await findStorageContainer(me)
+    if (!storageUrl) throw new Error('Your profile does not advertise a Pod for personal study progress.')
+    learningProgress = await loadStudyLearningProgress(store, me, storageUrl, deck.uri)
+  } catch (error) {
+    setup.error = error instanceof Error ? error.message : 'Unable to load personal study progress.'
+    setup.loading = false
+    return
+  }
+  setup.progress = learningProgress
+  setup.loading = false
+  let sessionCards: typeof cards = []
+  let current = 0
+  let score = 0
+  let saving = false
+  let completed = false
+  let saveError = ''
+  let sessionId = ''
+  type CardState = {
+    selected?: string
+    revealed: boolean
+    hintVisible: boolean
+    outcome?: 'correct' | 'incorrect' | 'revealed'
+    saved: boolean
+    awarded: boolean
+    alternatives: string[]
+  }
+  const states = new Map<string, CardState>()
+  const shuffle = <T,>(items: T[]): T[] => items
+    .map(value => ({ value, sort: Math.random() }))
+    .sort((left, right) => left.sort - right.sort)
+    .map(item => item.value)
+
+  const render = (): void => {
+    const card = sessionCards[current]
+    status.textContent = saveError || (saving ? 'Saving your progress…' : '')
+    retry.hidden = !saveError || saving
+    back.disabled = saving
+    content.replaceChildren()
+    if (!card) {
+      setup.progress = learningProgress
+      content.append(setup)
+      return
+    }
+    const state = states.get(card.uri)!
+    const { selected, revealed, hintVisible } = state
+    const header = document.createElement('header')
+    header.className = 'study-card-player-header'
+    header.innerHTML = `<div><span class="study-card-kicker">STUDY SESSION</span><h1>${escapeHtml(title)}</h1></div><div class="study-card-xp"><span>XP</span><strong>${score * 2}</strong><small>+2 each</small></div>`
+    if (completed) {
+      const summary = document.createElement('p')
+      summary.textContent = `Session complete — ${sessionCards.length} cards reviewed, ${score} correct without revealing, ${score * 2} XP earned.`
+      const another = document.createElement('button')
+      another.type = 'button'
+      another.textContent = 'Study another set'
+      another.disabled = saving || Boolean(saveError)
+      another.addEventListener('click', () => { sessionCards = []; completed = false; render() })
+      content.append(header, summary, another)
+      return
+    }
+    const progress = document.createElement('div')
+    progress.className = 'study-card-progress'
+    progress.innerHTML = `<div class="study-card-progress-label"><span>Card ${current + 1} of ${sessionCards.length}</span><strong>${Math.round(((current + 1) / sessionCards.length) * 100)}%</strong></div><div class="study-card-progress-track"><span style="width:${((current + 1) / sessionCards.length) * 100}%"></span></div>`
+
+    const question = document.createElement('article')
+    question.className = 'study-card-question'
+    question.innerHTML = `<span class="study-card-label">QUESTION</span><p>${escapeHtml(card.front)}</p>`
+    const prompt = document.createElement('p')
+    prompt.className = 'study-card-prompt'
+    prompt.textContent = selected ? (selected === card.back ? 'Correct! Great work.' : `Not quite — the answer is “${card.back}”.`) : 'Choose the best answer'
+    const choices = document.createElement('div')
+    choices.className = 'study-card-choices'
+    state.alternatives.forEach((alternative, index) => {
+      const choice = document.createElement('button')
+      choice.type = 'button'
+      choice.className = 'study-card-choice'
+      if (selected) choice.classList.add(alternative === card.back ? 'is-correct' : alternative === selected ? 'is-wrong' : 'is-muted')
+      choice.disabled = selected !== undefined || saving || Boolean(saveError)
+      choice.innerHTML = `<span>${String.fromCharCode(65 + index)}</span><strong>${escapeHtml(alternative)}</strong>${selected && alternative === card.back ? '<b>✓</b>' : ''}`
+      choice.addEventListener('click', () => {
+        state.selected = alternative
+        if (!state.outcome) {
+          state.outcome = alternative === card.back ? 'correct' : 'incorrect'
+          void saveOutcome(card, state)
+        } else {
+          render()
+        }
+      })
+      choices.append(choice)
+    })
+
+    const tools = document.createElement('div')
+    tools.className = 'study-card-player-tools'
+    const hint = document.createElement('button')
+    hint.type = 'button'
+    hint.className = 'study-card-tool'
+    hint.textContent = hintVisible ? `Hint: ${card.back}` : '💡 Hint'
+    hint.disabled = saving || Boolean(saveError)
+    hint.addEventListener('click', () => {
+      state.hintVisible = !hintVisible
+      if (!state.outcome) { state.outcome = 'revealed'; void saveOutcome(card, state) } else render()
+    })
+    const reveal = document.createElement('button')
+    reveal.type = 'button'
+    reveal.className = 'study-card-tool'
+    reveal.textContent = revealed ? `Answer: ${card.back}` : '◉ Reveal answer'
+    reveal.disabled = saving || Boolean(saveError)
+    reveal.addEventListener('click', () => {
+      state.revealed = !revealed
+      if (!state.outcome) { state.outcome = 'revealed'; void saveOutcome(card, state) } else render()
+    })
+    tools.append(hint, reveal)
+    if (revealed && !selected) {
+      const explanation = document.createElement('p')
+      explanation.className = 'study-card-reveal'
+      explanation.textContent = card.back
+      question.append(explanation)
+    }
+
+    const navigation = document.createElement('nav')
+    navigation.className = 'study-card-player-navigation'
+    const previous = document.createElement('button')
+    previous.type = 'button'
+    previous.className = 'study-card-nav'
+    previous.textContent = '← Previous'
+    previous.disabled = current === 0 || saving || Boolean(saveError)
+    previous.addEventListener('click', () => { current -= 1; render() })
+    const next = document.createElement('button')
+    next.type = 'button'
+    next.className = 'study-card-nav study-card-next'
+    next.textContent = current === sessionCards.length - 1 ? 'Finish session' : 'Next card →'
+    next.disabled = !state.saved || saving || Boolean(saveError)
+    next.addEventListener('click', () => {
+      if (current < sessionCards.length - 1) {
+        current += 1
+        render()
+      } else {
+        void finishSession()
+      }
+    })
+    navigation.append(previous, next)
+    content.append(header, progress, question, prompt, choices, tools, navigation)
+  }
+  const saveOutcome = async (card: typeof cards[number], state: CardState): Promise<void> => {
+    if (!state.outcome || saving) return
+    saving = true
+    saveError = ''
+    render()
+    try {
+      if (!state.saved) {
+        learningProgress = await recordStudyCardOutcome(store, learningProgress, card.uri, state.outcome)
+        state.saved = true
+      }
+      if (state.outcome === 'correct' && !state.awarded) {
+        await updatePokemonProgress(store, 2, sym(`${uri}#study-${sessionId}-${sessionCards.indexOf(card)}`), deck, me)
+        state.awarded = true
+        score += 1
+      }
+    } catch (error) {
+      saveError = error instanceof Error ? error.message : 'Unable to save your study progress.'
+    } finally {
+      saving = false
+      render()
+    }
+  }
+  const finishSession = async (): Promise<void> => {
+    completed = true
+    saving = true
+    saveError = ''
+    render()
+    try {
+      const progress = await loadPokemonProgress(store, me)
+      if (progress) await showPokemonLevelUp(store, me, progress)
+    } catch (error) {
+      saveError = error instanceof Error ? error.message : 'Unable to load your Pokémon reward.'
+    } finally {
+      saving = false
+      render()
+    }
+  }
+  retry.addEventListener('click', () => {
+    if (completed) { void finishSession(); return }
+    const card = sessionCards[current]
+    const state = card && states.get(card.uri)
+    if (state) void saveOutcome(card, state)
+  })
+  setup.addEventListener('study-session-start', event => {
+    sessionCards = (event as CustomEvent<{ cards: typeof cards }>).detail.cards
+    current = 0
+    score = 0
+    completed = false
+    saveError = ''
+    sessionId = crypto.randomUUID()
+    states.clear()
+    sessionCards.forEach(card => {
+      const distractors = shuffle([...new Set(cards.filter(candidate => candidate.back !== card.back).map(candidate => candidate.back))]).slice(0, 3)
+      states.set(card.uri, { revealed: false, hintVisible: false, saved: false, awarded: false, alternatives: shuffle([card.back, ...distractors]) })
+    })
+    render()
+  })
+}
+
+function createStudyChatPanel (endpoint: string, roomId: string): {
+  element: HTMLElement
+  cleanup: () => void
+} {
+  const element = document.createElement('section')
+  element.className = 'study-card-chat'
+  if (!endpoint || !roomId) return { element, cleanup: () => {} }
+  const client = new LiveQuizClient({ endpoint })
+  const messages: LiveQuizChatMessage[] = []
+  let joined = false
+  let removeMessages = () => {}
+  const heading = document.createElement('div')
+  heading.className = 'live-quiz-chat-heading'
+  const title = document.createElement('h3')
+  title.textContent = 'Study room chat'
+  const count = document.createElement('span')
+  const content = document.createElement('div')
+  const render = (): void => {
+    count.textContent = `${messages.length} message${messages.length === 1 ? '' : 's'}`
+    content.innerHTML = ''
+    const list = document.createElement('ol')
+    list.setAttribute('aria-live', 'polite')
+    messages.forEach(message => {
+      const item = document.createElement('li')
+      const sender = document.createElement('strong')
+      sender.textContent = message.senderName
+      const text = document.createElement('span')
+      text.textContent = message.content
+      item.append(sender, text)
+      list.append(item)
+    })
+    content.append(list)
+  }
+  heading.append(title, count)
+  const joinForm = document.createElement('form')
+  joinForm.innerHTML = '<input name="name" required maxlength="80" autocomplete="name" placeholder="Your name"><button class="primary" type="submit">Join chat</button>'
+  const status = document.createElement('p')
+  status.className = 'study-card-chat-status'
+  status.textContent = 'Optional — join this deck’s study room.'
+  const toggle = document.createElement('button')
+  toggle.className = 'study-card-chat-toggle'
+  toggle.type = 'button'
+  toggle.setAttribute('aria-label', 'Open study room chat')
+  toggle.innerHTML = '<icon-lucide-message-circle-more aria-hidden="true"></icon-lucide-message-circle-more><span>Chat with friends</span>'
+  const panel = document.createElement('div')
+  panel.className = 'study-card-chat-panel live-quiz-chat'
+  panel.hidden = true
+  toggle.addEventListener('click', () => {
+    panel.hidden = !panel.hidden
+  })
+  joinForm.addEventListener('submit', event => {
+    event.preventDefault()
+    const name = new FormData(joinForm).get('name')?.toString().trim() || ''
+    if (!name) return
+    status.textContent = 'Connecting…'
+    void client.connect().then(() => {
+      joined = true
+      client.joinChatRoom({ name, roomId })
+      status.textContent = 'Connected to study room.'
+      joinForm.remove()
+      const composer = document.createElement('form')
+      composer.innerHTML = '<input name="message" maxlength="500" autocomplete="off" placeholder="Say something to the room"><button class="primary" type="submit">Send</button>'
+      composer.addEventListener('submit', submitEvent => {
+        submitEvent.preventDefault()
+        const input = composer.elements.namedItem('message') as HTMLInputElement
+        client.sendChatMessage(input.value)
+        input.value = ''
+      })
+      element.append(composer)
+    }).catch(error => {
+      status.textContent = error instanceof Error ? error.message : 'Unable to join study chat.'
+    })
+  })
+  removeMessages = client.onChatMessage(message => {
+    messages.push(message)
+    messages.splice(0, Math.max(0, messages.length - 100))
+    render()
+  })
+  render()
+  panel.append(heading, status, joinForm, content)
+  element.append(toggle, panel)
+  return {
+    element,
+    cleanup: () => {
+      if (joined) client.disconnect()
+      removeMessages()
+    }
+  }
 }
 
 async function renderContainerPicker (me: NamedNode, initialUrl?: string): Promise<void> {
@@ -334,6 +873,21 @@ async function renderContainerPicker (me: NamedNode, initialUrl?: string): Promi
   await refresh()
 }
 
+async function openStorageFileDialog (me: NamedNode): Promise<void> {
+  const storageUrl = await findStorageContainer(me)
+  if (!storageUrl) throw new Error('Your Pod profile does not advertise a storage container.')
+  const dialog = new PodFileDialog()
+  dialog.store = store
+  dialog.storageUrl = storageUrl
+  dialog.onSelect = (uri: string) => {
+    void openSubject(uri).catch(error => {
+      message(error instanceof Error ? error.message : 'Unable to open the selected file.', 'error')
+    })
+  }
+  dialog.onClose = () => dialog.remove()
+  document.body.appendChild(dialog)
+}
+
 async function openSubject (uri: string): Promise<void> {
   if (!isHttpUrl(uri)) throw new Error('The subject must be an HTTP(S) URL.')
   const subject = sym(uri)
@@ -388,7 +942,7 @@ function renderLiveQuiz (me: NamedNode, entry: { subject: NamedNode, title: stri
   section.className = 'questionnaire-create'
   const back = document.createElement('button')
   back.type = 'button'
-  back.textContent = 'Back to questionnaires'
+  back.textContent = 'Home'
   back.addEventListener('click', () => { void renderLibrary(me) })
   const liveQuiz = document.createElement('questionaire-live-quiz') as HTMLElement & {
     endpoint: string
@@ -405,22 +959,150 @@ function renderLiveQuiz (me: NamedNode, entry: { subject: NamedNode, title: stri
   app.appendChild(section)
 }
 
-async function renderLibrary (me: NamedNode): Promise<void> {
+async function renderEnglishPractice (
+  me: NamedNode,
+  initialPracticeType: 'paragraph' | 'essay'
+): Promise<void> {
+  const workspaceUrl = await ensureQuestionnaireWorkspace(store, me)
   document.querySelector<HTMLElement>('#PageHeader')?.setAttribute('hidden', '')
+  app.classList.add('app-home')
+  const section = document.createElement('section')
+  section.className = 'questionnaire-create'
+  const back = document.createElement('button')
+  back.type = 'button'
+  back.className = 'study-card-back'
+  back.textContent = 'Home'
+  const practice = document.createElement('questionaire-english-practice') as HTMLElement & {
+    endpoint: string
+    store: LiveStore
+    user: NamedNode
+    workspaceUrl: string
+    initialPracticeType: 'paragraph' | 'essay'
+    flushPendingSave: () => Promise<boolean>
+  }
+  practice.endpoint = getAppServicesEndpoint({
+    dev: import.meta.env.DEV,
+    appServicesEndpoint: import.meta.env.VITE_SOLID_APP_SERVICES_ENDPOINT,
+    legacySidecarEndpoint: import.meta.env.VITE_QUIZ_SIDECAR_ENDPOINT
+  }) ?? ''
+  practice.store = store
+  practice.user = me
+  practice.workspaceUrl = workspaceUrl
+  practice.initialPracticeType = initialPracticeType
+  back.addEventListener('click', () => {
+    void practice.flushPendingSave().then(saved => {
+      if (saved) void renderLibrary(me)
+    })
+  })
+  section.append(back, practice)
+  app.innerHTML = ''
+  app.appendChild(section)
+}
+
+async function renderLibrary (me: NamedNode): Promise<void> {
+  const header = document.querySelector<HTMLElement>('#PageHeader')
+  header?.setAttribute('hidden', '')
+  header?.querySelector('solid-ui-provider')?.remove()
+  app.classList.remove('app-loading', 'app-welcome')
   app.classList.add('app-home')
   app.innerHTML = ''
   const home = document.createElement('questionaire-home') as HTMLElement & {
     entries: ReturnType<typeof entriesFromSubjects>
     publishedEntries: Awaited<ReturnType<typeof ownPublishedQuestionnaires>>
+    savedEntries: ReturnType<typeof entriesFromSubjects>
     sharedEntries: Awaited<ReturnType<typeof discoverSharedQuestionnaires>>
     section: 'mine' | 'shared'
     workspaceReady: boolean
+    workspaceCreated: boolean
     status: string
     statusKind: 'info' | 'error'
     liveGameEndpoint: string
+    friendCount: number
+    friends: FriendSummary[]
+    friendSearchResults: WebIdSearchResult[]
+    friendSearchStatus: string
+    pokemonProgress?: PokemonProgress
+    quizAverages: Record<string, number>
+    studyDecks: StudyDeckSummary[]
+    sharedStudyDecks: SharedStudyDeckEntry[]
+    chatUnread: number
+    chatInboxNotifications: ChatInboxNotification[]
+    chatInboxStatus: string
   }
   app.appendChild(home)
-  home.liveGameEndpoint = import.meta.env.VITE_QUIZ_GAME_ENDPOINT?.trim() || ''
+  home.liveGameEndpoint = getQuizGameEndpoint()
+  home.friendCount = 0
+  home.friends = []
+  home.friendSearchResults = []
+  home.friendSearchStatus = ''
+  home.pokemonProgress = undefined
+  home.quizAverages = {}
+  home.studyDecks = []
+  home.sharedStudyDecks = []
+  home.chatInboxNotifications = []
+  home.chatInboxStatus = ''
+  if (friendChatClient?.webId !== me.uri) {
+    friendChatClient?.disconnect()
+    friendChatDialog?.remove()
+    friendChatDialog = undefined
+    friendChatClient = new FriendChatClient(me.uri, utils.label(me), getQuizGameEndpoint())
+    friendChatClient.connect()
+  }
+  unsubscribeChatHome?.()
+  unsubscribeChatHome = friendChatClient!.subscribe(snapshot => {
+    home.chatUnread = Object.values(snapshot.unread).reduce((sum, value) => sum + value, 0)
+  })
+  const refreshChatInbox = (): void => {
+    home.chatInboxStatus = 'Loading chat notifications…'
+    void loadChatInboxNotifications(store, me).then(({ notifications, warnings }) => {
+      const latest = new Map<string, ChatInboxNotification>()
+      notifications.forEach(item => { if (!latest.has(item.conversationId)) latest.set(item.conversationId, item) })
+      home.chatInboxNotifications = [...latest.values()]
+      home.chatInboxStatus = warnings.join(' ')
+    }).catch(error => {
+      home.chatInboxStatus = error instanceof Error ? error.message : 'Unable to load chat inbox notifications.'
+    })
+  }
+  const notifyChat = (title: string, conversationId: string): void => {
+    refreshChatInbox()
+    try {
+      if ('Notification' in window && Notification.permission === 'granted' &&
+        localStorage.getItem('questionaire-chat-notifications') === 'true') {
+        const notification = new Notification(title, {
+          body: 'Open Solid Learn to view your chat.', tag: conversationId
+        })
+        notification.onclick = () => {
+          window.focus()
+          home.dispatchEvent(new CustomEvent('questionaire-home-open-chat-invitation', {
+            detail: { conversationId }
+          }))
+          notification.close()
+        }
+      }
+    } catch (error) {
+      home.chatInboxStatus = error instanceof Error ? error.message : 'Unable to show browser notification.'
+    }
+  }
+  friendChatClient!.onIncoming = incoming => notifyChat(`New chat message from ${incoming.senderName}`, incoming.conversationId || '')
+  friendChatClient!.onInvitation = conversation => notifyChat('You have been invited to a chat', conversation.id)
+  refreshChatInbox()
+  void loadFriendSummaries(store, me).then(friends => {
+    home.friends = friends
+    home.friendCount = friends.length
+    setChatFriends(friends)
+  }).catch(error => {
+    home.friendSearchStatus = error instanceof Error ? error.message : 'Unable to load friends.'
+  })
+  void (async () => {
+    if (!store.fetcher) throw new Error('Unable to refresh friends: no Solid fetcher is available.')
+    await store.fetcher.load(me.doc())
+    const friends = await loadFriendSummaries(store, me)
+    home.friends = friends
+    home.friendCount = friends.length
+    setChatFriends(friends)
+  })().catch(error => {
+    home.friendSearchStatus = error instanceof Error ? error.message : 'Unable to refresh friends.'
+  })
   home.addEventListener('questionaire-home-choose', () => {
     void openQuestionnaireDialog(me).catch((error: unknown) => {
       setStatus(error instanceof Error ? error.message : 'Unable to search your Pod.', 'error')
@@ -436,38 +1118,111 @@ async function renderLibrary (me: NamedNode): Promise<void> {
 
   function renderDocumentGeneration (me: NamedNode, endpoint: string): void {
     const section = document.createElement('section')
-    section.className = 'questionnaire-create'
-    section.innerHTML = '<h1>Generate study cards</h1><p>Select a document to preview cards before anything is saved to your Pod.</p>'
+    section.className = 'questionnaire-create study-card-generator'
+    section.innerHTML = '<header class="study-card-generator-header"></header><section class="study-card-upload-heading"><span><icon-lucide-sparkles aria-hidden="true"></icon-lucide-sparkles> GENERATE STUDY CARDS</span><h1>Turn a document into cards</h1><p>Add your notes or a document. You will review every generated card before anything is saved.</p></section>'
     const input = document.createElement('input')
+    input.className = 'study-card-source'
     input.type = 'file'
-    input.accept = '.pdf,.docx,.md,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/markdown,text/plain'
+    input.accept = '.pdf,.docx,.pptx,.md,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/markdown,text/plain'
+    let selectedFile: File | undefined
     const generate = document.createElement('button')
     generate.type = 'button'
-    generate.className = 'primary'
-    generate.textContent = 'Generate preview'
+    generate.className = 'primary study-card-generate'
+    generate.innerHTML = '<icon-lucide-sparkles aria-hidden="true"></icon-lucide-sparkles> Generate preview'
     generate.disabled = true
     const back = document.createElement('button')
+    back.className = 'study-card-back'
     back.type = 'button'
-    back.textContent = 'Back to questionnaires'
     const confirmSave = document.createElement('button')
     confirmSave.type = 'button'
-    confirmSave.textContent = 'Confirm accepted cards'
+    confirmSave.innerHTML = '<icon-lucide-check aria-hidden="true"></icon-lucide-check> Confirm cards'
     confirmSave.disabled = true
-    const exportMemo = document.createElement('button')
-    exportMemo.type = 'button'
-    exportMemo.textContent = 'Export Solid Memo RDF'
-    exportMemo.disabled = true
+    const countLabel = document.createElement('label')
+    countLabel.className = 'study-card-count'
+    countLabel.innerHTML = '<span>Cards to generate</span>'
+    const countSelect = document.createElement('select')
+    countSelect.setAttribute('aria-label', 'Cards to generate')
+    ;[5, 10, 15, 20, 30, 40, 50, 75, 100].forEach(count => {
+      const option = document.createElement('option')
+      option.value = String(count)
+      option.textContent = String(count)
+      option.selected = count === 10
+      countSelect.append(option)
+    })
+    countLabel.append(countSelect)
+    const dropzone = document.createElement('label')
+    dropzone.className = 'study-card-dropzone'
+    dropzone.innerHTML = '<span class="study-card-upload-icon"><icon-lucide-upload aria-hidden="true"></icon-lucide-upload></span><strong>Drop a document here</strong><small>or click to choose a file</small><em>PDF, Word, PowerPoint, Markdown, or text · up to 40 MB</em>'
+    dropzone.append(input)
+    const uploadDivider = document.createElement('div')
+    uploadDivider.className = 'study-card-upload-divider'
+    uploadDivider.textContent = 'or'
+    const pasteNotes = document.createElement('button')
+    pasteNotes.type = 'button'
+    pasteNotes.className = 'study-card-paste'
+    pasteNotes.innerHTML = '<span>✎</span><strong>Paste your notes instead<small>Perfect for short notes or copied text</small></strong><b>→</b>'
+    const pasteEditor = document.createElement('div')
+    pasteEditor.className = 'study-card-paste-editor'
+    pasteEditor.hidden = true
+    pasteEditor.innerHTML = '<label>PASTE YOUR NOTES<textarea placeholder="Paste class notes, an article or any text here…"></textarea></label><div><button type="button" data-paste-cancel>Cancel</button><button type="button" data-paste-use>Use these notes</button></div>'
+    const privacyNote = document.createElement('p')
+    privacyNote.className = 'study-card-privacy'
+    privacyNote.innerHTML = '<strong>◇ You stay in control.</strong> Cards are only saved after you review and accept them.'
+    const sourceName = document.createElement('p')
+    sourceName.className = 'study-card-source-name'
+    sourceName.hidden = true
+    const actions = document.createElement('div')
+    actions.className = 'study-card-actions'
+    actions.append(countLabel, generate, confirmSave)
+    const howItWorks = document.createElement('section')
+    howItWorks.className = 'study-card-how'
+    howItWorks.innerHTML = '<p>HOW IT WORKS</p><div><article><b>1</b><span><strong>Add a source</strong><small>Choose notes or a document.</small></span></article><article><b>2</b><span><strong>Review each card</strong><small>Keep, edit or skip anything.</small></span></article><article><b>3</b><span><strong>Save to your Pod</strong><small>Your accepted cards stay yours.</small></span></article></div>'
     const status = document.createElement('p')
     status.className = 'info'
     const preview = document.createElement('div')
     let reviews: StudyCardReview[] = []
-    section.append(input, document.createElement('br'), generate, back, confirmSave, exportMemo, status, preview)
+    back.innerHTML = '<icon-lucide-arrow-left aria-hidden="true"></icon-lucide-arrow-left>'
+    back.setAttribute('aria-label', 'Back to questionnaires')
+    back.style.cssText = 'width:32px;height:32px;min-height:32px;padding:0;border:0;display:inline-flex;align-items:center;justify-content:center;line-height:0;'
+    back.querySelector('icon-lucide-arrow-left')?.setAttribute('style', 'width:18px;height:18px;display:block;')
+    section.querySelector('.study-card-generator-header')?.prepend(back)
+    section.append(dropzone, uploadDivider, pasteNotes, pasteEditor, privacyNote, sourceName, actions, howItWorks, status, preview)
     app.innerHTML = ''
     app.classList.add('app-home')
     app.appendChild(section)
-    input.addEventListener('change', () => {
-      generate.disabled = !input.files?.length
-      status.textContent = input.files?.[0]?.name ?? ''
+    const setSelectedFile = (file: File | undefined): void => {
+      selectedFile = file
+      generate.disabled = !file
+      sourceName.textContent = file ? fileTitle(file.name) : ''
+      sourceName.hidden = !file
+      dropzone.classList.toggle('has-file', Boolean(file))
+    }
+    input.addEventListener('change', () => setSelectedFile(input.files?.[0]))
+    dropzone.addEventListener('dragover', event => {
+      event.preventDefault()
+      dropzone.classList.add('is-dragging')
+    })
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('is-dragging'))
+    dropzone.addEventListener('drop', event => {
+      event.preventDefault()
+      dropzone.classList.remove('is-dragging')
+      setSelectedFile(event.dataTransfer?.files[0])
+    })
+    pasteNotes.addEventListener('click', () => {
+      pasteNotes.hidden = true
+      pasteEditor.hidden = false
+      pasteEditor.querySelector('textarea')?.focus()
+    })
+    pasteEditor.querySelector('[data-paste-cancel]')?.addEventListener('click', () => {
+      pasteEditor.hidden = true
+      pasteNotes.hidden = false
+    })
+    pasteEditor.querySelector('[data-paste-use]')?.addEventListener('click', () => {
+      const notes = pasteEditor.querySelector('textarea')?.value.trim() ?? ''
+      if (!notes) return
+      setSelectedFile(new File([notes], 'Pasted notes.txt', { type: 'text/plain' }))
+      pasteEditor.hidden = true
+      pasteNotes.hidden = false
     })
     back.addEventListener('click', () => { void renderLibrary(me) })
     const renderReview = (): void => {
@@ -475,13 +1230,14 @@ async function renderLibrary (me: NamedNode): Promise<void> {
       const duplicateIds = duplicateStudyCardReviewIds(reviews)
       status.textContent = `${summary.accepted} accepted · ${summary.pending} pending · ${summary.rejected} rejected.${duplicateIds.size ? ` ${duplicateIds.size} duplicate card${duplicateIds.size === 1 ? '' : 's'} detected; review before saving.` : ''} Nothing has been saved.`
       confirmSave.disabled = summary.accepted === 0
-      exportMemo.disabled = summary.accepted === 0
       preview.innerHTML = reviews.map((review, index) =>
-        `<article class="questionnaire-result" data-card-id="${review.id}">
-          <strong>Card ${index + 1} · ${review.status}${duplicateIds.has(review.id) ? ' · duplicate' : ''}</strong>
-          <label>Front <input data-card-field="front" value="${escapeHtml(review.card.front)}"></label>
-          <label>Back <input data-card-field="back" value="${escapeHtml(review.card.back)}"></label>
-          <small>Source: ${escapeHtml(review.card.sourceReference)}</small>
+        `<article class="questionnaire-result study-card-review" data-card-id="${review.id}">
+          <div class="study-card-review-header"><strong>Card ${index + 1} · ${review.status}${duplicateIds.has(review.id) ? ' · duplicate' : ''}</strong><span>${review.status.toUpperCase()}</span></div>
+          <div class="study-card-review-fields">
+            <label>Question <input data-card-field="front" value="${escapeHtml(review.card.front)}"></label>
+            <label>Answer <input data-card-field="back" value="${escapeHtml(review.card.back)}"></label>
+          </div>
+          <small class="study-card-review-source">Source: ${escapeHtml(review.card.sourceReference)}</small>
           <div class="registration-controls">
             <button type="button" data-card-action="accept">${review.status === 'accepted' ? 'Accepted' : 'Accept'}</button>
             <button type="button" data-card-action="reject">${review.status === 'rejected' ? 'Rejected' : 'Reject'}</button>
@@ -507,37 +1263,33 @@ async function renderLibrary (me: NamedNode): Promise<void> {
       renderReview()
     })
     confirmSave.addEventListener('click', () => {
-      if (!window.confirm('Save the accepted study cards to your Pod? This will create a new study deck.')) return
-      const file = input.files?.[0]
-      const title = file?.name ?? 'Generated study cards'
-      const turtle = serializeStudyDeck(title, reviews, file?.name)
-      const output = document.createElement('pre')
-      output.className = 'questionnaire-result'
-      output.textContent = turtle
-      preview.prepend(output)
-      status.textContent = 'Confirmation received. Saving accepted cards to your Pod…'
-      confirmSave.disabled = true
-      void findStorageContainer(me).then(storageUrl => {
-        if (!storageUrl) throw new Error('Your Pod profile does not advertise a storage container.')
-        return saveAcceptedStudyDeck(store, storageUrl, title, reviews, file?.name)
-      }).then(document => {
-        status.textContent = `Saved accepted cards to ${document.uri}`
-      }).catch(error => {
-        status.className = 'error'
-        status.textContent = error instanceof Error ? error.message : 'Unable to save study cards.'
-        confirmSave.disabled = false
-      })
-    })
-    exportMemo.addEventListener('click', () => {
-      const file = input.files?.[0]
-      const output = document.createElement('pre')
-      output.className = 'questionnaire-result'
-      output.textContent = serializeSolidMemoDeck(file?.name ?? 'Generated study cards', reviews)
-      preview.prepend(output)
-      status.textContent = 'Solid Memo RDF export preview is ready. No additional Pod write was performed.'
+      const dialog = new StudyCardConfirmDialog()
+      dialog.initialTitle = fileTitle(selectedFile?.name ?? 'Generated study cards')
+      dialog.onConfirm = (title: string) => {
+        const file = selectedFile
+        const turtle = serializeStudyDeck(title, reviews, file?.name)
+        const output = document.createElement('pre')
+        output.className = 'questionnaire-result'
+        output.textContent = turtle
+        preview.prepend(output)
+        status.textContent = 'Confirmation received. Saving accepted cards to your Pod…'
+        confirmSave.disabled = true
+        void findStorageContainer(me).then(storageUrl => {
+          if (!storageUrl) throw new Error('Your Pod profile does not advertise a storage container.')
+          return saveAcceptedStudyDeck(store, storageUrl, title, reviews, file?.name)
+        }).then(document => {
+          status.textContent = `Saved accepted cards to ${document.uri}`
+        }).catch(error => {
+          status.className = 'error'
+          status.textContent = error instanceof Error ? error.message : 'Unable to save study cards.'
+          confirmSave.disabled = false
+        })
+      }
+      dialog.onClose = () => dialog.remove()
+      document.body.appendChild(dialog)
     })
     generate.addEventListener('click', () => {
-      const file = input.files?.[0]
+      const file = selectedFile
       if (!file) return
       generate.disabled = true
       status.textContent = 'Extracting document and generating cards…'
@@ -545,7 +1297,7 @@ async function renderLibrary (me: NamedNode): Promise<void> {
       void (async () => {
         const client = new DocumentGenerationClient({ endpoint })
         const document = await client.extract(file)
-        const result = await client.generateFlashcards(document)
+        const result = await client.generateFlashcards(document, Number(countSelect.value))
         reviews = createStudyCardReviews(result.cards)
         renderReview()
       })().catch(error => {
@@ -553,12 +1305,6 @@ async function renderLibrary (me: NamedNode): Promise<void> {
         status.textContent = error instanceof Error ? error.message : 'Unable to generate study cards.'
       }).finally(() => { generate.disabled = false })
     })
-  }
-
-  function escapeHtml (value: string): string {
-    return value.replace(/[&<>"']/g, character => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', [String.fromCharCode(34)]: '&quot;', [String.fromCharCode(39)]: '&#39;'
-    })[character]!)
   }
 
   const setStatus = (text: string, kind: 'info' | 'error' = 'info'): void => {
@@ -578,26 +1324,132 @@ async function renderLibrary (me: NamedNode): Promise<void> {
     }
     renderDocumentGeneration(me, endpoint)
   })
+  home.addEventListener('questionaire-home-open-english', event => {
+    const practiceType = (event as CustomEvent<unknown>).detail === 'essay' ? 'essay' : 'paragraph'
+    void renderEnglishPractice(me, practiceType).catch(error => {
+      app.innerHTML = ''
+      const message = document.createElement('p')
+      message.setAttribute('role', 'alert')
+      message.textContent = `Unable to open English practice: ${error instanceof Error ? error.message : String(error)}`
+      app.appendChild(message)
+    })
+  })
+  home.addEventListener('questionaire-home-open-pod', () => {
+    void openStorageFileDialog(me).catch((error: unknown) => {
+      setStatus(error instanceof Error ? error.message : 'Unable to browse your Pod.', 'error')
+    })
+  })
+  const openFriendChat = (conversationId = ''): void => {
+    if (!friendChatClient) return
+    if (friendChatDialog?.isConnected) {
+      if (conversationId) void friendChatDialog.openConversation(conversationId)
+      return
+    }
+    const dialog = document.createElement('questionaire-friend-chat-dialog') as FriendChatDialog
+    dialog.client = friendChatClient
+    dialog.friends = home.friends
+    dialog.initialConversation = conversationId
+    dialog.onNotify = async (conversation, kind) => {
+      await sendChatInboxNotifications(store, me, conversation, kind)
+    }
+    dialog.onClose = () => {
+      dialog.remove()
+      friendChatDialog = undefined
+    }
+    friendChatDialog = dialog
+    document.body.append(dialog)
+  }
+  home.addEventListener('questionaire-home-open-chat', () => openFriendChat())
+  home.addEventListener('questionaire-home-refresh-inbox', refreshChatInbox)
+  home.addEventListener('questionaire-home-open-chat-invitation', event => {
+    const notification = (event as CustomEvent<{ conversationId?: string }>).detail
+    openFriendChat(notification?.conversationId)
+  })
+  home.addEventListener('questionaire-home-open-study-deck', event => {
+    const uri = (event as CustomEvent<string>).detail
+    void renderStudyDeck(me, uri).catch(error => {
+      setStatus(error instanceof Error ? error.message : 'Unable to open study cards.', 'error')
+    })
+  })
+  home.addEventListener('questionaire-home-share-study-deck', event => {
+    const uri = (event as CustomEvent<string>).detail
+    if (!uri) return
+    try {
+      if (solidLogicSingleton.store !== store) {
+        throw new Error('This host does not expose its access-control service to study cards.')
+      }
+      showDialog<QuestionnaireShareDialog>(QuestionnaireShareDialog, {
+        props: { subjectUri: uri, store, resourceType: 'study-deck' }
+      })
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Unable to open study-card sharing.', 'error')
+    }
+  })
+  home.addEventListener('questionaire-home-store-study-deck', event => {
+    const entry = (event as CustomEvent<SharedStudyDeckEntry>).detail
+    if (!entry) return
+    void (async () => {
+      workspaceUrl ||= await ensureQuestionnaireWorkspace(store, me)
+      home.workspaceReady = true
+      await storeSharedStudyDeck(store, me, workspaceUrl, entry)
+      home.sharedStudyDecks = home.sharedStudyDecks.map(deck =>
+        deck.uri === entry.uri ? { ...deck, stored: true } : deck)
+      const storageUrl = await findStorageContainer(me)
+      if (storageUrl) home.studyDecks = await loadStudyDecks(storageUrl, me, workspaceUrl)
+      home.status = `${entry.title} is now in your study-card library.`
+      home.statusKind = 'info'
+    })().catch(error => {
+      setStatus(error instanceof Error ? error.message : 'Unable to store shared study cards.', 'error')
+    })
+  })
+  home.addEventListener('questionaire-home-resume-pokemon-choice', () => {
+    void (async () => {
+      const progress = home.pokemonProgress ?? await loadPokemonProgress(store, me)
+      if (!progress?.pendingChoices.length) return
+      const resumed = await resumeDeferredPokemonChoices(store, me)
+      home.pokemonProgress = resumed
+      await showPokemonLevelUp(store, me, resumed, updated => {
+        home.pokemonProgress = updated
+      })
+    })().catch(error => {
+      setStatus(error instanceof Error ? error.message : 'Unable to reopen your Pokémon choice.', 'error')
+    })
+  })
 
   setStatus('Preparing your Questionnaires workspace…')
   try {
-    workspaceUrl = await ensureQuestionnaireWorkspace(store, me)
-    home.workspaceReady = true
+    workspaceUrl = await findQuestionnaireWorkspace(store, me) ?? ''
+    home.workspaceReady = Boolean(workspaceUrl)
   } catch (error) {
     workspaceUrl = ''
     home.workspaceReady = false
     setStatus(error instanceof Error ? error.message : 'Unable to prepare your Questionnaires workspace.', 'error')
   }
+  void (async () => {
+    const storageUrl = await findStorageContainer(me)
+    if (storageUrl) home.studyDecks = await loadStudyDecks(storageUrl, me, workspaceUrl)
+    const storedDeckUris = workspaceUrl ? await loadStoredStudyDeckUris(store, workspaceUrl) : new Set<string>()
+    home.sharedStudyDecks = (await discoverInboxSharedStudyDecks(store, me)).map(entry => ({
+      ...entry,
+      stored: storedDeckUris.has(entry.uri)
+    }))
+  })().catch(error => {
+    home.status = error instanceof Error ? error.message : 'Unable to load saved or shared study cards.'
+    home.statusKind = 'error'
+  })
   try {
     statuses = await loadTypeIndexes(store, me)
     subjects = [...statuses.keys()].map(uri => sym(uri))
-    await Promise.all(subjects.map(async subject => {
+    // Show the home from the type-index results immediately. Individual
+    // documents can hydrate their titles and metrics after the first paint.
+    renderEntries()
+    void Promise.all(subjects.map(async subject => {
       try {
         await store.fetcher?.load(subject.doc())
       } catch {
         // Keep a registered instance visible even if its document is currently unavailable.
       }
-    }))
+    })).then(() => { renderEntries() })
   } catch (error) {
     setStatus(`Could not load all type indexes: ${error instanceof Error ? error.message : 'unknown error'}`, 'error')
   }
@@ -605,12 +1457,7 @@ async function renderLibrary (me: NamedNode): Promise<void> {
     try {
       const workspaceSubjects = await questionnairesInWorkspace(store, workspaceUrl)
       subjects = [...new Map([...subjects, ...workspaceSubjects].map(subject => [subject.uri, subject])).values()]
-      if (home.statusKind !== 'error') {
-        const indexedOnly = subjects.length - workspaceSubjects.length
-        setStatus(subjects.length
-          ? `${workspaceSubjects.length} in your workspace${indexedOnly ? ` and ${indexedOnly} from your type indexes` : ''}.`
-          : 'Your workspace is ready.')
-      }
+      if (home.statusKind !== 'error') setStatus('')
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Unable to load your Questionnaires workspace.', 'error')
     }
@@ -629,9 +1476,57 @@ async function renderLibrary (me: NamedNode): Promise<void> {
     }
   }))
   home.publishedEntries = await ownPublishedQuestionnaires(store, subjects)
+  let storedUris = new Set<string>()
+  if (workspaceUrl) {
+    try {
+      storedUris = await loadStoredQuestionnaireUris(store, workspaceUrl)
+      const savedSubjects = [...storedUris].map(uri => sym(uri))
+      const savedResults = await Promise.all(savedSubjects.map(async subject => {
+        try {
+          if (!store.fetcher) throw new Error('No Pod fetcher is available.')
+          await store.fetcher.load(subject.doc())
+          return { subject }
+        } catch (error) {
+          return { error: `${subject.uri}: ${error instanceof Error ? error.message : 'Unable to load saved questionnaire.'}` }
+        }
+      }))
+      const loadedSubjects = savedResults.flatMap(result => 'subject' in result && result.subject ? [result.subject] : [])
+      home.savedEntries = entriesFromSubjects(store, loadedSubjects, new Map())
+      const failedLoads = savedResults.filter(result => 'error' in result)
+      if (failedLoads.length) {
+        setStatus(`${failedLoads.length} saved questionnaire${failedLoads.length === 1 ? '' : 's'} could not be loaded: ${failedLoads.map(result => 'error' in result ? result.error : '').join('; ')}`, 'error')
+      }
+    } catch (error) {
+      setStatus(`Unable to load saved questionnaires: ${error instanceof Error ? error.message : 'unknown error'}`, 'error')
+    }
+  }
+  const migrationSenders = new Set([
+    'https://sharonsolidosplayground.com/profile/card#me',
+    'https://sharonsolidosplayground.com/sharon/profile/card#me'
+  ])
+  const migrationKey = `questionnaire-share-migration-resend:${me.uri}`
+  if (migrationSenders.has(me.uri) && home.publishedEntries.length && localStorage.getItem(migrationKey) !== 'complete') {
+    const migrationRecipients = [
+      'https://sharonsolidosplayground.com/dimitri/profile/card#me',
+      'https://sharonsolidosplayground.com/timmy/profile/card#me',
+      'https://sharonsolidosplayground.com/marcus/profile/card#me'
+    ].map(uri => sym(uri))
+    void migrateQuestionnaireShareNotifications(store, me, migrationRecipients, home.publishedEntries, true).then(result => {
+      if (!result.failed.length) localStorage.setItem(migrationKey, 'complete')
+      if (result.failed.length) {
+        home.status = `Share migration sent ${result.sent} notification${result.sent === 1 ? '' : 's'}; ${result.failed.length} failed.`
+        home.statusKind = 'error'
+      } else if (result.sent || result.skipped) {
+        home.status = `Share migration checked ${result.sent + result.skipped} published share${result.sent + result.skipped === 1 ? '' : 's'}: ${result.sent} notification${result.sent === 1 ? '' : 's'} sent.`
+        home.statusKind = 'info'
+      }
+    }).catch(error => {
+      home.status = error instanceof Error ? `Share migration failed: ${error.message}` : 'Share migration failed.'
+      home.statusKind = 'error'
+    })
+  }
   try {
     home.sharedEntries = await discoverInboxSharedQuestionnaires(store, me)
-    const storedUris = workspaceUrl ? await loadStoredQuestionnaireUris(store, workspaceUrl) : new Set<string>()
     home.sharedEntries = home.sharedEntries.map(entry => ({
       ...entry,
       stored: storedUris.has(entry.subject.uri)
@@ -657,6 +1552,16 @@ async function renderLibrary (me: NamedNode): Promise<void> {
       // Public discovery is optional; direct inbox shares remain visible.
     }
   })()
+  void loadPokemonProgress(store, me).then(async progress => {
+    home.pokemonProgress = progress
+    if (progress) home.quizAverages = await quizAveragesFromProgress(store, progress.progressDocument)
+    if (progress && home.isConnected && hasUndeferredPokemonChoice(progress)) {
+      return showPokemonLevelUp(store, me, progress, updated => { home.pokemonProgress = updated })
+    }
+  }).catch(error => {
+    home.status = error instanceof Error ? error.message : 'Unable to load Pokémon progress.'
+    home.statusKind = 'error'
+  })
 
   home.addEventListener('questionaire-home-create', () => {
     if (workspaceUrl) void renderContainerPicker(me, workspaceUrl).catch((error: unknown) => {
@@ -670,10 +1575,74 @@ async function renderLibrary (me: NamedNode): Promise<void> {
       void open(subject.uri).catch(error => message(error instanceof Error ? error.message : 'Unable to open questionnaire.', 'error'))
     }
   })
+  home.addEventListener('questionaire-home-open-profile', () => {
+    window.open(me.uri, '_blank', 'noopener,noreferrer')
+  })
+  home.addEventListener('questionaire-home-create-workspace', () => {
+    home.status = 'Creating your Questionaire workspace…'
+    home.statusKind = 'info'
+    void ensureQuestionnaireWorkspace(store, me).then(createdUrl => {
+      workspaceUrl = createdUrl
+      home.workspaceReady = true
+      home.workspaceCreated = true
+      home.status = ''
+      window.setTimeout(() => { home.workspaceCreated = false }, 4_000)
+    }).catch(error => {
+      home.status = error instanceof Error ? error.message : 'Unable to create your Questionaire workspace.'
+      home.statusKind = 'error'
+    })
+  })
   home.addEventListener('questionaire-home-play-together', (event) => {
     const entry = (event as CustomEvent<{ subject: NamedNode, title: string, questionCount: number }>).detail
     if (!entry?.subject || !home.liveGameEndpoint) return
     renderLiveQuiz(me, entry, home.liveGameEndpoint)
+  })
+  home.addEventListener('questionaire-home-open-friends', () => {
+    setStatus(home.friendCount
+      ? `${home.friendCount} friend${home.friendCount === 1 ? '' : 's'} loaded from your profile.`
+      : 'No outgoing foaf:knows friends were found in your profile.')
+  })
+  home.addEventListener('questionaire-home-search-friends', event => {
+    const query = (event as CustomEvent<string>).detail?.trim() ?? ''
+    home.friendSearchStatus = ''
+    home.friendSearchResults = []
+    if (!query) {
+      home.friendSearchStatus = 'Enter a name or exact WebID URL.'
+      return
+    }
+    const isWebId = /^https?:\/\//i.test(query)
+    home.friendSearchStatus = isWebId ? 'Checking that WebID…' : 'Searching your contacts and friends…'
+    const search = isWebId
+      ? searchWebIds(store, query)
+      : searchContactsAndFriends(solidLogicSingleton.directory, me, query)
+    void search.then(results => {
+      home.friendSearchResults = results
+      home.friendSearchStatus = results.length
+        ? `${results.length} result${results.length === 1 ? '' : 's'} found.`
+        : isWebId
+          ? 'No accessible WebID profile found.'
+          : 'No matching contact or friend found. You can also enter their exact WebID URL.'
+    }).catch(error => {
+      home.friendSearchStatus = error instanceof Error ? error.message : 'Unable to search for that WebID.'
+    })
+  })
+  home.addEventListener('questionaire-home-add-friend', event => {
+    const uri = (event as CustomEvent<string>).detail
+    home.friendSearchStatus = 'Saving the friend link to your profile…'
+    void addFriend(store, me, uri).then(async () => {
+      home.friends = await loadFriendSummaries(store, me)
+      home.friendCount = home.friends.length
+      setChatFriends(home.friends)
+      home.friendSearchStatus = 'Friend added to your profile.'
+    }).catch(error => {
+      home.friendSearchStatus = error instanceof Error ? error.message : 'Unable to add this friend. Check that your profile is writable.'
+    })
+  })
+  home.addEventListener('questionaire-home-scroll-top', () => {
+    home.shadowRoot?.querySelector('.questionaire-home-content')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+  home.addEventListener('questionaire-home-scroll-files', () => {
+    home.shadowRoot?.querySelector('.questionaire-home-files')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   })
   home.addEventListener('questionaire-home-store', (event) => {
     const entry = (event as CustomEvent<SharedQuestionnaireEntry>).detail
@@ -682,6 +1651,9 @@ async function renderLibrary (me: NamedNode): Promise<void> {
       home.sharedEntries = home.sharedEntries.map(candidate =>
         candidate.subject.uri === entry.subject.uri ? { ...candidate, stored: true } : candidate
       )
+      if (!home.savedEntries.some(candidate => candidate.subject.uri === entry.subject.uri)) {
+        home.savedEntries = [...home.savedEntries, entry]
+      }
     }).catch(error => {
       message(error instanceof Error ? error.message : 'Unable to store this questionnaire.', 'error')
     })
@@ -696,14 +1668,6 @@ async function renderLibrary (me: NamedNode): Promise<void> {
       renderEntries()
     }).catch((error: unknown) => {
       setStatus(error instanceof Error ? error.message : `Unable to update the ${detail.kind} type index.`, 'error')
-    })
-  })
-  home.addEventListener('questionaire-home-open-pod', () => {
-    void findStorageContainer(me).then(storageUrl => {
-      if (!storageUrl) throw new Error('Your Pod profile does not advertise a storage container.')
-      return renderContainerPicker(me, storageUrl)
-    }).catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : 'Unable to browse your Pod.', 'error')
     })
   })
   home.addEventListener('questionaire-home-search', () => {
@@ -739,20 +1703,31 @@ async function renderLibrary (me: NamedNode): Promise<void> {
   })
 }
 
-async function start (): Promise<void> {
+function ensurePageHeaderProvider (): void {
   const header = document.querySelector<HTMLElement>('#PageHeader')
-  if (header && !header.querySelector('solid-ui-provider')) {
-    header.innerHTML = `
-      <div class="page-header-inner">
-        <a class="page-brand" href="/" aria-label="Solid home">S</a>
-        <div class="page-header-spacer"></div>
-        <button class="page-header-icon" type="button" aria-label="Bookmarks">♡</button>
-        <solid-ui-provider><solid-ui-account></solid-ui-account></solid-ui-provider>
-      </div>
-    `
-  }
+  if (!header || header.querySelector('solid-ui-provider')) return
+  header.innerHTML = `
+    <div class="page-header-inner">
+      <a class="page-brand" href="/" aria-label="Solid home">S</a>
+      <div class="page-header-spacer"></div>
+      <a class="page-header-register" href="${accountRegistrationUrl}" hidden
+        target="_blank" rel="noopener noreferrer">Sign up</a>
+      <button class="page-header-icon" type="button" aria-label="Bookmarks">♡</button>
+      <solid-ui-provider><solid-ui-account hide-signup></solid-ui-account></solid-ui-provider>
+    </div>
+  `
+}
+
+function updatePageHeaderRegistrationLink (loggedIn = Boolean(authn.currentUser())): void {
+  const registrationLink = document.querySelector<HTMLElement>('#PageHeader .page-header-register')
+  if (registrationLink) registrationLink.hidden = loggedIn
+}
+
+async function start (): Promise<void> {
+  ensurePageHeaderProvider()
   rememberLoginReturnUrl()
   await checkUserWithoutBlockingStartup()
+  updatePageHeaderRegistrationLink()
   restoreLoginReturnUrl()
   const contract = parseStandaloneUrl(window.location.href)
   if (contract.subject) {
@@ -762,7 +1737,7 @@ async function start (): Promise<void> {
   if (contract.baseUrl) {
     const me = authn.currentUser()
     if (!me) {
-      message('Sign in to create a questionnaire. You can still open a published questionnaire with ?subject=…')
+      renderWelcome()
       return
     }
     await createQuestionnaire(contract.baseUrl, me)
@@ -770,7 +1745,7 @@ async function start (): Promise<void> {
   }
   const me = authn.currentUser()
   if (!me) {
-    message('Open a questionnaire with ?subject=<index.ttl URL>, or sign in to create one.')
+    renderWelcome()
     return
   }
   await renderLibrary(me)
@@ -778,7 +1753,19 @@ async function start (): Promise<void> {
 
 // Keep the requested URL intact while allowing the login flow to resume the
 // create route after the identity provider redirects back to this app.
-authSession.events.on('login', () => { void start() })
+authSession.events.on('login', () => {
+  updatePageHeaderRegistrationLink(true)
+  void start()
+})
+authSession.events.on('logout', () => {
+  updatePageHeaderRegistrationLink(false)
+  unsubscribeChatHome?.()
+  unsubscribeChatHome = undefined
+  friendChatClient?.disconnect()
+  friendChatClient = undefined
+  friendChatDialog?.remove()
+  friendChatDialog = undefined
+})
 
 void start().catch((error: unknown) => {
   message(error instanceof Error ? error.message : 'Unable to load questionnaire.', 'error')

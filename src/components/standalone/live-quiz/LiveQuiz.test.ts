@@ -22,6 +22,8 @@ function clientFixture () {
     disconnect: vi.fn(),
     onState: vi.fn(listener => { stateListener = listener; return () => {} }),
     onError: vi.fn(() => () => {}),
+    onChatMessage: vi.fn(() => () => {}),
+    sendChatMessage: vi.fn(),
     createGame: vi.fn(),
     joinGame: vi.fn(),
     startGame: vi.fn(),

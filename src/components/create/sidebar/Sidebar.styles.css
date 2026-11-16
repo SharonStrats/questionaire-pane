@@ -165,3 +165,30 @@
   font-size: 11px;
   line-height: 1.35;
 }
+
+@media (max-width: 760px) {
+  .questionaire-pane-create-sidebar {
+    width: 100%;
+    min-width: 0;
+    border-right: 0;
+    border-bottom: 1px solid #e2e5ea;
+  }
+
+  .questionaire-pane-create-sidebar-list {
+    flex: 0 0 auto;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 0 8px 10px;
+    scroll-snap-type: x proximity;
+  }
+
+  .questionaire-pane-create-sidebar-question {
+    flex: 0 0 min(240px, 72vw);
+    scroll-snap-align: start;
+  }
+
+  .questionaire-pane-create-sidebar-menu {
+    margin-top: 0;
+    padding: 0 8px 10px;
+  }
+}

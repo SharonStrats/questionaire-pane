@@ -60,3 +60,12 @@
   background: #eff6ff;
   color: #1d4ed8;
 }
+
+@media (max-width: 620px) {
+  .questionaire-pane-take-question-true-false-title { font-size: 23px; }
+  .questionaire-pane-take-question-true-false-option { min-height: 48px; padding: 0 14px; }
+}
+
+@media (max-width: 360px) {
+  .questionaire-pane-take-question-true-false-options { grid-template-columns: 1fr; }
+}

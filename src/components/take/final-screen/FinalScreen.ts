@@ -41,13 +41,16 @@ export default class QuestionairePaneTakeFinalScreen extends WebComponent {
   accessor answers: Record<string, string | string[] | null> = {}
 
   @property({ attribute: false })
-  accessor shareStatus: 'idle' | 'sharing' | 'shared' | 'error' = 'idle'
+  accessor shareStatus: 'idle' | 'saving' | 'saved' | 'sharing' | 'shared' | 'error' = 'idle'
 
   @property({ attribute: false })
   accessor shareError = ''
 
   @property({ attribute: false })
   accessor resultStatus: 'idle' | 'saving' | 'saved' | 'sharing' | 'shared' | 'error' = 'idle'
+
+  @property({ type: Boolean, attribute: 'results-saved' })
+  accessor resultsSaved = false
 
   @state()
   private accessor visibleExplanations = new Set<string>()
@@ -166,15 +169,15 @@ export default class QuestionairePaneTakeFinalScreen extends WebComponent {
             : nothing}
           <section class="questionaire-pane-take-final-screen-share">
             <div>
-              <h3>What would you like to do with your result?</h3>
-              <p>Save keeps the result private to you. Share also gives the questionnaire creator read access.</p>
+              <h3>${this.resultsSaved ? 'Your result is saved privately' : this.resultStatus === 'saving' ? 'Saving your result privately' : 'Your result will be saved privately'}</h3>
+              <p>Share it to also give the questionnaire creator read access.</p>
             </div>
             <div class="questionaire-pane-take-final-screen-share-actions">
-              <button type="button" class="questionaire-pane-take-final-screen-private" ?disabled=${this.resultStatus !== 'idle'} @click=${() => this.dispatchEvent(new CustomEvent('questionaire-take-save-results', { bubbles: true, composed: true }))}>${this.resultStatus === 'saving' ? 'Saving…' : this.resultStatus === 'saved' ? 'Results saved' : 'Save results'}</button>
+              <button type="button" class="questionaire-pane-take-final-screen-private" ?disabled=${this.resultStatus === 'saving' || this.resultStatus === 'sharing' || this.resultsSaved} @click=${() => this.dispatchEvent(new CustomEvent('questionaire-take-save-results', { bubbles: true, composed: true }))}>${this.resultStatus === 'saving' ? 'Saving…' : this.resultsSaved ? 'Results saved' : this.resultStatus === 'error' ? 'Retry save' : 'Save results'}</button>
               <button type="button" class="questionaire-pane-take-final-screen-share-button" ?disabled=${this.resultStatus === 'saving' || this.resultStatus === 'sharing' || this.resultStatus === 'shared'} @click=${() => this.dispatchEvent(new CustomEvent('questionaire-take-share-results', { bubbles: true, composed: true }))}>${this.resultStatus === 'sharing' ? 'Sharing…' : this.resultStatus === 'shared' ? 'Results shared' : 'Share results'}</button>
               <button type="button" class="questionaire-pane-take-final-screen-restart" ?disabled=${this.resultStatus === 'saving' || this.resultStatus === 'sharing'} @click=${() => this.dispatchEvent(new CustomEvent('questionaire-take-cancel', { bubbles: true, composed: true }))}>Cancel / Exit</button>
             </div>
-            ${this.shareStatus === 'error' ? html`<p role="alert" class="questionaire-pane-take-final-screen-share-error">${this.shareError}</p>` : nothing}
+            ${this.shareError ? html`<p role="alert" class="questionaire-pane-take-final-screen-share-error">${this.shareError}</p>` : nothing}
             ${this.resultStatus === 'saved' ? html`<p role="status" class="questionaire-pane-take-final-screen-share-success">Your result is saved privately and available to you.</p>` : nothing}
             ${this.resultStatus === 'shared' ? html`<p role="status" class="questionaire-pane-take-final-screen-share-success">The creator can now read your results.</p>` : nothing}
           </section>

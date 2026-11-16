@@ -218,6 +218,10 @@
     grid-template-columns: 1fr;
   }
 
+  .questionaire-pane-take-question-match-title {
+    font-size: 23px;
+  }
+
   .questionaire-pane-take-question-match-column-label--right {
     text-align: left;
   }

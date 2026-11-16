@@ -37,6 +37,18 @@ export interface SharedQuestionnaireEntry extends QuestionnaireEntry {
   }
 }
 
+export interface SharedStudyDeckEntry {
+  uri: string
+  title: string
+  cardCount: number
+  notification: NamedNode
+  stored?: boolean
+  sharedBy: {
+    uri: string
+    label: string
+  }
+}
+
 export interface KnownPerson {
   kind: 'person' | 'group'
   uri: string
@@ -199,13 +211,13 @@ export async function storeSharedQuestionnaire (
   workspaceUrl: string,
   entry: SharedQuestionnaireEntry
 ): Promise<void> {
-  const registry = sym(`${trailingSlash(workspaceUrl)}shared-questionnaires.ttl`)
+  const registry = sym(`${trailingSlash(workspaceUrl)}learning-library.ttl`)
   const registryDoc = registry.doc()
   await createDocumentIfMissing(store, registryDoc, `
 @prefix dct: <http://purl.org/dc/terms/> .
 @prefix quiz: <https://sharonstrats.github.io/solidnext-vocab/vocab/quiz#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-<#this> a quiz:QuestionnaireLibrary ;
+<#this> a quiz:LearningLibrary ;
     dct:creator <${me.uri}> .
 `)
   await load(store, registry)
@@ -223,22 +235,114 @@ export async function storeSharedQuestionnaire (
   await store.updater.update([], statements)
 }
 
+async function loadStoredUris (
+  store: LiveStore,
+  registryUrl: string,
+  predicateName: string
+): Promise<Set<string>> {
+  const registry = sym(registryUrl)
+  const predicate = quiz(predicateName)
+  try {
+    await load(store, registry)
+  } catch (error) {
+    const failure = error as { status?: number, response?: { status?: number } }
+    if (failure.status === 404 || failure.response?.status === 404) return new Set()
+    throw error
+  }
+  return new Set(
+    store.statementsMatching(undefined, predicate, undefined, registry.doc())
+      .flatMap(statement => statement.object.termType === 'NamedNode' ? [statement.object.uri] : [])
+  )
+}
+
 export async function loadStoredQuestionnaireUris (
   store: LiveStore,
   workspaceUrl: string
 ): Promise<Set<string>> {
-  const registry = sym(`${trailingSlash(workspaceUrl)}shared-questionnaires.ttl`)
-  try {
-    await load(store, registry)
-  } catch {
-    return new Set()
-  }
-  return new Set(
-    namedNodes(store.each(undefined, quiz('sharedQuestionnaire'), undefined, registry.doc()))
-      .map(subject => store.any(subject, quiz('sharedQuestionnaire'), undefined, registry.doc()))
-      .filter((subject): subject is NamedNode => subject?.termType === 'NamedNode')
-      .map(subject => subject.uri)
+  const root = trailingSlash(workspaceUrl)
+  const [legacy, library] = await Promise.all([
+    loadStoredUris(store, `${root}shared-questionnaires.ttl`, 'sharedQuestionnaire'),
+    loadStoredUris(store, `${root}learning-library.ttl`, 'sharedQuestionnaire')
+  ])
+  return new Set([...legacy, ...library])
+}
+
+export async function loadStoredStudyDeckUris (
+  store: LiveStore,
+  workspaceUrl: string
+): Promise<Set<string>> {
+  return loadStoredUris(
+    store,
+    `${trailingSlash(workspaceUrl)}learning-library.ttl`,
+    'sharedStudyDeck'
   )
+}
+
+export async function storeSharedStudyDeck (
+  store: LiveStore,
+  me: NamedNode,
+  workspaceUrl: string,
+  entry: SharedStudyDeckEntry
+): Promise<void> {
+  const registry = sym(`${trailingSlash(workspaceUrl)}learning-library.ttl`)
+  const registryDoc = registry.doc()
+  await createDocumentIfMissing(store, registryDoc, `
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix quiz: <https://sharonstrats.github.io/solidnext-vocab/vocab/quiz#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+<#this> a quiz:LearningLibrary ;
+    dct:creator <${me.uri}> .
+`)
+  await load(store, registry)
+  const deck = sym(entry.uri)
+  if (store.each(undefined, quiz('sharedStudyDeck'), deck, registryDoc).length) return
+  const item = sym(`${registryDoc.uri}#saved-${encodeURIComponent(entry.uri).replace(/%/g, '')}`)
+  if (!store.updater) throw new Error('Unable to store this study deck: no Pod updater is available.')
+  await store.updater.update([], [
+    st(item, rdf('type'), quiz('SavedStudyDeck'), registryDoc),
+    st(item, quiz('sharedStudyDeck'), deck, registryDoc),
+    st(item, dct('created'), literal(new Date().toISOString()), registryDoc)
+  ])
+}
+
+export async function discoverInboxSharedStudyDecks (
+  store: LiveStore,
+  me: NamedNode
+): Promise<SharedStudyDeckEntry[]> {
+  await load(store, me)
+  const inbox = store.any(me, ldp('inbox')) as NamedNode | undefined
+  if (inbox?.termType !== 'NamedNode' || !store.fetcher) return []
+  await load(store, inbox)
+  const notifications = namedNodes(store.each(inbox, ldp('contains'), undefined, inbox.doc()))
+  const entries = new Map<string, { entry: SharedStudyDeckEntry, created: string }>()
+  for (const notification of notifications) {
+    try {
+      await load(store, notification)
+      if (!store.holds(notification, rdf('type'), quiz('StudyDeckShare'), notification.doc())) continue
+      const target = store.any(notification, quiz('sharedStudyDeck'), undefined, notification.doc())
+      if (target?.termType !== 'NamedNode') continue
+      const deck = target as NamedNode
+      await load(store, deck)
+      const creator = store.any(notification, quiz('sharedBy'), undefined, notification.doc())
+      const creatorNode = creator?.termType === 'NamedNode' ? creator as NamedNode : undefined
+      const entry: SharedStudyDeckEntry = {
+        uri: deck.uri,
+        title: store.anyValue(sym(`${deck.uri}#deck`), quiz('name'), undefined, deck.doc()) ?? 'Study cards',
+        cardCount: store.each(sym(`${deck.uri}#deck`), quiz('studyCard'), undefined, deck.doc()).length,
+        notification,
+        sharedBy: {
+          uri: creatorNode?.uri ?? '',
+          label: creatorNode ? labelFor(store, creatorNode) : 'Someone'
+        }
+      }
+      const created = store.anyValue(notification, dct('created'), undefined, notification.doc()) ?? ''
+      const previous = entries.get(deck.uri)
+      if (!previous || created > previous.created) entries.set(deck.uri, { entry, created })
+    } catch {
+      // Ignore unavailable or malformed inbox items without hiding other shares.
+    }
+  }
+  return [...entries.values()].map(({ entry }) => entry)
 }
 
 export async function sendQuestionnaireShareNotification (
@@ -263,10 +367,85 @@ export async function sendQuestionnaireShareNotification (
     quiz:sharedBy <${sender.uri}> ;
     dct:created "${new Date().toISOString()}"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
 `
-  await store.fetcher.webOperation('POST', inbox.uri, {
+  const response = await store.fetcher.webOperation('POST', inbox.uri, {
     data: notification,
     contentType: 'text/turtle'
   })
+  if (!response.ok) throw new Error(`Unable to send questionnaire notification: HTTP ${response.status}`)
+}
+
+export async function sendStudyDeckShareNotification (
+  store: LiveStore,
+  sender: NamedNode,
+  recipient: NamedNode,
+  deck: NamedNode
+): Promise<void> {
+  if (!store.fetcher) throw new Error('Unable to notify the recipient: no Solid fetcher is available.')
+  await load(store, recipient)
+  const inbox = store.any(recipient, ldp('inbox')) as NamedNode | undefined
+  if (inbox?.termType !== 'NamedNode') throw new Error('The recipient profile does not advertise an inbox.')
+  const response = await store.fetcher.webOperation('POST', inbox.uri, {
+    data: `
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix quiz: <https://sharonstrats.github.io/solidnext-vocab/vocab/quiz#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+<> a quiz:StudyDeckShare ;
+    quiz:sharedStudyDeck <${deck.uri}> ;
+    quiz:sharedBy <${sender.uri}> ;
+    dct:created "${new Date().toISOString()}"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
+`,
+    contentType: 'text/turtle'
+  })
+  if (!response.ok) throw new Error(`Unable to send study-card notification: HTTP ${response.status}`)
+}
+
+async function hasQuestionnaireShareNotification (
+  store: LiveStore,
+  recipient: NamedNode,
+  sender: NamedNode,
+  questionnaire: NamedNode
+): Promise<boolean> {
+  await load(store, recipient)
+  const inbox = store.any(recipient, ldp('inbox')) as NamedNode | undefined
+  if (inbox?.termType !== 'NamedNode') return false
+  await load(store, inbox)
+  const notifications = namedNodes(store.each(inbox, ldp('contains'), undefined, inbox.doc()))
+  for (const notification of notifications) {
+    try {
+      await load(store, notification)
+    } catch {
+      continue
+    }
+    if (store.holds(notification, rdf('type'), quiz('QuestionnaireShare'), notification.doc()) &&
+      store.holds(notification, quiz('sharedQuestionnaire'), questionnaire, notification.doc()) &&
+      store.holds(notification, quiz('sharedBy'), sender, notification.doc())) return true
+  }
+  return false
+}
+
+export async function migrateQuestionnaireShareNotifications (
+  store: LiveStore,
+  sender: NamedNode,
+  recipients: NamedNode[],
+  publishedQuestionnaires: QuestionnaireEntry[],
+  forceResend = false
+): Promise<{ sent: number, skipped: number, failed: string[] }> {
+  const result = { sent: 0, skipped: 0, failed: [] as string[] }
+  for (const recipient of recipients) {
+    for (const entry of publishedQuestionnaires) {
+      try {
+        if (!forceResend && await hasQuestionnaireShareNotification(store, recipient, sender, entry.subject)) {
+          result.skipped += 1
+          continue
+        }
+        await sendQuestionnaireShareNotification(store, sender, recipient, entry.subject)
+        result.sent += 1
+      } catch (error) {
+        result.failed.push(`${recipient.uri} / ${entry.title}: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+  }
+  return result
 }
 
 export function isPublishedQuestionnaire (store: LiveStore, subject: NamedNode): boolean {
@@ -353,7 +532,7 @@ export async function addToTypeIndex (
   if (insertions.length) await store.updater.update([], insertions)
 }
 
-export async function ensureQuestionnaireWorkspace (store: LiveStore, me: NamedNode): Promise<string> {
+export async function findQuestionnaireWorkspace (store: LiveStore, me: NamedNode): Promise<string | undefined> {
   await load(store, me)
   const preferences = store.any(me, pim('preferencesFile')) as NamedNode | undefined
   if (preferences?.termType === 'NamedNode') {
@@ -368,6 +547,14 @@ export async function ensureQuestionnaireWorkspace (store: LiveStore, me: NamedN
     const existingPrefix = existing && store.any(existing, space('uriPrefix'), undefined, preferences.doc()) as NamedNode | undefined
     if (existingPrefix?.termType === 'NamedNode') return trailingSlash(existingPrefix.uri)
   }
+  return undefined
+}
+
+export async function ensureQuestionnaireWorkspace (store: LiveStore, me: NamedNode): Promise<string> {
+  const existing = await findQuestionnaireWorkspace(store, me)
+  if (existing) return existing
+  await load(store, me)
+  const preferences = store.any(me, pim('preferencesFile')) as NamedNode | undefined
 
   const storage = store.any(me, pim('storage')) as NamedNode | undefined
   if (!storage || storage.termType !== 'NamedNode') throw new Error('Your Pod profile does not advertise a storage container.')

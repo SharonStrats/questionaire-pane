@@ -1,6 +1,7 @@
 solid-ui-dialog-content {
   display: grid;
-  min-width: min(460px, 80vw);
+  min-width: min(460px, calc(100vw - 32px));
+  box-sizing: border-box;
   gap: 1rem;
 }
 
@@ -51,4 +52,9 @@ select {
   color: var(--solid-ui-color-gray-500, #64748b);
   font-size: var(--solid-ui-font-size-xs, 0.75rem);
   text-overflow: ellipsis;
+}
+
+@media (max-width: 480px) {
+  solid-ui-dialog-content { padding: 16px; }
+  label { font-size: 13px; }
 }

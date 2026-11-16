@@ -3,6 +3,7 @@ import { graph, literal, Namespace, serialize, sym, type LiveStore, type NamedNo
 import { questionairePredicates } from './predicates'
 import type { QuestionaireAcl } from '../context'
 import { createContainerIfMissing, createDocumentIfMissing, ensureTrailingSlash } from './types'
+import { updatePokemonProgress, type PokemonProgress } from './pokemonProgress'
 
 const HTTP_SCHEMES = new Set(['http:', 'https:'])
 const dct = Namespace('http://purl.org/dc/terms/')
@@ -23,6 +24,8 @@ export interface ShareQuestionnaireResultsOptions {
 
 export interface SharedQuestionnaireResults {
   resultContainer: NamedNode
+  pokemonProgress?: PokemonProgress
+  pokemonProgressError?: string
 }
 
 function resultId (): string {
@@ -86,12 +89,7 @@ function resultDocuments (container: NamedNode, user: NamedNode, questionnaire: 
   ]
 }
 
-export async function persistQuestionnaireResults (
-  store: LiveStore,
-  acl: QuestionaireAcl | null,
-  questionnaire: NamedNode,
-  options: ShareQuestionnaireResultsOptions
-): Promise<SharedQuestionnaireResults> {
+function questionnaireCreatorWebId (store: LiveStore, questionnaire: NamedNode): NamedNode {
   const creator = store.any(
     questionnaire,
     questionairePredicates.questionnaire.creator,
@@ -111,14 +109,40 @@ export async function persistQuestionnaireResults (
   if (!HTTP_SCHEMES.has(creatorUrl.protocol)) {
     throw new Error(`The questionnaire creator is not a valid WebID: ${creator.value}`)
   }
+  return sym(creator.value)
+}
+
+async function grantQuestionnaireCreatorReadAccess (
+  acl: QuestionaireAcl,
+  creator: NamedNode,
+  resultContainer: NamedNode
+): Promise<void> {
+  const plan = await acl.planGrantContainerContents(
+    resultContainer,
+    { type: 'agent', iri: creator.value },
+    ['Read']
+  )
+  const response = await acl.applyPlan(plan)
+  if (!response.ok) {
+    throw new Error(`Unable to share questionnaire results: HTTP ${response.status}`)
+  }
+}
+
+export async function persistQuestionnaireResults (
+  store: LiveStore,
+  acl: QuestionaireAcl | null,
+  questionnaire: NamedNode,
+  options: ShareQuestionnaireResultsOptions
+): Promise<SharedQuestionnaireResults> {
+  const creator = questionnaireCreatorWebId(store, questionnaire)
 
   const user = options.user ?? authn.currentUser()
   if (!user) {
-    throw new Error('Unable to share questionnaire results because you are not signed in.')
+    throw new Error('Unable to save questionnaire results because you are not signed in.')
   }
   const storage = options.storage ?? await findStorage(store, user)
   if (!storage) {
-    throw new Error('Unable to share questionnaire results because your Pod storage location could not be found.')
+    throw new Error('Unable to save questionnaire results because your Pod storage location could not be found.')
   }
 
   const resultContainer = sym(`${ensureTrailingSlash(storage.uri)}questionnaire-results/${resultId()}/`)
@@ -128,22 +152,39 @@ export async function persistQuestionnaireResults (
   for (const document of resultDocuments(resultContainer, user, questionnaire, options)) {
     await createDocumentIfMissing(store, document.document, document.data)
   }
+  let pokemonProgress: PokemonProgress | undefined
+  let pokemonProgressError: string | undefined
+  try {
+    pokemonProgress = await updatePokemonProgress(
+      store,
+      options.earnedPoints,
+      resultContainer,
+      questionnaire,
+      user,
+      options.availablePoints
+    )
+  } catch (error) {
+    pokemonProgressError = error instanceof Error ? error.message : String(error)
+    console.error('Questionnaire result saved, but Pokemon progress could not be updated.', error)
+  }
 
   if (options.shareWithCreator) {
     if (!acl) {
       throw new Error('Unable to share questionnaire results because ACL services are not configured.')
     }
-    const plan = await acl.planGrantContainerContents(
-      resultContainer,
-      { type: 'agent', iri: creator.value },
-      ['Read']
-    )
-    const response = await acl.applyPlan(plan)
-    if (!response.ok) {
-      throw new Error(`Unable to share questionnaire results: HTTP ${response.status}`)
-    }
+    await grantQuestionnaireCreatorReadAccess(acl, creator, resultContainer)
   }
-  return { resultContainer }
+  return { resultContainer, pokemonProgress, pokemonProgressError }
+}
+
+export async function sharePersistedQuestionnaireResults (
+  store: LiveStore,
+  acl: QuestionaireAcl,
+  questionnaire: NamedNode,
+  resultContainer: NamedNode
+): Promise<void> {
+  const creator = questionnaireCreatorWebId(store, questionnaire)
+  await grantQuestionnaireCreatorReadAccess(acl, creator, resultContainer)
 }
 
 export async function shareQuestionnaireResults (

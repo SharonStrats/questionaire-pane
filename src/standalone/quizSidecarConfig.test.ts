@@ -3,7 +3,7 @@ import { getAppServicesEndpoint, getDevelopmentSidecarEndpoint } from './quizSid
 
 describe('standalone quiz sidecar configuration', () => {
   it('defaults development watch mode to the local sidecar', () => {
-    expect(getDevelopmentSidecarEndpoint({ dev: true })).toBe('http://localhost:5001')
+    expect(getDevelopmentSidecarEndpoint({ dev: true })).toBe('http://127.0.0.1:5001')
   })
 
   it('uses the configured development endpoint', () => {

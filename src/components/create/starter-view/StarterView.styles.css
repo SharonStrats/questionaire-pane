@@ -140,3 +140,39 @@
   line-height: 1;
   flex-shrink: 0;
 }
+
+@media (max-width: 640px) {
+  .questionaire-pane-create-starter-view {
+    padding: 28px 16px 40px;
+  }
+
+  .questionaire-pane-create-starter-view-card,
+  .questionaire-pane-create-starter-view-picker {
+    padding: 22px 18px;
+  }
+
+  .questionaire-pane-create-starter-view-card h2 {
+    font-size: 24px;
+  }
+
+  .questionaire-pane-create-starter-view-card p {
+    font-size: 14px;
+  }
+
+  .questionaire-pane-create-starter-view-picker-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .questionaire-pane-create-starter-view-picker-card {
+    min-height: 68px;
+    padding: 12px;
+  }
+
+  .questionaire-pane-create-starter-view-picker-card-title {
+    font-size: 16px;
+  }
+
+  .questionaire-pane-create-starter-view-picker-card-description {
+    font-size: 12px;
+  }
+}

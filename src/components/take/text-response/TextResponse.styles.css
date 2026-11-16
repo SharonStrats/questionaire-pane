@@ -126,3 +126,10 @@
   border-color: #6c5ce7;
   box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.15);
 }
+
+@media (max-width: 620px) {
+  .questionaire-pane-take-question-text-response-title { font-size: 23px; }
+  .questionaire-pane-take-question-text-response--fill-in-the-blank .questionaire-pane-take-question-text-response-title { font-size: 21px; }
+  .questionaire-pane-take-question-text-response-question-body { padding: 14px; font-size: 13px; line-height: 2.2; }
+  .questionaire-pane-take-question-text-response-input { min-height: 48px; padding: 12px; }
+}

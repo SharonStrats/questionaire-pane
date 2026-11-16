@@ -5,3 +5,4 @@
 .questionaire-pane-take-question-rating-options { display: flex; gap: 10px; flex-wrap: wrap; }
 .questionaire-pane-take-question-rating-option { min-width: 44px; min-height: 44px; border: 1px solid #e2e5ea; border-radius: 12px; background: white; color: #334155; font-weight: 600; cursor: pointer; }
 .questionaire-pane-take-question-rating-option--selected { border-color: #7c3aed; background: #f5f3ff; color: #6d28d9; }
+@media (max-width: 620px) { .questionaire-pane-take-question-rating-title { font-size: 23px; } }

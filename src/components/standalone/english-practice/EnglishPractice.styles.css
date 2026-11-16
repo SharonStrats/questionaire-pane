@@ -1,0 +1,159 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  color: #1a2235;
+  background: #f5f6f8;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.english-practice-shell {
+  width: min(100%, 920px);
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 48px 24px 72px;
+}
+
+.english-practice-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+.english-practice-eyebrow,
+.english-practice-label {
+  color: #6c5ce7;
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+}
+.english-practice-header h1 { margin: 8px 0; font-size: 36px; font-weight: 400; }
+.english-practice-header p,
+.english-practice-card p { color: #6b7280; font-size: 12px; line-height: 1.6; }
+.english-practice-history-button,
+.english-practice-history-heading button,
+.english-practice-attempt-content button,
+.english-practice-retry-save {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid #dfe3ea;
+  border-radius: 8px;
+  color: #5142c5;
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.english-practice-history-button:disabled { cursor: progress; opacity: .7; }
+.english-practice-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  padding: 28px;
+  border: 1px solid #e2e5ea;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 6%);
+}
+.english-practice-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 14px;
+  color: #6c5ce7;
+  background: rgb(108 92 231 / 13%);
+}
+.english-practice-icon icon-lucide-book-open { width: 22px; height: 22px; }
+.english-practice-card h2 { margin: 8px 0 0; font-size: 20px; font-weight: 400; }
+.english-practice-card p { margin: 8px 0 0; }
+.english-practice-form {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(128px, auto);
+  align-items: end;
+  gap: 12px;
+  margin-top: 8px;
+}
+.english-practice-form label {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  color: #52616b;
+  font-size: 11px;
+}
+.english-practice-form input,
+.english-practice-form select {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid #e2e5ea;
+  border-radius: 8px;
+  color: #9ca3af;
+  background: #f8f9fb;
+  font: inherit;
+}
+.english-practice-prompt-preview { display: block; color: #344054; font-size: 11px; font-weight: 400; line-height: 1.4; overflow-wrap: anywhere; }
+.english-practice-form button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  background: #6c5ce7;
+  font: inherit;
+  font-size: 11px;
+  justify-content: center;
+  white-space: normal;
+}
+.english-practice-form button:disabled { cursor: not-allowed; opacity: .55; }
+.english-practice-form icon-lucide-sparkles { width: 14px; height: 14px; }
+.english-practice-note { grid-column: 1 / -1; margin-bottom: 0 !important; font-size: 10px !important; }
+.english-practice-save-status { grid-column: 1 / -1; min-height: 16px; margin: 0 !important; color: #667085; font-size: 10px !important; }
+.english-practice-response { display: grid; grid-column: 1 / -1; gap: 7px; color: #667085; font-size: 11px; font-weight: 700; }
+.english-practice-response textarea { min-height: 150px; padding: 11px; border: 1px solid #c8cedb; border-radius: 8px; color: #344054; background: #fff; font: inherit; line-height: 1.5; resize: vertical; }
+.english-practice-error { grid-column: 1 / -1; color: #a33 !important; }
+.english-peel-guide { grid-column: 1 / -1; padding: 16px; border: 1px solid #dfe3ea; border-radius: 10px; color: #344054; background: #f8f7ff; }
+.english-peel-guide-heading { display: flex; justify-content: space-between; gap: 12px; }
+.english-peel-guide-heading span { color: #6c5ce7; font-size: 10px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; }
+.english-peel-guide h3 { margin: 4px 0 0; font-size: 15px; }
+.english-peel-guide-heading button { width: 25px; height: 25px; padding: 0; border: 0; border-radius: 50%; color: #667085; background: transparent; cursor: pointer; font-size: 19px; }
+.english-peel-guide ol { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0; padding: 0; list-style: none; }
+.english-peel-guide li { display: grid; gap: 4px; padding: 10px; border-radius: 7px; background: #fff; font-size: 11px; }
+.english-peel-guide li span { color: #667085; font-size: 10px; line-height: 1.35; }
+.english-peel-guide p { margin: 0; color: #667085; font-size: 11px; line-height: 1.45; }
+.english-practice-feedback { grid-column: 1 / -1; padding: 16px; border: 1px solid #dfe3ea; border-radius: 10px; background: #fff; }
+.english-practice-feedback h3 { margin: 0 0 8px; font-size: 16px; }
+.english-practice-feedback h4 { margin: 16px 0 6px; color: #667085; font-size: 11px; text-transform: uppercase; }
+.english-practice-feedback ul { margin: 0; padding-left: 20px; color: #344054; font-size: 12px; line-height: 1.5; }
+.english-practice-feedback article { margin-top: 12px; padding-top: 12px; border-top: 1px solid #eaecf0; color: #344054; font-size: 12px; }
+.english-practice-feedback article p { margin: 5px 0; }
+.english-practice-feedback article small { color: #667085; }
+.english-practice-history { grid-template-columns: 1fr; }
+.english-practice-history-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.english-practice-history-heading h2 { margin: 6px 0; font-size: 22px; font-weight: 400; }
+.english-practice-history-heading p { margin: 0; }
+.english-practice-attempt { border-top: 1px solid #eaecf0; padding: 14px 0; }
+.english-practice-attempt summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; cursor: pointer; color: #344054; font-size: 12px; line-height: 1.5; }
+.english-practice-attempt summary span { display: grid; gap: 3px; }
+.english-practice-attempt summary strong { color: #5142c5; }
+.english-practice-attempt summary time { flex: 0 0 auto; color: #667085; font-size: 10px; }
+.english-practice-attempt-content { padding-top: 14px; }
+.english-practice-attempt-content h3 { margin: 0; font-size: 14px; }
+.english-practice-attempt-response { white-space: pre-wrap; overflow-wrap: anywhere; color: #344054 !important; }
+.english-practice-attempt-content .english-practice-feedback { margin: 14px 0; }
+.english-practice-retry-save { grid-column: 1 / -1; justify-self: start; }
+
+@media (max-width: 900px) {
+  .english-practice-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .english-practice-form button { grid-column: 1 / -1; justify-self: start; }
+}
+
+@media (max-width: 640px) {
+  .english-practice-shell { padding: 32px 16px 48px; }
+  .english-practice-header { flex-direction: column; }
+  .english-practice-history-heading,
+  .english-practice-attempt summary { flex-direction: column; }
+  .english-practice-card { grid-template-columns: 1fr; padding: 20px; }
+  .english-practice-form { grid-template-columns: 1fr; }
+  .english-peel-guide ol { grid-template-columns: 1fr 1fr; }
+}

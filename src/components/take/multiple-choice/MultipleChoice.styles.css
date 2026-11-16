@@ -122,3 +122,9 @@
   border-radius: 16px;
   object-fit: cover;
 }
+
+@media (max-width: 620px) {
+  .questionaire-pane-take-question-multiple-choice-title { font-size: 23px; }
+  .questionaire-pane-take-question-multiple-choice-option { min-height: 48px; padding: 12px; }
+  .questionaire-pane-take-question-multiple-choice-option-label { font-size: 14px; }
+}
