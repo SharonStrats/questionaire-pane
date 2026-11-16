@@ -6,7 +6,7 @@ import { customElement, WebComponent } from 'solid-ui'
 import { questionaireContext, type QuestionaireContext } from '../../../../context'
 import { uploadQuestionImage } from '../../../../service/imageUpload'
 import { createQuestionaireLogic } from '../../../../service/questionaireLogic'
-import styles from './imageUpload.styles.css'
+import styles from './ImageUpload.styles.css'
 
 @customElement('questionaire-pane-create-question-image-upload')
 export default class QuestionairePaneCreateQuestionImageUpload extends WebComponent {

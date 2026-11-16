@@ -1,3 +1,5 @@
+import { appServicesFetch } from './appServicesFetch'
+
 export interface GradingRequest {
   question: string
   studentAnswer: string
@@ -102,7 +104,7 @@ export class ShortAnswerSidecarClient {
 
   constructor (options: ShortAnswerSidecarClientOptions) {
     this.url = `${options.endpoint.replace(/\/+$/, '')}/api/grade/short-answer`
-    this.requestFetch = options.fetch ?? globalThis.fetch
+    this.requestFetch = options.fetch ?? appServicesFetch(options.endpoint)
   }
 
   async grade (input: ShortAnswerSidecarInput): Promise<GradingResponse> {

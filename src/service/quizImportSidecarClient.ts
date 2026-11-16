@@ -5,6 +5,7 @@ import type {
   NormalizedSourceDocument
 } from './quizAiService'
 import { normalizeSidecarEndpoint } from './sidecarEndpoint'
+import { appServicesFetch } from './appServicesFetch'
 
 export const MAX_AI_IMPORT_QUESTIONS = 6
 export const MAX_AI_IMPORT_DOCUMENT_CHARACTERS = 100_000
@@ -97,7 +98,7 @@ export class QuizImportSidecarClient {
 
   constructor (options: QuizImportSidecarClientOptions) {
     this.url = `${normalizeSidecarEndpoint(options.endpoint, 'Quiz import service')}/api/import/quiz`
-    this.requestFetch = options.fetch ?? globalThis.fetch
+    this.requestFetch = options.fetch ?? appServicesFetch(options.endpoint)
   }
 
   async generate (

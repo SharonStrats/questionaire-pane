@@ -40,7 +40,7 @@ import '../components/standalone/english-practice/EnglishPractice'
 import '../questionairePane.css'
 import './standalone.css'
 import { isHttpUrl, parseStandaloneUrl } from './url'
-import { accountRegistrationUrl } from './accountLinks'
+import { accountRegistrationUrl, getStandaloneLoginIssuer } from './accountLinks'
 import { replaceViewWithRestorableContent } from './viewNavigation'
 import {
   addToTypeIndex,
@@ -119,14 +119,11 @@ function getQuizGameEndpoint (): string {
 
 window.SolidLogic = { authSession }
 
-function configureLocalLoginIssuer (): void {
-  if (window.location.hostname !== 'localhost' || window.location.port !== '4200') return
-
-  const configuredIssuer = import.meta.env.VITE_LOGIN_ISSUER?.trim() || 'http://localhost:3100'
+function configureLoginIssuer (): void {
   const currentIssuer = window.localStorage.getItem('loginIssuer')
-
-  if (!currentIssuer || currentIssuer === window.location.origin) {
-    window.localStorage.setItem('loginIssuer', configuredIssuer)
+  const issuer = getStandaloneLoginIssuer(window.location, currentIssuer, import.meta.env.VITE_LOGIN_ISSUER)
+  if (issuer && issuer !== currentIssuer) {
+    window.localStorage.setItem('loginIssuer', issuer)
   }
 }
 
@@ -167,7 +164,7 @@ function restoreLoginReturnUrl (): void {
   history.replaceState(null, document.title, `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`)
 }
 
-configureLocalLoginIssuer()
+configureLoginIssuer()
 configureQuizSidecar()
 
 function message (text: string, kind: 'info' | 'error' = 'info'): void {

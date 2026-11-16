@@ -77,6 +77,7 @@ button, input { font: inherit; }
 .page-search input::placeholder { color: #8993a8; }
 .page-header-icon { width: 30px; height: 30px; border-color: #586278; font-size: 16px; }
 .page-header-inner solid-ui-provider { display: flex; align-items: center; }
+#PageHeader solid-ui-signup-button { display: none; }
 
 #app { max-width: 1280px; margin: 0 auto; padding: 24px; }
 #app.app-home { max-width: none; padding: 0; }

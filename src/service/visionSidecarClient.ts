@@ -1,5 +1,6 @@
 import type { NormalizedSourceBlock, NormalizedSourceDocument } from './quizAiService'
 import { normalizeSidecarEndpoint } from './sidecarEndpoint'
+import { appServicesFetch } from './appServicesFetch'
 
 export const MAX_VISION_FILE_BYTES = 25 * 1024 * 1024
 
@@ -66,7 +67,7 @@ export class VisionSidecarClient {
 
   constructor (options: VisionSidecarClientOptions) {
     this.url = `${normalizeSidecarEndpoint(options.endpoint, 'Vision sidecar')}/api/extract/vision`
-    this.requestFetch = options.fetch ?? globalThis.fetch
+    this.requestFetch = options.fetch ?? appServicesFetch(options.endpoint)
   }
 
   async extract (file: Pick<File, 'name' | 'type'>, contents: ArrayBuffer): Promise<NormalizedSourceDocument> {

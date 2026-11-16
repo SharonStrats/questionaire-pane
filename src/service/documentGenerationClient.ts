@@ -1,4 +1,5 @@
 import { normalizeSidecarEndpoint } from './sidecarEndpoint'
+import { appServicesFetch } from './appServicesFetch'
 
 export interface GeneratedFlashcard {
   front: string
@@ -74,7 +75,7 @@ export class DocumentGenerationClient {
 
   constructor (options: { endpoint: string, fetch?: typeof globalThis.fetch }) {
     this.baseUrl = normalizeSidecarEndpoint(options.endpoint, 'Document service')
-    this.requestFetch = options.fetch ?? globalThis.fetch.bind(globalThis)
+    this.requestFetch = options.fetch ?? appServicesFetch(options.endpoint)
   }
 
   async extract (file: File): Promise<ExtractedDocument> {

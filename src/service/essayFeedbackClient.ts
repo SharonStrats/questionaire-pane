@@ -1,3 +1,5 @@
+import { appServicesFetch } from './appServicesFetch'
+
 export interface EssayFeedbackRubricItem {
   criterion: string
   points: number
@@ -41,7 +43,7 @@ export class EssayFeedbackClient {
 
   constructor (options: { endpoint: string, fetch?: typeof globalThis.fetch }) {
     this.url = `${options.endpoint.replace(/\/+$/, '')}/api/feedback/essay`
-    this.requestFetch = options.fetch ?? globalThis.fetch.bind(globalThis)
+    this.requestFetch = options.fetch ?? appServicesFetch(options.endpoint)
   }
 
   async assess (input: { essay: string, assignment?: string, paragraphCount?: number, rubric: EssayFeedbackRubricItem[] }): Promise<EssayFeedback> {
