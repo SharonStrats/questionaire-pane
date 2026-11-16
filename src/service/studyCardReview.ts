@@ -37,6 +37,40 @@ export function updateStudyCardReview (
     : review)
 }
 
+export function acceptPendingStudyCardReviews (reviews: StudyCardReview[]): StudyCardReview[] {
+  return reviews.map(review => review.status === 'pending' ? { ...review, status: 'accepted' } : review)
+}
+
+export function removeRejectedStudyCardReviews (reviews: StudyCardReview[]): StudyCardReview[] {
+  return reviews.filter(review => review.status !== 'rejected')
+}
+
+export function replaceRejectedStudyCardReviews (
+  reviews: StudyCardReview[],
+  cards: GeneratedFlashcard[]
+): StudyCardReview[] {
+  let nextId = reviews.reduce((max, review) => {
+    const match = /^card-(\d+)$/.exec(review.id)
+    return match ? Math.max(max, Number(match[1])) : max
+  }, 0) + 1
+  let nextCard = 0
+  const replacement = (card: GeneratedFlashcard): StudyCardReview => ({
+    id: `card-${nextId++}`,
+    card: { ...card },
+    status: 'pending'
+  })
+
+  const updated = reviews.flatMap(review => {
+    if (review.status !== 'rejected') return [review]
+    const card = cards[nextCard++]
+    return card ? [replacement(card)] : []
+  })
+  return [
+    ...updated,
+    ...cards.slice(nextCard).map(replacement)
+  ]
+}
+
 export function summarizeStudyCardReviews (reviews: StudyCardReview[]): Record<StudyCardReviewStatus, number> {
   return reviews.reduce<Record<StudyCardReviewStatus, number>>((summary, review) => {
     summary[review.status] += 1

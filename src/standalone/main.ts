@@ -11,8 +11,17 @@ import '~icons/lucide/upload'
 import '~icons/lucide/message-circle-more'
 import questionairePane from '../index'
 import { configureQuizAiService } from '../service/quizAiService'
-import { DocumentGenerationClient } from '../service/documentGenerationClient'
-import { createStudyCardReviews, duplicateStudyCardReviewIds, summarizeStudyCardReviews, updateStudyCardReview, type StudyCardReview } from '../service/studyCardReview'
+import { DocumentGenerationClient, type ExtractedDocument } from '../service/documentGenerationClient'
+import {
+  acceptPendingStudyCardReviews,
+  createStudyCardReviews,
+  duplicateStudyCardReviewIds,
+  removeRejectedStudyCardReviews,
+  replaceRejectedStudyCardReviews,
+  summarizeStudyCardReviews,
+  updateStudyCardReview,
+  type StudyCardReview
+} from '../service/studyCardReview'
 import { serializeStudyDeck } from '../service/studyCardRdf'
 import { saveAcceptedStudyDeck } from '../service/studyDeckPersistence'
 import { updatePokemonProgress } from '../service/pokemonProgress'
@@ -75,6 +84,7 @@ import type FriendChatDialog from '../components/standalone/friend-chat/FriendCh
 import '../components/standalone/friend-chat/FriendChatDialog'
 import QuestionnaireShareDialog from '../components/standalone/questionnaire-share/QuestionnaireShareDialog'
 import { loadChatInboxNotifications, sendChatInboxNotifications, type ChatInboxNotification } from '../service/chatNotifications'
+import { markInboxNotificationRead } from '../service/inboxNotifications'
 
 declare global {
   interface Window {
@@ -1027,6 +1037,7 @@ async function renderLibrary (me: NamedNode): Promise<void> {
     sharedStudyDecks: SharedStudyDeckEntry[]
     chatUnread: number
     chatInboxNotifications: ChatInboxNotification[]
+    chatInboxUnread: number
     chatInboxStatus: string
   }
   app.appendChild(home)
@@ -1040,6 +1051,7 @@ async function renderLibrary (me: NamedNode): Promise<void> {
   home.studyDecks = []
   home.sharedStudyDecks = []
   home.chatInboxNotifications = []
+  home.chatInboxUnread = 0
   home.chatInboxStatus = ''
   if (friendChatClient?.webId !== me.uri) {
     friendChatClient?.disconnect()
@@ -1052,19 +1064,84 @@ async function renderLibrary (me: NamedNode): Promise<void> {
   unsubscribeChatHome = friendChatClient!.subscribe(snapshot => {
     home.chatUnread = Object.values(snapshot.unread).reduce((sum, value) => sum + value, 0)
   })
-  const refreshChatInbox = (): void => {
-    home.chatInboxStatus = 'Loading chat notifications…'
-    void loadChatInboxNotifications(store, me).then(({ notifications, warnings }) => {
-      const latest = new Map<string, ChatInboxNotification>()
-      notifications.forEach(item => { if (!latest.has(item.conversationId)) latest.set(item.conversationId, item) })
-      home.chatInboxNotifications = [...latest.values()]
+  let workspaceUrl = ''
+  const refreshInbox = (): void => {
+    home.chatInboxStatus = 'Refreshing inbox…'
+    void (async () => {
+      const [chatResult, questionnaireResult, deckResult, storedQuestionnaireResult, storedDeckResult] =
+        await Promise.allSettled([
+          loadChatInboxNotifications(store, me),
+          discoverInboxSharedQuestionnaires(store, me),
+          discoverInboxSharedStudyDecks(store, me),
+          workspaceUrl ? loadStoredQuestionnaireUris(store, workspaceUrl) : Promise.resolve(new Set<string>()),
+          workspaceUrl ? loadStoredStudyDeckUris(store, workspaceUrl) : Promise.resolve(new Set<string>())
+        ])
+      const warnings: string[] = []
+      if (chatResult.status === 'fulfilled') {
+        const { notifications, warnings: chatWarnings } = chatResult.value
+        const latest = new Map<string, ChatInboxNotification>()
+        notifications.forEach(item => { if (!latest.has(item.conversationId)) latest.set(item.conversationId, item) })
+        home.chatInboxNotifications = [...latest.values()]
+        home.chatInboxUnread = notifications.filter(item => !item.read).length
+        warnings.push(...chatWarnings)
+      } else {
+        warnings.push(chatResult.reason instanceof Error ? chatResult.reason.message : 'Unable to load chat inbox notifications.')
+      }
+
+      const publicEntries = home.sharedEntries.filter(entry => !entry.notification)
+      if (questionnaireResult.status === 'fulfilled') {
+        const stored = storedQuestionnaireResult.status === 'fulfilled' ? storedQuestionnaireResult.value : new Set<string>()
+        if (storedQuestionnaireResult.status === 'rejected') {
+          warnings.push(storedQuestionnaireResult.reason instanceof Error
+            ? storedQuestionnaireResult.reason.message
+            : 'Unable to load saved questionnaire references.')
+        }
+        const directEntries = questionnaireResult.value.map(entry => ({
+          ...entry,
+          stored: stored.has(entry.subject.uri)
+        }))
+        const merged = new Map<string, SharedQuestionnaireEntry>(directEntries.map(entry => [entry.subject.uri, entry]))
+        publicEntries.forEach(entry => {
+          const direct = merged.get(entry.subject.uri)
+          merged.set(entry.subject.uri, direct
+            ? {
+                ...entry,
+                stored: direct.stored,
+                notification: direct.notification,
+                notificationId: direct.notificationId,
+                read: direct.read,
+                unavailableReason: direct.unavailableReason
+              }
+            : entry)
+        })
+        home.sharedEntries = [...merged.values()]
+      } else {
+        warnings.push(questionnaireResult.reason instanceof Error
+          ? questionnaireResult.reason.message
+          : 'Unable to refresh shared questionnaires.')
+      }
+
+      if (deckResult.status === 'fulfilled') {
+        const stored = storedDeckResult.status === 'fulfilled' ? storedDeckResult.value : new Set<string>()
+        if (storedDeckResult.status === 'rejected') {
+          warnings.push(storedDeckResult.reason instanceof Error
+            ? storedDeckResult.reason.message
+            : 'Unable to load saved study-card references.')
+        }
+        home.sharedStudyDecks = deckResult.value.map(entry => ({
+          ...entry,
+          stored: stored.has(entry.uri)
+        }))
+      } else {
+        warnings.push(deckResult.reason instanceof Error ? deckResult.reason.message : 'Unable to refresh shared study cards.')
+      }
       home.chatInboxStatus = warnings.join(' ')
-    }).catch(error => {
-      home.chatInboxStatus = error instanceof Error ? error.message : 'Unable to load chat inbox notifications.'
+    })().catch(error => {
+      home.chatInboxStatus = error instanceof Error ? error.message : 'Unable to refresh your inbox.'
     })
   }
   const notifyChat = (title: string, conversationId: string): void => {
-    refreshChatInbox()
+    refreshInbox()
     try {
       if ('Notification' in window && Notification.permission === 'granted' &&
         localStorage.getItem('questionaire-chat-notifications') === 'true') {
@@ -1085,7 +1162,6 @@ async function renderLibrary (me: NamedNode): Promise<void> {
   }
   friendChatClient!.onIncoming = incoming => notifyChat(`New chat message from ${incoming.senderName}`, incoming.conversationId || '')
   friendChatClient!.onInvitation = conversation => notifyChat('You have been invited to a chat', conversation.id)
-  refreshChatInbox()
   void loadFriendSummaries(store, me).then(friends => {
     home.friends = friends
     home.friendCount = friends.length
@@ -1109,7 +1185,6 @@ async function renderLibrary (me: NamedNode): Promise<void> {
     })
   })
 
-  let workspaceUrl = ''
   let subjects: NamedNode[] = []
   let statuses = new Map<string, QuestionnaireIndexStatus>()
   const renderEntries = (): void => {
@@ -1125,6 +1200,7 @@ async function renderLibrary (me: NamedNode): Promise<void> {
     input.type = 'file'
     input.accept = '.pdf,.docx,.pptx,.md,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/markdown,text/plain'
     let selectedFile: File | undefined
+    let extractedDocument: ExtractedDocument | undefined
     const generate = document.createElement('button')
     generate.type = 'button'
     generate.className = 'primary study-card-generate'
@@ -1180,17 +1256,40 @@ async function renderLibrary (me: NamedNode): Promise<void> {
     const status = document.createElement('p')
     status.className = 'info'
     const preview = document.createElement('div')
+    const reviewActions = document.createElement('div')
+    reviewActions.className = 'study-card-review-actions'
+    reviewActions.hidden = true
+    const acceptPending = document.createElement('button')
+    acceptPending.type = 'button'
+    acceptPending.textContent = 'Accept all pending'
+    const removeRejected = document.createElement('button')
+    removeRejected.type = 'button'
+    removeRejected.textContent = 'Remove rejected'
+    const regenerateRejected = document.createElement('button')
+    regenerateRejected.type = 'button'
+    regenerateRejected.textContent = 'Regenerate rejected'
+    reviewActions.append(acceptPending, removeRejected, regenerateRejected)
     let reviews: StudyCardReview[] = []
+    let regenerating = false
     back.innerHTML = '<icon-lucide-arrow-left aria-hidden="true"></icon-lucide-arrow-left>'
     back.setAttribute('aria-label', 'Back to questionnaires')
     back.style.cssText = 'width:32px;height:32px;min-height:32px;padding:0;border:0;display:inline-flex;align-items:center;justify-content:center;line-height:0;'
     back.querySelector('icon-lucide-arrow-left')?.setAttribute('style', 'width:18px;height:18px;display:block;')
     section.querySelector('.study-card-generator-header')?.prepend(back)
-    section.append(dropzone, uploadDivider, pasteNotes, pasteEditor, privacyNote, sourceName, actions, howItWorks, status, preview)
+    section.append(dropzone, uploadDivider, pasteNotes, pasteEditor, privacyNote, sourceName, actions, howItWorks, status, reviewActions, preview)
     app.innerHTML = ''
     app.classList.add('app-home')
     app.appendChild(section)
     const setSelectedFile = (file: File | undefined): void => {
+      if (file !== selectedFile) {
+        extractedDocument = undefined
+        reviews = []
+        preview.replaceChildren()
+        confirmSave.disabled = true
+        status.className = 'info'
+        status.textContent = ''
+        syncReviewActions()
+      }
       selectedFile = file
       generate.disabled = !file
       sourceName.textContent = file ? fileTitle(file.name) : ''
@@ -1225,11 +1324,19 @@ async function renderLibrary (me: NamedNode): Promise<void> {
       pasteNotes.hidden = false
     })
     back.addEventListener('click', () => { void renderLibrary(me) })
+    const syncReviewActions = (): void => {
+      const summary = summarizeStudyCardReviews(reviews)
+      reviewActions.hidden = reviews.length === 0
+      acceptPending.disabled = summary.pending === 0 || regenerating
+      removeRejected.disabled = summary.rejected === 0 || regenerating
+      regenerateRejected.disabled = summary.rejected === 0 || !extractedDocument || regenerating
+    }
     const renderReview = (): void => {
       const summary = summarizeStudyCardReviews(reviews)
       const duplicateIds = duplicateStudyCardReviewIds(reviews)
       status.textContent = `${summary.accepted} accepted · ${summary.pending} pending · ${summary.rejected} rejected.${duplicateIds.size ? ` ${duplicateIds.size} duplicate card${duplicateIds.size === 1 ? '' : 's'} detected; review before saving.` : ''} Nothing has been saved.`
       confirmSave.disabled = summary.accepted === 0
+      syncReviewActions()
       preview.innerHTML = reviews.map((review, index) =>
         `<article class="questionnaire-result study-card-review" data-card-id="${review.id}">
           <div class="study-card-review-header"><strong>Card ${index + 1} · ${review.status}${duplicateIds.has(review.id) ? ' · duplicate' : ''}</strong><span>${review.status.toUpperCase()}</span></div>
@@ -1245,6 +1352,35 @@ async function renderLibrary (me: NamedNode): Promise<void> {
         </article>`
       ).join('')
     }
+    acceptPending.addEventListener('click', () => {
+      reviews = acceptPendingStudyCardReviews(reviews)
+      renderReview()
+    })
+    removeRejected.addEventListener('click', () => {
+      reviews = removeRejectedStudyCardReviews(reviews)
+      renderReview()
+    })
+    regenerateRejected.addEventListener('click', () => {
+      const rejectedCount = summarizeStudyCardReviews(reviews).rejected
+      if (!extractedDocument || rejectedCount === 0) return
+      regenerating = true
+      syncReviewActions()
+      status.className = 'info'
+      status.textContent = `Regenerating ${rejectedCount} rejected card${rejectedCount === 1 ? '' : 's'}… Nothing has been saved.`
+      void new DocumentGenerationClient({ endpoint }).generateFlashcards(extractedDocument, rejectedCount)
+        .then(result => {
+          reviews = replaceRejectedStudyCardReviews(reviews, result.cards)
+          renderReview()
+        })
+        .catch(error => {
+          status.className = 'error'
+          status.textContent = error instanceof Error ? error.message : 'Unable to regenerate rejected study cards.'
+        })
+        .finally(() => {
+          regenerating = false
+          syncReviewActions()
+        })
+    })
     preview.addEventListener('input', event => {
       const target = event.target as HTMLInputElement
       const card = target.closest<HTMLElement>('[data-card-id]')
@@ -1292,12 +1428,17 @@ async function renderLibrary (me: NamedNode): Promise<void> {
       const file = selectedFile
       if (!file) return
       generate.disabled = true
+      extractedDocument = undefined
+      reviews = []
+      confirmSave.disabled = true
+      syncReviewActions()
       status.textContent = 'Extracting document and generating cards…'
+      status.className = 'info'
       preview.innerHTML = ''
       void (async () => {
         const client = new DocumentGenerationClient({ endpoint })
-        const document = await client.extract(file)
-        const result = await client.generateFlashcards(document, Number(countSelect.value))
+        extractedDocument = await client.extract(file)
+        const result = await client.generateFlashcards(extractedDocument, Number(countSelect.value))
         reviews = createStudyCardReviews(result.cards)
         renderReview()
       })().catch(error => {
@@ -1360,7 +1501,24 @@ async function renderLibrary (me: NamedNode): Promise<void> {
     document.body.append(dialog)
   }
   home.addEventListener('questionaire-home-open-chat', () => openFriendChat())
-  home.addEventListener('questionaire-home-refresh-inbox', refreshChatInbox)
+  home.addEventListener('questionaire-home-refresh-inbox', refreshInbox)
+  home.addEventListener('questionaire-home-mark-notification-read', event => {
+    const uri = (event as CustomEvent<string>).detail
+    if (!uri) return
+    void markInboxNotificationRead(store, me, sym(uri)).then(() => {
+      home.chatInboxNotifications = home.chatInboxNotifications.map(notification =>
+        notification.uri === sym(uri).uri ? { ...notification, read: true } : notification)
+      home.chatInboxUnread = Math.max(0, home.chatInboxUnread - 1)
+      home.sharedEntries = home.sharedEntries.map(entry =>
+        entry.notification?.uri === sym(uri).uri ? { ...entry, read: true } : entry)
+      home.sharedStudyDecks = home.sharedStudyDecks.map(entry =>
+        entry.notification.uri === sym(uri).uri ? { ...entry, read: true } : entry)
+    }).catch(error => {
+      const failure = error instanceof Error ? error.message : 'Unable to mark the inbox item as read.'
+      home.chatInboxStatus = failure
+      setStatus(failure, 'error')
+    })
+  })
   home.addEventListener('questionaire-home-open-chat-invitation', event => {
     const notification = (event as CustomEvent<{ conversationId?: string }>).detail
     openFriendChat(notification?.conversationId)
@@ -1428,11 +1586,6 @@ async function renderLibrary (me: NamedNode): Promise<void> {
   void (async () => {
     const storageUrl = await findStorageContainer(me)
     if (storageUrl) home.studyDecks = await loadStudyDecks(storageUrl, me, workspaceUrl)
-    const storedDeckUris = workspaceUrl ? await loadStoredStudyDeckUris(store, workspaceUrl) : new Set<string>()
-    home.sharedStudyDecks = (await discoverInboxSharedStudyDecks(store, me)).map(entry => ({
-      ...entry,
-      stored: storedDeckUris.has(entry.uri)
-    }))
   })().catch(error => {
     home.status = error instanceof Error ? error.message : 'Unable to load saved or shared study cards.'
     home.statusKind = 'error'
@@ -1525,15 +1678,7 @@ async function renderLibrary (me: NamedNode): Promise<void> {
       home.statusKind = 'error'
     })
   }
-  try {
-    home.sharedEntries = await discoverInboxSharedQuestionnaires(store, me)
-    home.sharedEntries = home.sharedEntries.map(entry => ({
-      ...entry,
-      stored: storedUris.has(entry.subject.uri)
-    }))
-  } catch {
-    home.sharedEntries = []
-  }
+  refreshInbox()
   void (async () => {
     try {
       const people = await solidLogicSingleton.directory.search({
@@ -1545,7 +1690,16 @@ async function renderLibrary (me: NamedNode): Promise<void> {
       const merged = new Map(home.sharedEntries.map(entry => [entry.subject.uri, entry]))
       publicEntries.forEach(entry => {
         const existing = merged.get(entry.subject.uri)
-        merged.set(entry.subject.uri, existing ? { ...entry, stored: existing.stored, notification: existing.notification } : entry)
+        merged.set(entry.subject.uri, existing
+          ? {
+              ...entry,
+              stored: existing.stored,
+              notification: existing.notification,
+              notificationId: existing.notificationId,
+              read: existing.read,
+              unavailableReason: existing.unavailableReason
+            }
+          : entry)
       })
       home.sharedEntries = [...merged.values()]
     } catch {

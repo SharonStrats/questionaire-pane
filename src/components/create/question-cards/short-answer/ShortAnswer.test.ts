@@ -1,11 +1,14 @@
 // @vitest-environment happy-dom
 
 import { describe, expect, it, vi } from 'vitest'
-import { graph, literal, sym } from 'rdflib'
+import { graph, literal, sym, type Statement } from 'rdflib'
 import { questionairePredicates } from '../../../../service/predicates'
 import './ShortAnswer'
 
-async function renderShortAnswer (answers: string[] = []) {
+async function renderShortAnswer (
+  answers: string[] = [],
+  criteria: Array<{ criterion: string, points: number }> = []
+) {
   const store = graph()
   const questionnaire = sym('https://example.test/quiz/index.ttl')
   const question = sym('https://example.test/quiz/draft/questions/q1.ttl')
@@ -17,6 +20,13 @@ async function renderShortAnswer (answers: string[] = []) {
     const answerResource = sym(`${question.uri}#answer-${index}`)
     store.add(question, questionairePredicates.question.answer, answerResource, questionDocument)
     store.add(answerResource, questionairePredicates.question.answerText, literal(answer), questionDocument)
+  }
+  for (const [index, criterion] of criteria.entries()) {
+    const resource = sym(`${questionDocument.uri}#grading-criterion-question-${index + 1}`)
+    store.add(question, questionairePredicates.question.gradingCriterion, resource, questionDocument)
+    store.add(resource, questionairePredicates.question.criterionText, literal(criterion.criterion), questionDocument)
+    store.add(resource, questionairePredicates.question.criterionPoints, literal(String(criterion.points)), questionDocument)
+    store.add(resource, questionairePredicates.question.position, literal(String(index + 1)), questionDocument)
   }
 
   const element = globalThis.document.createElement('questionaire-pane-create-question-short-answer') as HTMLElement & {
@@ -84,6 +94,42 @@ describe('short-answer accepted answer editor', () => {
       statement.subject.value !== question.uri &&
       statement.predicate.value === questionairePredicates.question.answerText.value
     ).map((statement) => statement.object.value)).toEqual(['four', '4'])
+
+    element.remove()
+  })
+
+  it('edits weighted criteria and saves criterion resources', async () => {
+    const { element, store, question } = await renderShortAnswer([], [
+      { criterion: 'mentions sunlight', points: 2 }
+    ])
+    const root = element.shadowRoot ?? element
+    const update = vi.fn(async (_deleted: Statement[], _inserted: Statement[]) => {})
+    ;(store as unknown as { fetcher: unknown }).fetcher = { load: vi.fn(async () => {}) }
+    ;(store as unknown as { updater: unknown }).updater = { update }
+
+    const criterion = root.querySelector<HTMLInputElement>('input[placeholder="What should a correct answer include?"]')
+    const points = root.querySelector<HTMLInputElement>('[aria-label="Criterion 1 weight in points"]')
+    expect(criterion?.value).toBe('mentions sunlight')
+    expect(points?.value).toBe('2')
+    if (!criterion || !points) throw new Error('Expected the weighted grading criterion inputs.')
+    criterion.value = 'mentions sunlight and chlorophyll'
+    criterion.dispatchEvent(new Event('input', { bubbles: true }))
+    points.value = '3'
+    points.dispatchEvent(new Event('change', { bubbles: true }))
+    await element.updateComplete
+
+    const footer = root.querySelector('questionaire-pane-create-question-footer')
+    footer?.dispatchEvent(new CustomEvent('questionaire-question-footer-save', { bubbles: true }))
+    await vi.waitFor(() => expect(update).toHaveBeenCalled())
+
+    const savedCriteria = update.mock.calls
+      .flatMap(([, inserted]) => inserted)
+      .filter(statement => statement.predicate.value === questionairePredicates.question.criterionPoints.value)
+    expect(savedCriteria.map(statement => statement.object.value)).toEqual(['3'])
+    expect(update.mock.calls.flatMap(([, inserted]) => inserted).some(statement =>
+      statement.subject.value === question.uri &&
+      statement.predicate.value === questionairePredicates.question.gradingCriterion.value
+    )).toBe(true)
 
     element.remove()
   })

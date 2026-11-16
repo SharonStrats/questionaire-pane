@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { createStudyCardReviews, duplicateStudyCardReviewIds, summarizeStudyCardReviews, updateStudyCardReview } from './studyCardReview'
+import {
+  acceptPendingStudyCardReviews,
+  createStudyCardReviews,
+  duplicateStudyCardReviewIds,
+  removeRejectedStudyCardReviews,
+  replaceRejectedStudyCardReviews,
+  summarizeStudyCardReviews,
+  updateStudyCardReview
+} from './studyCardReview'
 
 const card = { front: 'Front', back: 'Back', sourceReference: 'notes.md', difficulty: 'easy' as const }
 
@@ -40,5 +48,22 @@ describe('study card review state', () => {
     expect(updated[0].card.back).toBe('Edited back')
     expect(updated[0].status).toBe('pending')
     expect(updated[1]).toEqual(reviews[1])
+  })
+
+  it('accepts pending cards without changing prior decisions', () => {
+    const reviews = updateStudyCardReview(createStudyCardReviews([card, { ...card, front: 'Second' }]), 'card-1', { status: 'rejected' })
+
+    expect(acceptPendingStudyCardReviews(reviews).map(review => review.status)).toEqual(['rejected', 'accepted'])
+  })
+
+  it('removes rejected cards and replaces them with new pending cards', () => {
+    const reviews = updateStudyCardReview(createStudyCardReviews([card, { ...card, front: 'Second' }]), 'card-1', { status: 'rejected' })
+    const regenerated = replaceRejectedStudyCardReviews(reviews, [{ ...card, front: 'Regenerated' }])
+
+    expect(regenerated.map(review => [review.id, review.card.front, review.status])).toEqual([
+      ['card-3', 'Regenerated', 'pending'],
+      ['card-2', 'Second', 'pending']
+    ])
+    expect(removeRejectedStudyCardReviews(reviews).map(review => review.id)).toEqual(['card-2'])
   })
 })

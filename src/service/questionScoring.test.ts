@@ -1,7 +1,8 @@
 import { graph, literal, st, sym, type LiveStore, type NamedNode } from 'rdflib'
 import { describe, expect, it } from 'vitest'
 import { questionairePredicates } from './predicates'
-import { calculateQuestionnaireScore } from './questionScoring'
+import { calculateQuestionnaireScore, evaluateQuestionAnswer } from './questionScoring'
+import type { ShortAnswerEvaluation } from './quizAiService'
 
 function addMatchPair (
   store: LiveStore,
@@ -159,5 +160,35 @@ describe('calculateQuestionnaireScore', () => {
       earnedPoints: 2,
       correct: true
     }))
+  })
+
+  it('applies weighted partial scores and withholds provisional needs-review scores', () => {
+    const store = graph() as LiveStore
+    const questionnaire = sym('https://pod.example/rubric-questionnaire/index.ttl#this')
+    const question = sym('https://pod.example/rubric-questionnaire/draft/questions/q1.ttl#this')
+    const questionDoc = question.doc()
+    store.add(st(questionnaire, questionairePredicates.question.rdfType, questionairePredicates.questionnaire.quizType, questionnaire.doc()))
+    store.add(st(question, questionairePredicates.question.isPartOf, sym('https://pod.example/rubric-questionnaire/draft.ttl'), questionDoc))
+    store.add(st(question, questionairePredicates.question.eduQuestionType, literal('Short Answer'), questionDoc))
+    store.add(st(question, questionairePredicates.question.points, literal('6'), questionDoc))
+
+    const partial: ShortAnswerEvaluation = {
+      correct: false, score: 2, maxScore: 3, feedback: 'Partial credit.',
+      confidence: 0.9, needsReview: false, method: 'sidecar'
+    }
+    expect(evaluateQuestionAnswer(store, question, 'partial', {}, partial)).toMatchObject({
+      availablePoints: 6,
+      earnedPoints: 4,
+      correct: false
+    })
+
+    const needsReview: ShortAnswerEvaluation = {
+      ...partial, correct: true, score: 3, needsReview: true
+    }
+    expect(evaluateQuestionAnswer(store, question, 'uncertain', {}, needsReview)).toMatchObject({
+      availablePoints: 6,
+      earnedPoints: 0,
+      correct: false
+    })
   })
 })

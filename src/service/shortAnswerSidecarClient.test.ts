@@ -44,6 +44,34 @@ describe('ShortAnswerSidecarClient', () => {
     await expect(client.grade(input)).rejects.toMatchObject({ code: 'malformed' } satisfies Partial<ShortAnswerSidecarError>)
   })
 
+  it('rejects out-of-range scores and a maxScore that does not match the weighted rubric', async () => {
+    const client = new ShortAnswerSidecarClient({
+      endpoint: 'http://localhost:5001',
+      fetch: vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        ...validResponse,
+        score: 3
+      }), { status: 200 }))
+    })
+    await expect(client.grade(input)).rejects.toMatchObject({ code: 'malformed' })
+
+    const mismatchedMax = new ShortAnswerSidecarClient({
+      endpoint: 'http://localhost:5001',
+      fetch: vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        ...validResponse,
+        maxScore: 3
+      }), { status: 200 }))
+    })
+    await expect(mismatchedMax.grade(input)).rejects.toMatchObject({ code: 'malformed' })
+  })
+
+  it('does not send an inconsistent weighted rubric', async () => {
+    const fetch = vi.fn()
+    const client = new ShortAnswerSidecarClient({ endpoint: 'http://localhost:5001', fetch })
+
+    await expect(client.grade({ ...input, maxScore: 3 })).rejects.toMatchObject({ code: 'malformed' })
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it('reports HTTP errors without exposing client credentials', async () => {
     const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ message: 'invalid request' }), { status: 400 }))
     const client = new ShortAnswerSidecarClient({ endpoint: 'http://localhost:5001', fetch })

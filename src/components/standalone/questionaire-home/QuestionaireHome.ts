@@ -104,6 +104,9 @@ export default class QuestionaireHome extends WebComponent {
   accessor chatInboxNotifications: ChatInboxNotification[] = []
 
   @property({ attribute: false })
+  accessor chatInboxUnread = 0
+
+  @property({ attribute: false })
   accessor chatInboxStatus = ''
 
   @property({ attribute: false })
@@ -169,14 +172,16 @@ export default class QuestionaireHome extends WebComponent {
 
   private renderInboxPanel () {
     if (!this.inboxOpen) return nothing
-    const shared = this.sharedEntries.filter(entry => entry.notification && !entry.stored).slice(0, 3)
-    const notifications = this.chatInboxNotifications.slice(0, 3)
+    const shared = this.sharedEntries.filter(entry => entry.notification && !entry.stored && !entry.read).slice(0, 3)
+    const sharedDecks = this.sharedStudyDecks.filter(entry => !entry.stored && !entry.read).slice(0, 3)
+    const notifications = this.chatInboxNotifications.filter(item => !item.read).slice(0, 3)
     const rows = [
       ...notifications.map(notification => ({
         title: notification.message,
         detail: notification.sender,
         icon: html`<icon-lucide-message-circle-more aria-hidden="true"></icon-lucide-message-circle-more>`,
         tone: 'purple',
+        notificationUri: notification.uri,
         action: () => this.dispatchAction('questionaire-home-open-chat-invitation', notification)
       })),
       ...shared.map(entry => ({
@@ -184,7 +189,16 @@ export default class QuestionaireHome extends WebComponent {
         detail: entry.description || 'Someone shared a questionnaire with you.',
         icon: html`<icon-lucide-file-check-corner aria-hidden="true"></icon-lucide-file-check-corner>`,
         tone: 'teal',
+        notificationUri: entry.notification?.uri,
         action: () => this.dispatchAction('questionaire-home-open', entry.subject)
+      })),
+      ...sharedDecks.map(entry => ({
+        title: entry.title,
+        detail: `${entry.cardCount} cards · Shared by ${entry.sharedBy.label}`,
+        icon: html`<icon-lucide-playing-cards-fan aria-hidden="true"></icon-lucide-playing-cards-fan>`,
+        tone: 'gold',
+        notificationUri: entry.notification.uri,
+        action: () => this.dispatchAction('questionaire-home-open-study-deck', entry.uri)
       }))
     ].slice(0, 3)
     return html`
@@ -203,7 +217,11 @@ export default class QuestionaireHome extends WebComponent {
           </header>
           <div class="questionaire-home-inbox-list">
             ${rows.length ? rows.map(row => html`
-              <button class="questionaire-home-inbox-row" type="button" @click=${() => { this.inboxOpen = false; row.action() }}>
+              <button class="questionaire-home-inbox-row" type="button" @click=${() => {
+                if (row.notificationUri) this.dispatchAction('questionaire-home-mark-notification-read', row.notificationUri)
+                this.inboxOpen = false
+                row.action()
+              }}>
                 <i class="questionaire-home-inbox-dot" aria-hidden="true"></i>
                 <span class="questionaire-home-inbox-row-icon questionaire-home-inbox-row-icon--${row.tone}">${row.icon}</span>
                 <span class="questionaire-home-inbox-row-copy"><strong>${row.title}</strong><small>${row.detail}</small><em>Recently</em></span>
@@ -230,7 +248,9 @@ export default class QuestionaireHome extends WebComponent {
   }
 
   private get inboxUnreadCount () {
-    return this.sharedEntries.filter(entry => entry.notification && !entry.stored).length + this.chatInboxNotifications.length
+    return this.sharedEntries.filter(entry => entry.notification && !entry.stored && !entry.read).length +
+      this.sharedStudyDecks.filter(entry => !entry.stored && !entry.read).length +
+      this.chatInboxUnread
   }
 
   private renderHeaderCountBadge (count: number, kind: 'friends' | 'inbox') {
@@ -751,35 +771,50 @@ export default class QuestionaireHome extends WebComponent {
       detail: string
       description: string
       action: () => void
+      notificationUri: string
+      read: boolean
+      unavailableReason?: string
       entry?: SharedQuestionnaireEntry
       deck?: SharedStudyDeckEntry
     }
     const items: InboxItem[] = [
       ...this.chatInboxNotifications.map(notification => ({
-        key: `chat:${notification.conversationId}`,
+        key: `chat:${notification.notificationId}`,
         kind: 'message' as const,
         title: notification.message,
         detail: notification.sender,
         description: 'New chat message',
+        notificationUri: notification.uri,
+        read: notification.read,
         action: () => this.dispatchAction('questionaire-home-open-chat-invitation', notification)
       })),
       ...entries.filter(entry => entry.notification && !entry.stored).map(entry => ({
-        key: `share:${entry.subject.uri}`,
+        key: `share:${entry.notificationId ?? entry.notification!.uri}`,
         kind: 'quiz' as const,
         title: entry.title,
-        detail: entry.description || 'Someone shared a quiz with you.',
-        description: 'Shared quiz',
+        detail: entry.unavailableReason ?? (entry.description || 'Someone shared a quiz with you.'),
+        description: entry.unavailableReason ? 'Unavailable share' : 'Shared quiz',
+        notificationUri: entry.notification!.uri,
+        read: entry.read ?? false,
+        unavailableReason: entry.unavailableReason,
         entry,
-        action: () => this.dispatchAction('questionaire-home-open', entry.subject)
+        action: () => {
+          if (!entry.unavailableReason) this.dispatchAction('questionaire-home-open', entry.subject)
+        }
       })),
       ...this.sharedStudyDecks.filter(entry => !entry.stored).map(deck => ({
-        key: `study-deck:${deck.uri}`,
+        key: `study-deck:${deck.notificationId ?? deck.notification.uri}`,
         kind: 'study-deck' as const,
         title: deck.title,
-        detail: `${deck.cardCount} cards · Shared by ${deck.sharedBy.label}`,
-        description: 'Shared study cards',
+        detail: deck.unavailableReason ?? `${deck.cardCount} cards · Shared by ${deck.sharedBy.label}`,
+        description: deck.unavailableReason ? 'Unavailable share' : 'Shared study cards',
+        notificationUri: deck.notification.uri,
+        read: deck.read ?? false,
+        unavailableReason: deck.unavailableReason,
         deck,
-        action: () => this.dispatchAction('questionaire-home-open-study-deck', deck.uri)
+        action: () => {
+          if (!deck.unavailableReason) this.dispatchAction('questionaire-home-open-study-deck', deck.uri)
+        }
       }))
     ]
     const query = this.inboxSearch.trim().toLocaleLowerCase()
@@ -787,13 +822,16 @@ export default class QuestionaireHome extends WebComponent {
       ? items.filter(item => `${item.title} ${item.detail}`.toLocaleLowerCase().includes(query))
       : items
     const selected = visibleItems.find(item => item.key === this.selectedInboxItem) ?? visibleItems[0]
-    const messages = this.chatInboxNotifications.length
-    const shared = entries.filter(entry => entry.notification && !entry.stored).length
-    const sharedDecks = this.sharedStudyDecks.filter(entry => !entry.stored).length
+    const messages = this.chatInboxUnread
+    const shared = entries.filter(entry => entry.notification && !entry.stored && !entry.read).length
+    const sharedDecks = this.sharedStudyDecks.filter(entry => !entry.stored && !entry.read).length
     return html`
       <div class="questionaire-home-inbox-page">
         <div class="questionaire-home-inbox-page-heading">
-          <div><h1>Inbox</h1><p>Messages and things your friends have shared with you.</p></div>
+          <div><h1>Inbox</h1><p>Messages and things your friends have shared with you.</p>
+            ${this.chatInboxStatus ? html`<p role="status">${this.chatInboxStatus}</p>` : nothing}
+          </div>
+          <button class="questionaire-home-inbox-profile" type="button" @click=${() => this.dispatchAction('questionaire-home-refresh-inbox')}>Refresh inbox</button>
           <button class="questionaire-home-inbox-profile" type="button" @click=${() => this.dispatchAction('questionaire-home-open-profile')}>Create profile</button>
         </div>
         <div class="questionaire-home-inbox-stats">
@@ -810,8 +848,11 @@ export default class QuestionaireHome extends WebComponent {
             <div class="questionaire-home-inbox-tabs"><button class="active" type="button">All</button><button type="button">Messages</button><button type="button">Shared with me</button></div>
             <div class="questionaire-home-inbox-items">
               ${visibleItems.length ? visibleItems.map(item => html`
-                <button class="questionaire-home-inbox-item ${selected?.key === item.key ? 'selected' : ''}" type="button"
-                  @click=${() => { this.selectedInboxItem = item.key }}>
+                <button class="questionaire-home-inbox-item ${selected?.key === item.key ? 'selected' : ''} ${item.read ? 'is-read' : 'is-unread'}" type="button"
+                  @click=${() => {
+                    this.selectedInboxItem = item.key
+                    if (!item.read) this.dispatchAction('questionaire-home-mark-notification-read', item.notificationUri)
+                  }}>
                   <span class="questionaire-home-inbox-item-icon questionaire-home-inbox-item-icon--${item.kind}">
                     ${item.kind === 'message'
                       ? html`<icon-lucide-message-circle-more aria-hidden="true"></icon-lucide-message-circle-more>`
@@ -819,7 +860,7 @@ export default class QuestionaireHome extends WebComponent {
                         ? html`<icon-lucide-playing-cards-fan aria-hidden="true"></icon-lucide-playing-cards-fan>`
                         : html`<icon-lucide-file-check-corner aria-hidden="true"></icon-lucide-file-check-corner>`}
                   </span>
-                  <span><strong>${item.title}</strong><small>${item.detail}</small><em>${item.description}</em></span><b>›</b>
+                  <span><strong>${item.title}</strong><small>${item.detail}</small><em>${item.description} · ${item.read ? 'Read' : 'Unread'}</em></span><b>›</b>
                 </button>
               `) : html`<p class="questionaire-home-inbox-page-empty">No inbox items found.</p>`}
             </div>
@@ -836,18 +877,22 @@ export default class QuestionaireHome extends WebComponent {
               <small>${selected.description}</small>
               <h2>${selected.detail}</h2>
               <blockquote>${selected.title}</blockquote>
-              <p>${selected.kind === 'message'
+              <p>${selected.unavailableReason ?? (selected.kind === 'message'
                 ? 'Open the chat to reply and continue the conversation.'
                 : selected.kind === 'study-deck'
                   ? 'Save a reference to these study cards in your library or open them now.'
-                  : 'Open this shared quiz to start learning.'}</p>
-              ${selected.entry && !selected.entry.stored ? html`
+                  : 'Open this shared quiz to start learning.')}</p>
+              <p>${selected.read ? 'Read' : 'Unread'}</p>
+              ${selected.entry && !selected.entry.stored && !selected.unavailableReason ? html`
                 <button type="button" @click=${() => this.dispatchAction('questionaire-home-store', selected.entry)}>＋ Add to My quizzes</button>
               ` : nothing}
-              ${selected.deck && !selected.deck.stored ? html`
+              ${selected.deck && !selected.deck.stored && !selected.unavailableReason ? html`
                 <button type="button" @click=${() => this.dispatchAction('questionaire-home-store-study-deck', selected.deck)}>＋ Store for me</button>
               ` : nothing}
-              <button type="button" @click=${selected.action}>${selected.kind === 'message' ? 'Open chat' : selected.kind === 'study-deck' ? 'Open study cards' : 'Open quiz'}</button>
+              <button type="button" ?disabled=${Boolean(selected.unavailableReason)} @click=${() => {
+                if (!selected.read) this.dispatchAction('questionaire-home-mark-notification-read', selected.notificationUri)
+                selected.action()
+              }}>${selected.unavailableReason ? 'Unavailable' : selected.kind === 'message' ? 'Open chat' : selected.kind === 'study-deck' ? 'Open study cards' : 'Open quiz'}</button>
             ` : html`<p>Select an inbox item to see its details.</p>`}
           </div>
         </div>

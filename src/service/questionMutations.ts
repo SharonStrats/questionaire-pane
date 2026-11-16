@@ -14,9 +14,11 @@ import {
 import { questionairePredicates } from './predicates'
 import { nextPublishedVersion } from './publishedVersion'
 import { nextQuestionNumber } from './questionNumbering'
+import type { GradingCriterion } from './shortAnswerSidecarClient'
 
 const dct = Namespace('http://purl.org/dc/terms/')
 const schema = Namespace('https://schema.org/')
+const xsd = Namespace('http://www.w3.org/2001/XMLSchema#')
 
 function questionTypeLabel (questionType: NamedNode) {
   const labels: Record<string, string> = {
@@ -148,7 +150,7 @@ export interface QuestionaireMutationService {
   updateQuestionImage(options: { question: NamedNode, image: string }): Promise<void>
   updateQuestionHint(options: { question: NamedNode, hint: string }): Promise<void>
   updateQuestionExplanation(options: { question: NamedNode, explanation: string }): Promise<void>
-  updateQuestionGradingCriteria(options: { question: NamedNode, criteria: string[] }): Promise<void>
+  updateQuestionGradingCriteria(options: { question: NamedNode, criteria: GradingCriterion[] }): Promise<void>
   updateQuestionPoints(options: { question: NamedNode, points: number }): Promise<void>
   updateQuestionOptions(options: { question: NamedNode, options: string[], correctOption?: string | null, correctOptions?: string[] | null }): Promise<void>
   updateQuestionAnswers(options: { question: NamedNode, answers: string[] }): Promise<void>
@@ -639,7 +641,7 @@ export function createQuestionaireMutations (store: LiveStore): QuestionaireMuta
     })
   }
 
-  async function updateQuestionGradingCriteria (options: { question: NamedNode, criteria: string[] }) {
+  async function updateQuestionGradingCriteria (options: { question: NamedNode, criteria: GradingCriterion[] }) {
     const fetcher = store.fetcher
     const updater = store.updater
     if (!fetcher || !updater) {
@@ -649,12 +651,33 @@ export function createQuestionaireMutations (store: LiveStore): QuestionaireMuta
     const questionDoc = options.question.doc()
     await enqueueDocumentUpdate(questionDoc, async () => {
       await fetcher.load(questionDoc)
-      const predicate = questionairePredicates.question.gradingCriteria
-      const del = [...store.statementsMatching(options.question, predicate, undefined, questionDoc)]
-      const ins = options.criteria
-        .map((criterion) => criterion.trim())
-        .filter(Boolean)
-        .map((criterion) => st(options.question, predicate, literal(criterion), questionDoc))
+      const legacyPredicate = questionairePredicates.question.gradingCriteria
+      const linkPredicate = questionairePredicates.question.gradingCriterion
+      const criteria = options.criteria
+        .map(({ criterion, points }) => ({ criterion: criterion.trim(), points }))
+        .filter(({ criterion }) => criterion.length > 0)
+      if (criteria.some(({ points }) => !Number.isInteger(points) || points < 1)) {
+        throw new Error('Each grading criterion must have a positive whole-number weight.')
+      }
+      const oldResources = store.each(options.question, linkPredicate, undefined, questionDoc)
+        .filter((resource): resource is NamedNode => resource.termType === 'NamedNode')
+      const del = [
+        ...store.statementsMatching(options.question, legacyPredicate, undefined, questionDoc),
+        ...store.statementsMatching(options.question, linkPredicate, undefined, questionDoc),
+        ...oldResources.flatMap(resource => store.statementsMatching(resource, undefined, undefined, questionDoc))
+      ]
+      const criterionClass = sym('https://sharonstrats.github.io/solidnext-vocab/vocab/quiz#GradingCriterion')
+      const ins = criteria.flatMap(({ criterion, points }, index) => {
+        const questionFragment = new URL(options.question.uri).hash.slice(1) || 'question'
+        const resource = sym(`${questionDoc.uri}#grading-criterion-${encodeURIComponent(questionFragment)}-${index + 1}`)
+        return [
+          st(options.question, linkPredicate, resource, questionDoc),
+          st(resource, questionairePredicates.question.rdfType, criterionClass, questionDoc),
+          st(resource, questionairePredicates.question.criterionText, literal(criterion), questionDoc),
+          st(resource, questionairePredicates.question.criterionPoints, literal(String(points), xsd('integer')), questionDoc),
+          st(resource, questionairePredicates.question.position, literal(String(index + 1)), questionDoc)
+        ]
+      })
       await updater.update(del, ins)
     })
   }

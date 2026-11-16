@@ -5,7 +5,7 @@ import { customElement, WebComponent } from 'solid-ui'
 import { type NamedNode } from 'rdflib'
 import styles from './TextResponse.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
-import { readQuestionValue, readQuestionValues } from '../../../service/questionAccessors'
+import { readQuestionGradingCriteria, readQuestionValue, readQuestionValues } from '../../../service/questionAccessors'
 import { loadQuizAiService } from '../../../service/quizAiService'
 import { getQuestionnaireFormat } from '../../../service/questionQueries'
 import { renderFormattedText } from '../../shared/formatting'
@@ -183,8 +183,7 @@ export default class QuestionairePaneTakeQuestionTextResponse extends WebCompone
       const service = await loadQuizAiService()
       const evaluation = await service.evaluateShortAnswer(this.draftAnswer, expectedAnswers, {
         question: this.getTitle(),
-        gradingCriteria: readQuestionValues(store, this.question, 'gradingCriteria')
-          .map((criterion) => ({ criterion, points: 1 }))
+        gradingCriteria: readQuestionGradingCriteria(store, this.question)
       })
       this.dispatchEvent(new CustomEvent('questionaire-answer-evaluated', {
         bubbles: true,

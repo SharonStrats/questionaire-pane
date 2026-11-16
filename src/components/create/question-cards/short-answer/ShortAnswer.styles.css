@@ -147,10 +147,27 @@
   gap: 8px;
 }
 
+.questionaire-pane-create-question-short-answer-criterion > input:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.questionaire-pane-create-question-short-answer-criterion-points {
+  flex: 0 0 82px;
+  width: 82px;
+  padding: 12px 8px;
+}
+
 .questionaire-pane-create-question-short-answer-criteria-note {
   color: #64748b;
   font-size: 12px;
   line-height: 1.5;
+}
+
+.questionaire-pane-create-question-short-answer-save-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 12px;
 }
 
 .questionaire-pane-create-question-short-answer-field > label,

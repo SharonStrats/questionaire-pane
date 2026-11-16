@@ -10,6 +10,8 @@ export interface ShortAnswerCalibrationFixture {
   expectedMethod: 'exact' | 'semantic' | 'sidecar'
   expectedAuthoritative: boolean
   expectedNeedsReview: boolean
+  expectedScore?: number
+  expectedMaxScore?: number
 }
 
 export const shortAnswerCalibrationFixtures: ShortAnswerCalibrationFixture[] = [
@@ -44,13 +46,13 @@ export const shortAnswerCalibrationFixtures: ShortAnswerCalibrationFixture[] = [
     answer: 'Plants make food.',
     expectedAnswers: ['Plants use sunlight for photosynthesis.'],
     gradingCriteria: [
-      { criterion: 'mentions sunlight', points: 1 },
+      { criterion: 'mentions sunlight', points: 2 },
       { criterion: 'explains food production', points: 1 }
     ],
     sidecarResponse: {
       decision: 'partial',
-      score: 1,
-      maxScore: 2,
+      score: 2,
+      maxScore: 3,
       confidence: 0.9,
       feedback: 'Mention sunlight as part of the explanation.',
       matchedCriteria: ['explains food production'],
@@ -59,12 +61,18 @@ export const shortAnswerCalibrationFixtures: ShortAnswerCalibrationFixture[] = [
     },
     expectedMethod: 'sidecar',
     expectedAuthoritative: true,
-    expectedNeedsReview: false
+    expectedNeedsReview: false,
+    expectedScore: 2,
+    expectedMaxScore: 3
   },
   {
     name: 'incorrect response',
     answer: 'Plants need sunlight to sleep.',
     expectedAnswers: ['Plants use sunlight for photosynthesis.'],
+    gradingCriteria: [
+      { criterion: 'mentions sunlight', points: 1 },
+      { criterion: 'explains food production', points: 1 }
+    ],
     sidecarResponse: {
       decision: 'needs-review',
       score: 0,
@@ -77,12 +85,18 @@ export const shortAnswerCalibrationFixtures: ShortAnswerCalibrationFixture[] = [
     },
     expectedMethod: 'sidecar',
     expectedAuthoritative: false,
-    expectedNeedsReview: true
+    expectedNeedsReview: true,
+    expectedScore: 0,
+    expectedMaxScore: 2
   },
   {
     name: 'ambiguous response',
     answer: 'It helps somehow.',
     expectedAnswers: ['Plants use sunlight for photosynthesis.'],
+    gradingCriteria: [
+      { criterion: 'mentions sunlight', points: 1 },
+      { criterion: 'explains food production', points: 1 }
+    ],
     sidecarResponse: {
       decision: 'needs-review',
       score: 0,
@@ -95,7 +109,9 @@ export const shortAnswerCalibrationFixtures: ShortAnswerCalibrationFixture[] = [
     },
     expectedMethod: 'sidecar',
     expectedAuthoritative: false,
-    expectedNeedsReview: true
+    expectedNeedsReview: true,
+    expectedScore: 0,
+    expectedMaxScore: 2
   },
   {
     name: 'sidecar failure fallback',
@@ -107,9 +123,28 @@ export const shortAnswerCalibrationFixtures: ShortAnswerCalibrationFixture[] = [
     expectedNeedsReview: false
   },
   {
+    name: 'rubric sidecar failure requires review',
+    answer: 'Plants make food.',
+    expectedAnswers: ['Plants use sunlight for photosynthesis.'],
+    gradingCriteria: [
+      { criterion: 'mentions sunlight', points: 2 },
+      { criterion: 'explains food production', points: 1 }
+    ],
+    sidecarFailure: true,
+    expectedMethod: 'semantic',
+    expectedAuthoritative: false,
+    expectedNeedsReview: true,
+    expectedScore: 0,
+    expectedMaxScore: 3
+  },
+  {
     name: 'low-confidence response',
     answer: 'Plants make energy.',
     expectedAnswers: ['Plants use sunlight for photosynthesis.'],
+    gradingCriteria: [
+      { criterion: 'mentions sunlight', points: 1 },
+      { criterion: 'explains food production', points: 1 }
+    ],
     sidecarResponse: {
       decision: 'correct',
       score: 2,

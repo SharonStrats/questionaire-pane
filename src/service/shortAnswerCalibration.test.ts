@@ -32,11 +32,12 @@ describe('offline short-answer calibration fixtures', () => {
         { question: 'Why do plants need sunlight?', gradingCriteria: fixture.gradingCriteria }
       )
 
-      const authoritative = result.method !== 'sidecar' ||
-        (result.confidence >= 0.8 && !result.needsReview)
+      const authoritative = !result.needsReview
       expect(result.method).toBe(fixture.expectedMethod)
       expect(authoritative).toBe(fixture.expectedAuthoritative)
       expect(result.needsReview).toBe(fixture.expectedNeedsReview)
+      if (fixture.expectedScore !== undefined) expect(result.score).toBe(fixture.expectedScore)
+      if (fixture.expectedMaxScore !== undefined) expect(result.maxScore).toBe(fixture.expectedMaxScore)
       expect(fetch).toHaveBeenCalledTimes(fixture.expectedMethod === 'exact' ? 0 : 1)
     })
   }

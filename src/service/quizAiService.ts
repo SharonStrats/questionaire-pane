@@ -990,13 +990,14 @@ async function createService (
       }
       try {
         const result = await sidecarClient.grade(sidecarInput)
+        const needsReview = result.needsReview || result.decision === 'needs-review' || result.confidence < 0.8
         return {
-          correct: result.score >= result.maxScore && !result.needsReview,
+          correct: result.score >= result.maxScore && !needsReview,
           score: result.score,
           maxScore: result.maxScore,
           feedback: result.feedback,
           confidence: result.confidence,
-          needsReview: result.needsReview || result.confidence < 0.8,
+          needsReview,
           method: 'sidecar' as const
         }
       } catch (error) {
@@ -1014,13 +1015,14 @@ async function createService (
     const confidence = Math.max(...vectors.slice(1).map((vector) => (
       vector.reduce((sum, value, index) => sum + value * (answerVector[index] ?? 0), 0)
     )), 0)
+    const rubricRequiresReview = Boolean(options.gradingCriteria?.length)
 
     return {
-      correct: confidence >= semanticMatchThreshold,
-      score: confidence >= semanticMatchThreshold ? 1 : 0,
-      maxScore: 1,
+      correct: !rubricRequiresReview && confidence >= semanticMatchThreshold,
+      score: rubricRequiresReview ? 0 : confidence >= semanticMatchThreshold ? 1 : 0,
+      maxScore: options.gradingCriteria?.reduce((sum, criterion) => sum + criterion.points, 0) || 1,
       feedback: '',
-      needsReview: false,
+      needsReview: rubricRequiresReview,
       confidence,
       method: 'semantic' as const
     }

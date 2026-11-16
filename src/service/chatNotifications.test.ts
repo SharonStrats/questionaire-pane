@@ -28,12 +28,18 @@ describe('chat inbox notifications', () => {
     const [, url, options] = vi.mocked(fetcher.webOperation).mock.calls[0]
     expect(url).toBe(inbox.uri)
     expect(options!.contentType).toBe('text/turtle')
+    expect(options!.data).toContain('quiz:notificationId')
+    expect(options!.data).toContain('quiz:notificationVersion')
+    expect(options!.data).toContain('quiz:read')
     const document = sym(`${inbox.uri}notification.ttl`)
     store.add(inbox, ldp('contains'), document, inbox)
     parse(options!.data!, store, document.uri, 'text/turtle')
     const result = await loadChatInboxNotifications(store, bob)
     expect(result.notifications[0]).toMatchObject({
-      conversationId: conversation.id, sender: alice.uri, message: 'You have been invited to a chat.'
+      conversationId: conversation.id,
+      sender: alice.uri,
+      message: 'You have been invited to a chat.',
+      read: false
     })
     expect(result.warnings).toEqual([])
   })

@@ -159,9 +159,12 @@ export function evaluateQuestionAnswer (
       correct
     }
   } else if (questionTypeUri === questionairePredicates.question.questionType.shortAnswer.value) {
-    correct = answerEvaluation?.correct ?? (question.uri in semanticAnswerResults
-      ? semanticAnswerResults[question.uri]
-      : expected.some((value) => normalizeTextAnswer(value) === normalizeTextAnswer(normalizedAnswer[0] ?? '')))
+    correct = answerEvaluation
+      ? answerEvaluation.correct && !answerEvaluation.needsReview
+      : question.uri in semanticAnswerResults
+        ? semanticAnswerResults[question.uri]
+        : expected.some(value =>
+            normalizeTextAnswer(value) === normalizeTextAnswer(normalizedAnswer[0] ?? ''))
   } else if (questionTypeUri === questionairePredicates.question.questionType.ordering.value) {
     correct = itemValues.length > 0 && normalizedAnswer.length === itemValues.length && normalizedAnswer.every((value, index) => normalizeTextAnswer(value) === normalizeTextAnswer(itemValues[index] ?? ''))
   } else if (questionTypeUri === questionairePredicates.question.questionType.match.value) {
@@ -178,7 +181,9 @@ export function evaluateQuestionAnswer (
     questionTypeUri,
     availablePoints,
     earnedPoints: answerEvaluation && answerEvaluation.maxScore > 0
-      ? availablePoints * Math.max(0, Math.min(1, answerEvaluation.score / answerEvaluation.maxScore))
+      ? answerEvaluation.needsReview
+        ? 0
+        : availablePoints * Math.max(0, Math.min(1, answerEvaluation.score / answerEvaluation.maxScore))
       : correct ? availablePoints : 0,
     correct,
     ...(answerEvaluation ? { evaluation: answerEvaluation } : {})

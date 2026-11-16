@@ -617,6 +617,8 @@ h1 { margin: 8px 0 10px; font-size: 36px; font-weight: 400; letter-spacing: -0.9
 .questionaire-home-inbox-full span { font-size: 17px; line-height: 10px; }
 .questionaire-home-inbox-page { position: relative; }
 .questionaire-home-inbox-page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.questionaire-home-inbox-page-heading > div { min-width: 0; }
+.questionaire-home-inbox-page-heading > button { flex-shrink: 0; }
 .questionaire-home-inbox-page-heading h1 { margin: 0; color: #24233a; font-size: 24px; font-weight: 500; }
 .questionaire-home-inbox-page-heading p { margin: 5px 0 0; color: #9996a9; font-size: 8px; }
 .questionaire-home-inbox-profile { padding: 9px 13px; border: 0; border-radius: 8px; color: #fff; background: #1d2746; font-size: 8px; }
@@ -642,6 +644,8 @@ h1 { margin: 8px 0 10px; font-size: 36px; font-weight: 400; letter-spacing: -0.9
 .questionaire-home-inbox-items { border-top: 1px solid #ececf3; }
 .questionaire-home-inbox-item { display: grid; grid-template-columns: 30px minmax(0, 1fr) 10px; align-items: center; gap: 8px; width: 100%; min-height: 78px; padding: 10px; border: 0; border-bottom: 1px solid #ececf3; color: #302e49; background: #fff; text-align: left; }
 .questionaire-home-inbox-item.selected { background: #f0edff; }
+.questionaire-home-inbox-item.is-unread strong { font-weight: 700; }
+.questionaire-home-inbox-item.is-read strong { color: #77758b; font-weight: 500; }
 .questionaire-home-inbox-item-icon { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 8px; }
 .questionaire-home-inbox-item-icon--message { color: #6c5ce7; background: #eeebff; }
 .questionaire-home-inbox-item-icon--quiz { color: #087c67; background: #e8f7f2; }

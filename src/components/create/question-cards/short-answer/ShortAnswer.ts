@@ -3,7 +3,8 @@ import { state } from 'lit/decorators.js'
 import { customElement } from 'solid-ui'
 import styles from './ShortAnswer.styles.css'
 import QuestionairePaneCreateQuestionCardBase from '../card-base/CardBase'
-import { readQuestionValue, readQuestionValues } from '../../../../service/questionAccessors'
+import { readQuestionGradingCriteria, readQuestionValue, readQuestionValues } from '../../../../service/questionAccessors'
+import type { GradingCriterion } from '../../../../service/shortAnswerSidecarClient'
 import { getQuestionnaireFormat } from '../../../../service/questionQueries'
 import '../header/Header'
 import '../footer/Footer'
@@ -37,7 +38,10 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
   private accessor draftAnswers: string[] = []
 
   @state()
-  private accessor draftCriteria: string[] = []
+  private accessor draftCriteria: GradingCriterion[] = []
+
+  @state()
+  private accessor saveError = ''
 
   @state()
   private accessor loadedQuestionUri: string | null = null
@@ -54,13 +58,14 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
     this.draftImage = readQuestionValue(this.getStore()!, question, 'image')
     this.draftPoints = String(this.getQuestionPoints())
     this.draftAnswers = readQuestionValues(this.getStore()!, question, 'answer')
-    this.draftCriteria = readQuestionValues(this.getStore()!, question, 'gradingCriteria')
+    this.draftCriteria = readQuestionGradingCriteria(this.getStore()!, question)
     this.loadedQuestionUri = question.uri
   }
 
   protected resetDraft () {
     super.resetDraft()
     this.loadedQuestionUri = null
+    this.saveError = ''
   }
 
   private getQuestionTitle () {
@@ -107,17 +112,27 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
     const explanation = this.draftExplanation.trim()
     const image = this.draftImage.trim()
     const points = Number.parseInt(this.draftPoints, 10)
+    const criteria = this.draftCriteria.filter(({ criterion }) => criterion.trim())
 
-    await logic.updateQuestionText({ question, title })
-    await logic.updateQuestionHint({ question, hint })
-    await logic.updateQuestionExplanation({ question, explanation })
-    await logic.updateQuestionImage({ question, image })
-    await logic.updateQuestionPoints({ question, points: Number.isFinite(points) ? points : 0 })
-    await logic.updateQuestionAnswers({ question, answers: this.draftAnswers })
-    await logic.updateQuestionGradingCriteria({ question, criteria: this.draftCriteria })
+    if (criteria.some(({ points }) => !Number.isInteger(points) || points < 1)) {
+      this.saveError = 'Each grading criterion needs a positive whole-number weight.'
+      return
+    }
 
-    this.emitQuestionChanged()
-    this.emitQuestionSaved()
+    try {
+      await logic.updateQuestionText({ question, title })
+      await logic.updateQuestionHint({ question, hint })
+      await logic.updateQuestionExplanation({ question, explanation })
+      await logic.updateQuestionImage({ question, image })
+      await logic.updateQuestionPoints({ question, points: Number.isFinite(points) ? points : 0 })
+      await logic.updateQuestionAnswers({ question, answers: this.draftAnswers })
+      await logic.updateQuestionGradingCriteria({ question, criteria })
+      this.saveError = ''
+      this.emitQuestionChanged()
+      this.emitQuestionSaved()
+    } catch (error) {
+      this.saveError = error instanceof Error ? error.message : 'Unable to save the question.'
+    }
   }
 
   render() {
@@ -254,7 +269,7 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
               <button
                 class="questionaire-pane-create-question-short-answer-add-criterion"
                 type="button"
-                @click=${() => { this.draftCriteria = [...this.draftCriteria, ''] }}
+                @click=${() => { this.draftCriteria = [...this.draftCriteria, { criterion: '', points: 1 }] }}
               >Add criterion</button>
             </div>
             ${this.draftCriteria.length > 0
@@ -264,11 +279,32 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
                     class="questionaire-pane-create-question-short-answer-input"
                     type="text"
                     placeholder="What should a correct answer include?"
-                    .value=${criterion}
+                    .value=${criterion.criterion}
                     @input=${(event: Event) => {
                       const criteria = this.draftCriteria.slice()
-                      criteria[index] = (event.currentTarget as HTMLInputElement).value
+                      criteria[index] = { ...criteria[index], criterion: (event.currentTarget as HTMLInputElement).value }
                       this.draftCriteria = criteria
+                      this.saveError = ''
+                    }}
+                  />
+                  <input
+                    class="questionaire-pane-create-question-short-answer-input questionaire-pane-create-question-short-answer-criterion-points"
+                    type="number"
+                    min="1"
+                    step="1"
+                    required
+                    aria-label=${`Criterion ${index + 1} weight in points`}
+                    .value=${String(criterion.points)}
+                    @change=${(event: Event) => {
+                      const points = Number((event.currentTarget as HTMLInputElement).value)
+                      if (!Number.isInteger(points) || points < 1) {
+                        this.saveError = 'Each grading criterion needs a positive whole-number weight.'
+                        return
+                      }
+                      const criteria = this.draftCriteria.slice()
+                      criteria[index] = { ...criteria[index], points }
+                      this.draftCriteria = criteria
+                      this.saveError = ''
                     }}
                   />
                   <button
@@ -277,13 +313,16 @@ export default class QuestionairePaneCreateQuestionShortAnswer extends Questiona
                     aria-label="Remove criterion"
                     @click=${() => {
                       this.draftCriteria = this.draftCriteria.filter((_, criterionIndex) => criterionIndex !== index)
+                      this.saveError = ''
                     }}
                   >Remove</button>
                 </div>
               `)
-              : html`<div class="questionaire-pane-create-question-short-answer-criteria-note">Accepted answers remain the fallback when no criteria are added. Each criterion is worth one point.</div>`}
+              : html`<div class="questionaire-pane-create-question-short-answer-criteria-note">Accepted answers remain the fallback when no criteria are added. Give each criterion a point weight to control its share of the total score.</div>`}
           </div>
         ` : ''}
+
+        ${this.saveError ? html`<p class="questionaire-pane-create-question-short-answer-save-error" role="alert">${this.saveError}</p>` : ''}
 
         <questionaire-pane-create-question-footer
           .points=${String(points)}

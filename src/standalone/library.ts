@@ -3,6 +3,7 @@ import { disco } from '../namespaces'
 import { createContainerIfMissing, createDocumentIfMissing } from '../service/types'
 import { questionairePredicates } from '../service/predicates'
 import { loadQuestionaireQuestionSummaries } from '../service/questionQueries'
+import { createNotificationId, isInboxNotificationRead } from '../service/inboxNotifications'
 
 const pim = Namespace('http://www.w3.org/ns/pim/space#')
 const solid = Namespace('http://www.w3.org/ns/solid/terms#')
@@ -30,6 +31,9 @@ export interface QuestionnaireEntry {
 
 export interface SharedQuestionnaireEntry extends QuestionnaireEntry {
   notification?: NamedNode
+  notificationId?: string
+  read?: boolean
+  unavailableReason?: string
   stored?: boolean
   sharedBy: {
     uri: string
@@ -42,6 +46,9 @@ export interface SharedStudyDeckEntry {
   title: string
   cardCount: number
   notification: NamedNode
+  notificationId?: string
+  read?: boolean
+  unavailableReason?: string
   stored?: boolean
   sharedBy: {
     uri: string
@@ -179,15 +186,30 @@ export async function discoverInboxSharedQuestionnaires (
       const subject = store.any(notification, quiz('sharedQuestionnaire'), undefined, notification.doc())
       if (subject?.termType !== 'NamedNode') continue
       const questionnaireSubject = subject as NamedNode
-      await load(store, questionnaireSubject)
-      const publishedSubject = await publishedQuestionnaireForTake(store, questionnaireSubject)
+      let publishedSubject = questionnaireSubject
+      let unavailableReason: string | undefined
+      try {
+        await load(store, questionnaireSubject)
+        publishedSubject = await publishedQuestionnaireForTake(store, questionnaireSubject)
+      } catch {
+        unavailableReason = 'This shared questionnaire is no longer available. Ask the sender to reshare it.'
+      }
       const creator = store.any(notification, quiz('sharedBy'), undefined, notification.doc())
-      const questionnaire = entriesFromSubjects(store, [publishedSubject], new Map())[0]
-      if (!questionnaire) continue
+      const questionnaire = entriesFromSubjects(store, [publishedSubject], new Map())[0] ?? {
+        subject: publishedSubject,
+        title: store.anyValue(notification, dct('title'), undefined, notification.doc()) ?? 'Shared questionnaire',
+        description: '',
+        kind: 'quiz' as const,
+        questionCount: 0,
+        indexes: { public: false, private: false }
+      }
       const creatorNode = creator?.termType === 'NamedNode' ? creator as NamedNode : undefined
       const entry = {
         ...questionnaire,
         notification,
+        notificationId: store.anyValue(notification, quiz('notificationId'), undefined, notification.doc()) ?? notification.uri,
+        read: isInboxNotificationRead(store, notification),
+        unavailableReason,
         sharedBy: {
           uri: creatorNode?.uri ?? '',
           label: creatorNode ? labelFor(store, creatorNode) : 'Someone'
@@ -322,14 +344,23 @@ export async function discoverInboxSharedStudyDecks (
       const target = store.any(notification, quiz('sharedStudyDeck'), undefined, notification.doc())
       if (target?.termType !== 'NamedNode') continue
       const deck = target as NamedNode
-      await load(store, deck)
+      let unavailableReason: string | undefined
+      try {
+        await load(store, deck)
+      } catch {
+        unavailableReason = 'These study cards are no longer available. Ask the sender to reshare them.'
+      }
       const creator = store.any(notification, quiz('sharedBy'), undefined, notification.doc())
       const creatorNode = creator?.termType === 'NamedNode' ? creator as NamedNode : undefined
       const entry: SharedStudyDeckEntry = {
         uri: deck.uri,
-        title: store.anyValue(sym(`${deck.uri}#deck`), quiz('name'), undefined, deck.doc()) ?? 'Study cards',
-        cardCount: store.each(sym(`${deck.uri}#deck`), quiz('studyCard'), undefined, deck.doc()).length,
+        title: store.anyValue(sym(`${deck.uri}#deck`), quiz('name'), undefined, deck.doc()) ??
+          store.anyValue(notification, dct('title'), undefined, notification.doc()) ?? 'Study cards',
+        cardCount: unavailableReason ? 0 : store.each(sym(`${deck.uri}#deck`), quiz('studyCard'), undefined, deck.doc()).length,
         notification,
+        notificationId: store.anyValue(notification, quiz('notificationId'), undefined, notification.doc()) ?? notification.uri,
+        read: isInboxNotificationRead(store, notification),
+        unavailableReason,
         sharedBy: {
           uri: creatorNode?.uri ?? '',
           label: creatorNode ? labelFor(store, creatorNode) : 'Someone'
@@ -365,6 +396,9 @@ export async function sendQuestionnaireShareNotification (
 <> a quiz:QuestionnaireShare ;
     quiz:sharedQuestionnaire <${questionnaire.uri}> ;
     quiz:sharedBy <${sender.uri}> ;
+    quiz:notificationId "${createNotificationId()}" ;
+    quiz:notificationVersion 1 ;
+    quiz:read false ;
     dct:created "${new Date().toISOString()}"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
 `
   const response = await store.fetcher.webOperation('POST', inbox.uri, {
@@ -392,6 +426,9 @@ export async function sendStudyDeckShareNotification (
 <> a quiz:StudyDeckShare ;
     quiz:sharedStudyDeck <${deck.uri}> ;
     quiz:sharedBy <${sender.uri}> ;
+    quiz:notificationId "${createNotificationId()}" ;
+    quiz:notificationVersion 1 ;
+    quiz:read false ;
     dct:created "${new Date().toISOString()}"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
 `,
     contentType: 'text/turtle'

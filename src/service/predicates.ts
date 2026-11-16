@@ -42,6 +42,9 @@ export const questionairePredicates = {
     hint: quiz('hint'),
     explanation: quiz('explanation'),
     gradingCriteria: quiz('gradingCriteria'),
+    gradingCriterion: quiz('gradingCriterion'),
+    criterionText: quiz('criterionText'),
+    criterionPoints: quiz('criterionPoints'),
     points: quiz('points'),
     rdfType: rdf('type'),
     // Schema.org: linked suggested and accepted answer resources.

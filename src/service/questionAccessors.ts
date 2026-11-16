@@ -1,5 +1,6 @@
 import { type LiveStore, type NamedNode } from 'rdflib'
 import { questionairePredicates } from './predicates'
+import type { GradingCriterion } from './shortAnswerSidecarClient'
 
 export function readQuestionValue (
   store: LiveStore,
@@ -32,9 +33,7 @@ export function readQuestionValues (
   const predicate = questionairePredicates.question[resolvedField]
 
   if (field === 'gradingCriteria') {
-    return store.statementsMatching(question, predicate, undefined, question.doc())
-      .map((statement) => statement.object.value)
-      .filter(Boolean)
+    return readQuestionGradingCriteria(store, question).map(({ criterion }) => criterion)
   }
 
   if (field === 'leftItem' || field === 'rightItem') {
@@ -153,6 +152,39 @@ export function readQuestionValues (
         question.doc()
       )?.value ?? ''
     })
+}
+
+export function readQuestionGradingCriteria (
+  store: LiveStore,
+  question: NamedNode
+): GradingCriterion[] {
+  const document = question.doc()
+  const predicate = questionairePredicates.question.gradingCriterion
+  const linkedCriteria = store.statementsMatching(question, predicate, undefined, document)
+    .filter(statement => statement.object.termType === 'NamedNode')
+    .map(statement => statement.object as NamedNode)
+    .map(resource => ({
+      resource,
+      criterion: store.any(resource, questionairePredicates.question.criterionText, undefined, document)?.value ?? '',
+      points: Number(store.any(resource, questionairePredicates.question.criterionPoints, undefined, document)?.value ?? 1),
+      position: Number(store.any(resource, questionairePredicates.question.position, undefined, document)?.value ?? 0)
+    }))
+    .filter(({ criterion, points }) => criterion.trim() && Number.isInteger(points) && points > 0)
+    .sort((left, right) => left.position - right.position)
+
+  if (linkedCriteria.length > 0) {
+    return linkedCriteria.map(({ criterion, points }) => ({ criterion, points }))
+  }
+
+  return store.statementsMatching(
+    question,
+    questionairePredicates.question.gradingCriteria,
+    undefined,
+    document
+  )
+    .map(statement => statement.object.value.trim())
+    .filter(Boolean)
+    .map(criterion => ({ criterion, points: 1 }))
 }
 
 export function readQuestionTypeUri (

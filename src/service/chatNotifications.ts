@@ -1,10 +1,12 @@
 import { graph, literal, Namespace, serialize, sym, type LiveStore, type NamedNode } from 'rdflib'
 import type { FriendConversation } from './friendChatClient'
+import { createNotificationId, isInboxNotificationRead } from './inboxNotifications'
 
 const quiz = Namespace('https://sharonstrats.github.io/solidnext-vocab/vocab/quiz#')
 const dct = Namespace('http://purl.org/dc/terms/')
 const ldp = Namespace('http://www.w3.org/ns/ldp#')
 const rdf = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
+const xsd = Namespace('http://www.w3.org/2001/XMLSchema#')
 
 export interface ChatInboxNotification {
   uri: string
@@ -12,6 +14,8 @@ export interface ChatInboxNotification {
   sender: string
   created: string
   message: string
+  notificationId: string
+  read: boolean
 }
 
 export async function sendChatInboxNotifications (
@@ -32,6 +36,9 @@ export async function sendChatInboxNotifications (
     data.add(document, dct('creator'), sender, document)
     data.add(document, dct('created'), literal(new Date().toISOString()), document)
     data.add(document, dct('description'), literal(kind === 'invitation' ? 'You have been invited to a chat.' : 'There is a new message in your chat.'), document)
+    data.add(document, quiz('notificationId'), literal(createNotificationId()), document)
+    data.add(document, quiz('notificationVersion'), literal('1', xsd('integer')), document)
+    data.add(document, quiz('read'), literal('false', xsd('boolean')), document)
     for (const participant of conversation.participantWebIds) data.add(document, quiz('participant'), sym(participant), document)
     const turtle = serialize(document, data, document.uri, 'text/turtle')
     if (typeof turtle !== 'string') throw new Error('Unable to serialize the chat inbox notification.')
@@ -61,10 +68,13 @@ export async function loadChatInboxNotifications (store: LiveStore, me: NamedNod
       const conversationId = store.anyValue(notification, dct('identifier'), undefined, document.doc())
       if (!conversationId || !/^[a-f0-9]{32}$/.test(conversationId)) continue
       notifications.push({
-        uri: document.uri, conversationId,
+        uri: notification.uri,
+        conversationId,
         sender: store.anyValue(notification, dct('creator'), undefined, document.doc()) || '',
         created: store.anyValue(notification, dct('created'), undefined, document.doc()) || '',
-        message: store.anyValue(notification, dct('description'), undefined, document.doc()) || 'Chat notification'
+        message: store.anyValue(notification, dct('description'), undefined, document.doc()) || 'Chat notification',
+        notificationId: store.anyValue(notification, quiz('notificationId'), undefined, document.doc()) || notification.uri,
+        read: isInboxNotificationRead(store, notification)
       })
     }
   }

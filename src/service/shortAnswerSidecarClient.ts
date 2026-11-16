@@ -63,13 +63,17 @@ export function toGradingRequest (input: ShortAnswerSidecarInput): GradingReques
   }
 }
 
-function isGradingResponse (value: unknown): value is GradingResponse {
+function isGradingResponse (value: unknown, expectedMaxScore: number): value is GradingResponse {
   if (!value || typeof value !== 'object') return false
   const response = value as Record<string, unknown>
   return (
     (response.decision === 'correct' || response.decision === 'partial' || response.decision === 'needs-review') &&
     Number.isInteger(response.score) &&
+    (response.score as number) >= 0 &&
     Number.isInteger(response.maxScore) &&
+    response.maxScore === expectedMaxScore &&
+    (response.maxScore as number) > 0 &&
+    (response.score as number) <= (response.maxScore as number) &&
     typeof response.confidence === 'number' &&
     response.confidence >= 0 &&
     response.confidence <= 1 &&
@@ -103,6 +107,14 @@ export class ShortAnswerSidecarClient {
 
   async grade (input: ShortAnswerSidecarInput): Promise<GradingResponse> {
     const request = toGradingRequest(input)
+    const rubricMaxScore = request.rubric.reduce((sum, criterion) => sum + criterion.points, 0)
+    if (
+      request.rubric.length === 0 ||
+      request.rubric.some(criterion => !Number.isInteger(criterion.points) || criterion.points < 1) ||
+      rubricMaxScore !== request.maxScore
+    ) {
+      throw new ShortAnswerSidecarError('Rubric weights must be positive whole numbers that sum to maxScore', 'malformed')
+    }
     let response: Response
     try {
       response = await this.requestFetch(this.url, {
@@ -127,7 +139,7 @@ export class ShortAnswerSidecarClient {
     } catch {
       throw new ShortAnswerSidecarError('Sidecar returned invalid JSON', 'malformed', response.status)
     }
-    if (!isGradingResponse(body)) {
+    if (!isGradingResponse(body, request.maxScore)) {
       throw new ShortAnswerSidecarError('Sidecar returned a malformed grading response', 'malformed', response.status)
     }
     return body

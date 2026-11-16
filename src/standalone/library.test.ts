@@ -21,6 +21,7 @@ import {
 const solid = (name: string) => sym(`http://www.w3.org/ns/solid/terms#${name}`)
 const rdf = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
 const ldp = Namespace('http://www.w3.org/ns/ldp#')
+const quiz = Namespace('https://sharonstrats.github.io/solidnext-vocab/vocab/quiz#')
 
 describe('type-index questionnaire registrations', () => {
   it('reports registrations independently for public and private indexes', async () => {
@@ -85,13 +86,39 @@ describe('questionnaire Pod crawling', () => {
       store.add(st(deck, quiz('studyCard'), sym(`${deckDocument.uri}#card-1`), deckDocument))
       store.fetcher = { load: vi.fn().mockResolvedValue(undefined) }
 
-      await expect(discoverInboxSharedStudyDecks(store, me)).resolves.toEqual([{
+      await expect(discoverInboxSharedStudyDecks(store, me)).resolves.toMatchObject([{
         uri: deckDocument.uri,
         title: 'Biology',
         cardCount: 1,
         notification,
+        notificationId: notification.uri,
+        read: false,
         sharedBy: { uri: sender.uri, label: 'profile' }
       }])
+    })
+
+    it('keeps a shared deck notification visible when access to the deck is revoked', async () => {
+      const store = graph() as any
+      const me = sym('https://recipient.example/profile/card#me')
+      const inbox = sym('https://recipient.example/inbox/')
+      const notification = sym('https://recipient.example/inbox/deck-share')
+      const deck = sym('https://sender.example/study-decks/private/index.ttl')
+      store.add(st(me, ldp('inbox'), inbox, me.doc()))
+      store.add(st(inbox, ldp('contains'), notification, inbox.doc()))
+      store.add(st(notification, rdf('type'), quiz('StudyDeckShare'), notification.doc()))
+      store.add(st(notification, quiz('sharedStudyDeck'), deck, notification.doc()))
+      store.fetcher = {
+        load: vi.fn(async (resource: { uri?: string }) => {
+          if (resource.uri === deck.uri) throw new Error('403 Forbidden')
+          return new Response('', { status: 200 })
+        })
+      }
+
+      const entries = await discoverInboxSharedStudyDecks(store, me)
+
+      expect(entries).toHaveLength(1)
+      expect(entries[0].unavailableReason).toContain('no longer available')
+      expect(entries[0].cardCount).toBe(0)
     })
 
     it('stores the original deck URI in the recipient-owned learning library', async () => {
@@ -137,6 +164,9 @@ describe('questionnaire Pod crawling', () => {
       await sendStudyDeckShareNotification(store, sender, recipient, deck)
       expect(webOperation.mock.calls[0][2].data).toContain('quiz:StudyDeckShare')
       expect(webOperation.mock.calls[0][2].data).toContain(deck.uri)
+      expect(webOperation.mock.calls[0][2].data).toContain('quiz:notificationId')
+      expect(webOperation.mock.calls[0][2].data).toContain('quiz:notificationVersion 1')
+      expect(webOperation.mock.calls[0][2].data).toContain('quiz:read false')
       webOperation.mockResolvedValueOnce(new Response('', { status: 403 }))
       await expect(sendStudyDeckShareNotification(store, sender, recipient, deck))
         .rejects.toThrow('HTTP 403')
@@ -254,6 +284,32 @@ describe('questionnaire Pod crawling', () => {
       expect(entries[0].notification).toEqual(duplicateNotification)
     })
 
+    it('keeps a share visible when its published questionnaire can no longer be loaded', async () => {
+      const store = graph() as any
+      const me = sym('https://recipient.example/profile/card#me')
+      const inbox = sym('https://recipient.example/inbox/')
+      const notification = sym('https://recipient.example/inbox/revoked-share')
+      const published = sym('https://sender.example/questionnaires/example/published/1/index.ttl#this')
+      const sender = sym('https://sender.example/profile/card#me')
+      store.add(st(me, ldp('inbox'), inbox, me.doc()))
+      store.add(st(inbox, ldp('contains'), notification, inbox.doc()))
+      store.add(st(notification, rdf('type'), quiz('QuestionnaireShare'), notification.doc()))
+      store.add(st(notification, quiz('sharedQuestionnaire'), published, notification.doc()))
+      store.add(st(notification, quiz('sharedBy'), sender, notification.doc()))
+      store.fetcher = {
+        load: vi.fn(async (resource: { uri?: string }) => {
+          if (resource.uri === published.doc().uri) throw new Error('403 Forbidden')
+          return new Response('', { status: 200 })
+        })
+      }
+
+      const entries = await discoverInboxSharedQuestionnaires(store, me)
+
+      expect(entries).toHaveLength(1)
+      expect(entries[0].unavailableReason).toContain('no longer available')
+      expect(entries[0].notification).toEqual(notification)
+    })
+
     it('posts a Turtle share record to the recipient inbox', async () => {
       const store = graph() as any
       const sender = sym('https://sender.example/profile/card#me')
@@ -276,6 +332,9 @@ describe('questionnaire Pod crawling', () => {
       }))
       expect(webOperation.mock.calls[0][2].data).toContain(questionnaire.uri)
       expect(webOperation.mock.calls[0][2].data).toContain(sender.uri)
+      expect(webOperation.mock.calls[0][2].data).toContain('quiz:notificationId')
+      expect(webOperation.mock.calls[0][2].data).toContain('quiz:notificationVersion 1')
+      expect(webOperation.mock.calls[0][2].data).toContain('quiz:read false')
     })
 
     it('surfaces failed questionnaire notification delivery', async () => {

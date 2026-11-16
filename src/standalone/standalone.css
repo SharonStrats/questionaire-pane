@@ -361,6 +361,9 @@ button, input { font: inherit; }
 .questionnaire-results { display: grid; gap: 12px; padding: 0; list-style: none; }
 .questionnaire-result, .empty-results { padding: 16px; border: 1px solid #dfe3ea; border-radius: 8px; }
 .study-card-review { display: grid; gap: 12px; padding: 14px 16px; background: #fff; }
+.study-card-review-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.study-card-review-actions button { min-height: 34px; padding: 7px 12px; border: 1px solid #dfe3ea; border-radius: 7px; color: #344054; background: #fff; cursor: pointer; }
+.study-card-review-actions button:disabled { cursor: not-allowed; opacity: .55; }
 .study-card-review-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #17213a; font-size: 12px; }
 .study-card-review-header span { padding: 4px 8px; border-radius: 999px; color: #8a5b00; background: #fff1cf; font-size: 8px; font-weight: 700; letter-spacing: .5px; }
 .study-card-review-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; }
@@ -402,6 +405,8 @@ button, input { font: inherit; }
   .study-card-question { min-height: 150px; padding: 22px 20px; }
   .study-card-question > p { font-size: 18px; }
   .study-card-choices { grid-template-columns: 1fr; }
+  .study-card-review-actions { display: grid; grid-template-columns: 1fr; }
+  .study-card-review-actions button { width: 100%; }
   .study-card-review-fields { grid-template-columns: 1fr; }
   .study-card-review-fields label + label { border-top: 1px solid #e5e7eb; border-left: 0; }
   .study-card-how > div { grid-template-columns: 1fr; }
