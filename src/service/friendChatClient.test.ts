@@ -15,6 +15,7 @@ const mock = vi.hoisted(() => ({
 }))
 
 vi.mock('socket.io-client', () => ({ io: () => mock.socket }))
+vi.mock('./realtimeTicket', () => ({ fetchRealtimeTicket: vi.fn(async () => 'test-ticket') }))
 
 describe('friend chat client', () => {
   beforeEach(() => {

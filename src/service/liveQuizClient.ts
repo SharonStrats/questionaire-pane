@@ -1,4 +1,5 @@
 import { io, type Socket } from 'socket.io-client'
+import { fetchRealtimeTicket } from './realtimeTicket'
 
 export interface LiveQuizPlayer {
   id: string
@@ -29,24 +30,32 @@ export interface LiveQuizChatMessage {
   timestamp: number
 }
 
-type LiveQuizSocket = Pick<Socket, 'connect' | 'disconnect' | 'emit' | 'on' | 'off' | 'once'>
+type LiveQuizSocket = Pick<Socket, 'connect' | 'disconnect' | 'emit' | 'on' | 'off' | 'once'> & {
+  auth: Socket['auth']
+}
 
 export interface LiveQuizClientOptions {
   endpoint: string
   socketFactory?: (endpoint: string, options: { autoConnect: boolean }) => LiveQuizSocket
+  ticketProvider?: (endpoint: string) => Promise<string>
 }
 
 export class LiveQuizClient {
   private readonly socket: LiveQuizSocket
+  private readonly endpoint: string
+  private readonly ticketProvider: (endpoint: string) => Promise<string>
 
   constructor (options: LiveQuizClientOptions) {
     const endpoint = options.endpoint.trim()
     if (!endpoint) throw new Error('A realtime game endpoint is required.')
+    this.endpoint = endpoint
+    this.ticketProvider = options.ticketProvider ?? fetchRealtimeTicket
     this.socket = (options.socketFactory ?? io)(endpoint, { autoConnect: false })
   }
 
   connect (): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return this.ticketProvider(this.endpoint).then(ticket => new Promise((resolve, reject) => {
+      this.socket.auth = { ticket }
       const onConnect = (): void => {
         cleanup()
         resolve()
@@ -62,7 +71,7 @@ export class LiveQuizClient {
       this.socket.once('connect', onConnect)
       this.socket.once('connect_error', onError)
       this.socket.connect()
-    })
+    }))
   }
 
   onState (listener: (state: LiveQuizState) => void): () => void {

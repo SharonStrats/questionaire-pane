@@ -1,4 +1,5 @@
 import { io, type Socket } from 'socket.io-client'
+import { fetchRealtimeTicket } from './realtimeTicket'
 
 export interface FriendChatPerson {
   uri: string
@@ -42,7 +43,12 @@ export class FriendChatClient {
   onIncoming?: (message: FriendMessage) => void
   onInvitation?: (conversation: FriendConversation) => void
 
-  constructor (readonly webId: string, private readonly name: string, endpoint: string) {
+  constructor (
+    readonly webId: string,
+    private readonly name: string,
+    private readonly endpoint: string,
+    private readonly ticketProvider: (endpoint: string) => Promise<string> = fetchRealtimeTicket
+  ) {
     this.socket = io(endpoint, { autoConnect: false, timeout: 5000 })
     this.socket.on('connect', () => this.register())
     this.socket.on('connect_error', () => {
@@ -80,13 +86,18 @@ export class FriendChatClient {
   }
 
   connect (): void {
-    this.socket.connect()
+    void this.ticketProvider(this.endpoint).then(ticket => {
+      this.socket.auth = { ticket }
+      this.socket.connect()
+    }).catch(error => {
+      this.update({ connection: 'disconnected', online: [], error: error instanceof Error ? error.message : 'Realtime authentication failed.' })
+    })
   }
 
   retry (): void {
     this.update({ connection: 'connecting', error: '' })
     if (this.socket.connected) this.register()
-    else this.socket.connect()
+    else this.connect()
   }
 
   private register (): void {

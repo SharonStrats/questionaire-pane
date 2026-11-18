@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LiveQuizClient } from './liveQuizClient'
 
+vi.mock('./realtimeTicket', () => ({ fetchRealtimeTicket: vi.fn(async () => 'test-ticket') }))
+
 const socket = {
+  auth: {},
   connect: vi.fn(),
   disconnect: vi.fn(),
   emit: vi.fn(),
