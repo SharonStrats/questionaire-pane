@@ -9,6 +9,16 @@ export interface EssayFeedback {
   overallFeedback: string
   strengths: string[]
   areasToImprove: string[]
+  criterionFeedback?: Array<{
+    criterion: string
+    score?: number
+    maxScore?: number
+    assessment: string
+    evidence: string
+    nextStep: string
+    exampleRevision?: string
+  }>
+  nextChallenge?: string
   paragraphFeedback: Array<{ paragraph: number, feedback: string, suggestion: string }>
   needsReview: boolean
 }
@@ -26,6 +36,19 @@ export function isEssayFeedback (value: unknown): value is EssayFeedback {
   return typeof result.overallFeedback === 'string' &&
     Array.isArray(result.strengths) && result.strengths.every(item => typeof item === 'string') &&
     Array.isArray(result.areasToImprove) && result.areasToImprove.every(item => typeof item === 'string') &&
+    (result.criterionFeedback === undefined ||
+      (Array.isArray(result.criterionFeedback) && result.criterionFeedback.every(item => {
+        if (!item || typeof item !== 'object') return false
+        const criterion = item as Record<string, unknown>
+        return typeof criterion.criterion === 'string' &&
+          (criterion.score === undefined || (typeof criterion.score === 'number' && Number.isInteger(criterion.score) && criterion.score >= 1 && criterion.score <= 5)) &&
+          (criterion.maxScore === undefined || criterion.maxScore === 5) &&
+          typeof criterion.assessment === 'string' &&
+          typeof criterion.evidence === 'string' &&
+          typeof criterion.nextStep === 'string' &&
+          (criterion.exampleRevision === undefined || typeof criterion.exampleRevision === 'string')
+      }))) &&
+    (result.nextChallenge === undefined || typeof result.nextChallenge === 'string') &&
     Array.isArray(result.paragraphFeedback) &&
     result.paragraphFeedback.every(item => {
       if (!item || typeof item !== 'object') return false

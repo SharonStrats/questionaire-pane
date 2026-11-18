@@ -16,19 +16,11 @@
   gap: 16px;
 }
 
-.questionaire-pane-create-question-base-type {
-  margin: 0 0 4px;
-  color: var(--solid-ui-color-slate-400, #94A3B8);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .questionaire-pane-create-question-base-title {
   margin: 0;
   color: var(--solid-ui-color-slate-900, #1E293B);
-  font-size: 18px;
+  font-family: var(--font-family-ui, "Atkinson Hyperlegible Next", "Inter", sans-serif);
+  font-size: 1rem;
   font-weight: 600;
 }
 

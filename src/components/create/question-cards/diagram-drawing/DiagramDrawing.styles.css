@@ -1,0 +1,30 @@
+:host {
+  display: block;
+}
+
+.questionaire-pane-create-question-diagram-drawing {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem;
+}
+
+.questionaire-pane-create-question-diagram-drawing-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.questionaire-pane-create-question-diagram-drawing-field label {
+  font-weight: 600;
+}
+
+.questionaire-pane-create-question-diagram-drawing-note {
+  margin: 0;
+  color: var(--color-text-secondary, #5f5a70);
+}
+
+.questionaire-pane-create-question-diagram-drawing-error {
+  margin: 0;
+  color: var(--color-danger, #b42318);
+}

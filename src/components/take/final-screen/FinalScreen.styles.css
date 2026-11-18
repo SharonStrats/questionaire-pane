@@ -8,6 +8,498 @@
   padding: 24px 0;
 }
 
+.questionaire-pane-take-final-screen--review {
+  display: block;
+  min-height: 100vh;
+  padding: 0;
+  background: #f4f6fb;
+  color: #202942;
+  text-align: left;
+}
+
+.questionaire-pane-take-final-screen-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 74px;
+  padding: 10px 28px;
+  border-top: 4px solid #1e293b;
+  border-bottom: 1px solid #dfe3eb;
+  background: #fff;
+}
+
+.questionaire-pane-take-final-screen-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.questionaire-pane-take-final-screen-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 12px;
+  background: #6c5ce7;
+  color: #fff;
+  font-size: 19px;
+}
+
+.questionaire-pane-take-final-screen-brand strong,
+.questionaire-pane-take-final-screen-brand small {
+  display: block;
+}
+
+.questionaire-pane-take-final-screen-brand strong {
+  overflow: hidden;
+  color: #202942;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.questionaire-pane-take-final-screen-brand small {
+  margin-top: 3px;
+  color: #778198;
+  font-size: 9px;
+}
+
+.questionaire-pane-take-final-screen-top-score {
+  display: grid;
+  gap: 4px;
+  text-align: right;
+}
+
+.questionaire-pane-take-final-screen-top-score span {
+  color: #7d8799;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.questionaire-pane-take-final-screen-top-score strong {
+  color: #202942;
+  font-size: 16px;
+}
+
+.questionaire-pane-take-final-screen-review-layout {
+  display: grid;
+  grid-template-columns: minmax(270px, 314px) minmax(0, 1fr);
+  min-height: calc(100vh - 74px);
+}
+
+.questionaire-pane-take-final-screen-sidebar {
+  padding: 48px 30px 28px;
+  border-right: 1px solid #dfe3eb;
+  background: #fcfcfe;
+}
+
+.questionaire-pane-take-final-screen-sidebar-kicker {
+  margin: 0 0 26px;
+  color: #6254ed;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.questionaire-pane-take-final-screen-score-ring {
+  display: grid;
+  place-items: center;
+  width: 120px;
+  height: 120px;
+  margin-bottom: 24px;
+  border-radius: 50%;
+  background: conic-gradient(#20ad8c var(--score-angle), #dcf5ee 0);
+  filter: drop-shadow(0 8px 10px rgba(32, 173, 140, 0.1));
+}
+
+.questionaire-pane-take-final-screen-score-ring > span {
+  display: grid;
+  place-content: center;
+  width: 102px;
+  height: 102px;
+  border-radius: 50%;
+  background: #fcfcfe;
+  text-align: center;
+}
+
+.questionaire-pane-take-final-screen-score-ring strong {
+  color: #202942;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.questionaire-pane-take-final-screen-score-ring small {
+  margin-top: 5px;
+  color: #168d72;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.questionaire-pane-take-final-screen-sidebar h1 {
+  margin: 0;
+  color: #202942;
+  font-size: 23px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+}
+
+.questionaire-pane-take-final-screen-sidebar-copy {
+  margin: 14px 0 22px;
+  color: #64708a;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.questionaire-pane-take-final-screen-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  margin-bottom: 38px;
+  border: 1px solid #dce1ea;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.questionaire-pane-take-final-screen-stats > div {
+  display: grid;
+  gap: 7px;
+  justify-items: center;
+  padding: 13px 4px 11px;
+}
+
+.questionaire-pane-take-final-screen-stats > div + div {
+  border-left: 1px solid #e8ebf1;
+}
+
+.questionaire-pane-take-final-screen-stats strong {
+  color: #202942;
+  font-size: 14px;
+}
+
+.questionaire-pane-take-final-screen-stats span {
+  color: #7d8799;
+  font-size: 7px;
+  text-transform: uppercase;
+}
+
+.questionaire-pane-take-final-screen-deck > p {
+  margin: 0 0 14px;
+  color: #778198;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.questionaire-pane-take-final-screen-deck nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.questionaire-pane-take-final-screen-deck-item {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.questionaire-pane-take-final-screen-deck-item.is-review {
+  background: #ffe8ec;
+  color: #bd3349;
+}
+
+.questionaire-pane-take-final-screen-deck-item.is-correct {
+  background: #e5f7f1;
+  color: #168d72;
+}
+
+.questionaire-pane-take-final-screen-deck-item[aria-current="step"] {
+  border: 2px solid currentColor;
+  background: #fff;
+}
+
+.questionaire-pane-take-final-screen-retry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 42px;
+  margin-top: 28px;
+  padding: 8px 12px;
+  border: 1px solid #dce1ea;
+  border-radius: 11px;
+  background: #fff;
+  color: #4a5873;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.questionaire-pane-take-final-screen-retry:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.questionaire-pane-take-final-screen-result-actions {
+  margin-top: 20px;
+}
+
+.questionaire-pane-take-final-screen-result-actions > p {
+  margin: 0 0 8px;
+  color: #778198;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.questionaire-pane-take-final-screen-result-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.questionaire-pane-take-final-screen-review-main {
+  min-width: 0;
+  padding: 40px clamp(22px, 6vw, 72px) 28px;
+  background:
+    radial-gradient(circle at 82% 7%, rgba(201, 246, 232, 0.54) 0 58px, transparent 60px),
+    #f4f6fb;
+}
+
+.questionaire-pane-take-final-screen-progress {
+  width: min(100%, 686px);
+  margin: 0 auto;
+}
+
+.questionaire-pane-take-final-screen-progress > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.questionaire-pane-take-final-screen-progress-label {
+  padding: 9px 14px;
+  border-radius: 11px;
+  background: #fff0d3;
+  color: #925300;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.questionaire-pane-take-final-screen-progress-count {
+  color: #8a93a6;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.questionaire-pane-take-final-screen-progress-track {
+  height: 3px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #e3e7ef;
+}
+
+.questionaire-pane-take-final-screen-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #21ad8c;
+  transition: width 180ms ease;
+}
+
+.questionaire-pane-take-final-screen-review-card {
+  width: min(100%, 686px);
+  min-height: 420px;
+  margin: 40px auto 0;
+  padding: 44px;
+  border: 1px solid #f3c98f;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 20px 50px rgba(44, 54, 80, 0.08);
+}
+
+.questionaire-pane-take-final-screen-question-type {
+  display: block;
+  margin-bottom: 24px;
+  padding: 9px 13px;
+  border-radius: 10px;
+  background: #ffebe6;
+  color: #c14a37;
+  font-size: 8px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.questionaire-pane-take-final-screen-review-card h2 {
+  margin: 0 0 30px;
+  color: #202942;
+  font-size: clamp(25px, 3.2vw, 36px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.12;
+}
+
+.questionaire-pane-take-final-screen-answer-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+  border: 1px solid #dce1ea;
+  border-radius: 16px;
+}
+
+.questionaire-pane-take-final-screen-answer-comparison > div {
+  min-height: 102px;
+  padding: 24px 16px;
+  background: #fafbfd;
+}
+
+.questionaire-pane-take-final-screen-answer-comparison > div + div {
+  border-left: 1px solid #dce1ea;
+}
+
+.questionaire-pane-take-final-screen-answer-comparison > div > span {
+  color: #7d8799;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.questionaire-pane-take-final-screen-answer-comparison p {
+  margin: 16px 0 0;
+  color: #4a5873;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.questionaire-pane-take-final-screen-answer-comparison .questionaire-pane-take-final-screen-correct-answer {
+  background: #effaf7;
+}
+
+.questionaire-pane-take-final-screen-correct-answer p {
+  color: #07866c;
+}
+
+.questionaire-pane-take-final-screen-why {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 32px;
+  padding: 16px;
+  border-radius: 16px;
+  background: #fff6e4;
+}
+
+.questionaire-pane-take-final-screen-why-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 12px;
+  background: #ffebbf;
+  color: #98610c;
+}
+
+.questionaire-pane-take-final-screen-why strong {
+  display: block;
+  margin: 3px 0 8px;
+  color: #8d5600;
+  font-size: 9px;
+}
+
+.questionaire-pane-take-final-screen-why p {
+  margin: 0;
+  color: #715b36;
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.questionaire-pane-take-final-screen-feedback,
+.questionaire-pane-take-final-screen-confidence {
+  margin: 16px 0 0;
+  color: #64708a;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.questionaire-pane-take-final-screen-feedback strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #4a5873;
+}
+
+.questionaire-pane-take-final-screen-review-navigation {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  width: min(100%, 686px);
+  margin: 44px auto 0;
+}
+
+.questionaire-pane-take-final-screen-review-navigation > span {
+  color: #7d8799;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.questionaire-pane-take-final-screen-review-navigation button {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid #dce1ea;
+  border-radius: 12px;
+  background: #fff;
+  color: #4a5873;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.questionaire-pane-take-final-screen-review-navigation button:last-child {
+  justify-self: end;
+  border-color: #6c5ce7;
+  background: #6c5ce7;
+  color: #fff;
+}
+
+.questionaire-pane-take-final-screen-review-navigation button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.questionaire-pane-take-final-screen-exit {
+  display: block;
+  margin: 12px 0 0 auto;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: #7d8799;
+  font: inherit;
+  font-size: 9px;
+  cursor: pointer;
+}
+
 .questionaire-pane-take-final-screen-card {
   width: min(100%, 560px);
   text-align: center;
@@ -233,6 +725,101 @@
 }
 
 @media (max-width: 620px) {
+  .questionaire-pane-take-final-screen-review-layout {
+    display: block;
+  }
+
+  .questionaire-pane-take-final-screen-sidebar {
+    padding: 22px 18px;
+    border-right: 0;
+    border-bottom: 1px solid #dfe3eb;
+  }
+
+  .questionaire-pane-take-final-screen-sidebar-kicker {
+    margin-bottom: 14px;
+  }
+
+  .questionaire-pane-take-final-screen-score-ring {
+    width: 96px;
+    height: 96px;
+    margin-bottom: 14px;
+  }
+
+  .questionaire-pane-take-final-screen-score-ring > span {
+    width: 82px;
+    height: 82px;
+  }
+
+  .questionaire-pane-take-final-screen-score-ring strong {
+    font-size: 25px;
+  }
+
+  .questionaire-pane-take-final-screen-sidebar h1 {
+    font-size: 21px;
+  }
+
+  .questionaire-pane-take-final-screen-sidebar-copy {
+    margin: 8px 0 16px;
+  }
+
+  .questionaire-pane-take-final-screen-stats {
+    margin-bottom: 20px;
+  }
+
+  .questionaire-pane-take-final-screen-deck nav {
+    gap: 6px;
+  }
+
+  .questionaire-pane-take-final-screen-review-main {
+    padding: 24px 16px 28px;
+  }
+
+  .questionaire-pane-take-final-screen-review-card {
+    min-height: 0;
+    margin-top: 24px;
+    padding: 24px 20px;
+    border-radius: 18px;
+  }
+
+  .questionaire-pane-take-final-screen-question-type {
+    margin-bottom: 18px;
+  }
+
+  .questionaire-pane-take-final-screen-review-card h2 {
+    margin-bottom: 22px;
+  }
+
+  .questionaire-pane-take-final-screen-answer-comparison {
+    grid-template-columns: 1fr;
+  }
+
+  .questionaire-pane-take-final-screen-answer-comparison > div {
+    min-height: 76px;
+    padding: 16px;
+  }
+
+  .questionaire-pane-take-final-screen-answer-comparison > div + div {
+    border-top: 1px solid #dce1ea;
+    border-left: 0;
+  }
+
+  .questionaire-pane-take-final-screen-answer-comparison p {
+    margin-top: 10px;
+  }
+
+  .questionaire-pane-take-final-screen-why {
+    margin-top: 22px;
+  }
+
+  .questionaire-pane-take-final-screen-review-navigation {
+    margin-top: 24px;
+  }
+
+  .questionaire-pane-take-final-screen-review-navigation button {
+    min-height: 44px;
+    padding: 0 10px;
+  }
+
   .questionaire-pane-take-final-screen-share {
     align-items: flex-start;
     flex-direction: column;

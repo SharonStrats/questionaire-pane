@@ -1,11 +1,14 @@
 import { html, nothing } from 'lit'
 import { customElement, WebComponent } from 'solid-ui'
+import 'solid-ui/components/combobox'
+import 'solid-ui/components/combobox-option'
 import { property, state } from 'lit/decorators.js'
 import type { LiveStore, NamedNode } from 'rdflib'
 import styles from './EnglishPractice.styles.css'
 import { englishParagraphPrompts } from '../../../data/englishParagraphPrompts'
 import { englishEssayPrompts } from '../../../data/englishEssayPrompts'
 import { EssayFeedbackClient, type EssayFeedback } from '../../../service/essayFeedbackClient'
+import { EnglishPromptGenerationClient, type GeneratedEnglishPrompt } from '../../../service/englishPromptGenerationClient'
 import {
   loadEnglishPracticeAttempts,
   loadEnglishPracticeDraft,
@@ -76,6 +79,18 @@ export default class EnglishPractice extends WebComponent {
   @state()
   private accessor peelDismissed = false
 
+  @state()
+  private accessor generatedPrompts: GeneratedEnglishPrompt[] = []
+
+  @state()
+  private accessor promptTopic = ''
+
+  @state()
+  private accessor promptDifficulty: 'easy' | 'medium' | 'hard' = 'medium'
+
+  @state()
+  private accessor generatingPrompts = false
+
   private draftTimer?: ReturnType<typeof setTimeout>
   private pendingDraftSave: Promise<void> = Promise.resolve()
   private draftDirty = false
@@ -89,7 +104,8 @@ export default class EnglishPractice extends WebComponent {
   }
 
   private get prompts () {
-    return this.practiceType === 'paragraph' ? englishParagraphPrompts : englishEssayPrompts
+    const curated = this.practiceType === 'paragraph' ? englishParagraphPrompts : englishEssayPrompts
+    return [...curated, ...this.generatedPrompts]
   }
 
   private get selectedPrompt () {
@@ -185,22 +201,59 @@ export default class EnglishPractice extends WebComponent {
   }
 
   private async changePracticeType (practiceType: EnglishPracticeType): Promise<void> {
-    if (practiceType === this.practiceType || !await this.flushPendingSave()) return
-    this.practiceType = practiceType
-    this.selectedPromptId = this.prompts[0].id
+    if (practiceType === this.practiceType) return
+    this.draftLoadGeneration++
+    this.loadingDraft = true
+    if (!await this.flushPendingSave()) {
+      this.loadingDraft = false
+      return
+    }
     this.responseText = ''
     this.feedback = undefined
+    this.generatedPrompts = []
+    this.practiceType = practiceType
+    this.selectedPromptId = this.prompts[0].id
     this.draftStatus = ''
-    await this.loadCurrentDraft()
+    this.loadingDraft = false
+  }
+
+  private async generatePrompts (): Promise<void> {
+    if (!this.endpoint || !this.promptTopic.trim() || this.generatingPrompts) return
+    this.generatingPrompts = true
+    this.error = ''
+    try {
+      this.generatedPrompts = await new EnglishPromptGenerationClient({ endpoint: this.endpoint }).generate({
+        yearLevel: 9,
+        curriculum: 'Australian Victorian Curriculum',
+        subject: 'English',
+        writingType: this.practiceType,
+        topic: this.promptTopic.trim(),
+        difficulty: this.promptDifficulty,
+        wordCount: this.practiceType === 'paragraph' ? { min: 100, max: 180 } : { min: 500, max: 800 },
+        count: 10
+      })
+      const firstPrompt = this.generatedPrompts[0]
+      if (firstPrompt) await this.changePrompt(firstPrompt.id)
+    } catch (error) {
+      this.error = error instanceof Error ? error.message : 'Unable to generate English prompts.'
+    } finally {
+      this.generatingPrompts = false
+    }
   }
 
   private async changePrompt (promptId: string): Promise<void> {
-    if (promptId === this.selectedPromptId || !await this.flushPendingSave()) return
-    this.selectedPromptId = promptId
+    if (promptId === this.selectedPromptId) return
+    this.draftLoadGeneration++
+    this.loadingDraft = true
+    if (!await this.flushPendingSave()) {
+      this.loadingDraft = false
+      return
+    }
     this.responseText = ''
     this.feedback = undefined
+    this.selectedPromptId = promptId
     this.draftStatus = ''
-    await this.loadCurrentDraft()
+    this.loadingDraft = false
   }
 
   private async showAttempts (): Promise<void> {
@@ -260,16 +313,21 @@ export default class EnglishPractice extends WebComponent {
     try {
       const feedback = await new EssayFeedbackClient({ endpoint: this.endpoint }).assess({
         essay: response,
-        assignment: this.selectedPrompt.prompt,
+        assignment: [
+          'Year level: 9',
+          `Writing format: ${this.practiceType}`,
+          `Expected length: ${this.selectedPrompt.suggestedWordRange}`,
+          `Task: ${this.selectedPrompt.prompt}`
+        ].join('\n'),
         paragraphCount,
         rubric: [
-          { criterion: 'Ideas and content: relevant and well developed ideas', points: 1 },
-          { criterion: 'Structure: logical organisation', points: 1 },
-          { criterion: 'Evidence: examples support the argument', points: 1 },
-          { criterion: 'Vocabulary: varied and appropriate language', points: 1 },
-          { criterion: 'Sentence construction: effective sentence variety', points: 1 },
-          { criterion: 'Grammar and punctuation: accurate writing', points: 1 },
-          { criterion: 'Critical thinking: explanation and analysis', points: 1 }
+          { criterion: 'Ideas and content: relevant, clear and sufficiently developed ideas', points: 5 },
+          { criterion: 'Structure: logical organisation appropriate to the requested writing format', points: 5 },
+          { criterion: 'Evidence and examples: relevant support that is specific and explained', points: 5 },
+          { criterion: 'Vocabulary: appropriate, precise and varied language', points: 5 },
+          { criterion: 'Sentence construction: clear, effective and appropriately varied sentences', points: 5 },
+          { criterion: 'Grammar and punctuation: accurate spelling, grammar, punctuation and sentence conventions', points: 5 },
+          { criterion: 'Critical thinking: explanation, analysis and evaluation appropriate to the task', points: 5 }
         ]
       })
       this.feedback = feedback
@@ -290,8 +348,7 @@ export default class EnglishPractice extends WebComponent {
     }
   }
 
-  private renderFeedback (feedback: EssayFeedback, response: string) {
-    const paragraphCount = response.trim().split(/\n\s*\n/).filter(Boolean).length || 1
+  private renderFeedback (feedback: EssayFeedback) {
     return html`
       <section class="english-practice-feedback" aria-label="AI writing feedback">
         <h3>AI feedback</h3>
@@ -300,9 +357,26 @@ export default class EnglishPractice extends WebComponent {
         <ul>${feedback.strengths.map(item => html`<li>${item}</li>`)}</ul>
         <h4>Areas to improve</h4>
         <ul>${feedback.areasToImprove.map(item => html`<li>${item}</li>`)}</ul>
-        ${feedback.paragraphFeedback.slice(0, paragraphCount).map(item => html`
-          <article><strong>Paragraph ${item.paragraph}</strong><p>${item.feedback}</p><small>Try: ${item.suggestion}</small></article>
-        `)}
+        ${feedback.criterionFeedback?.length ? html`
+          <h4>Rubric feedback</h4>
+          <div class="english-practice-rubric-feedback">
+            ${feedback.criterionFeedback.map(item => html`
+              <article>
+                <h5>${item.criterion}${item.score !== undefined ? html` <span>${item.score}/${item.maxScore ?? 5}</span>` : nothing}</h5>
+                <p>${item.assessment}</p>
+                <p><strong>Evidence:</strong> ${item.evidence}</p>
+                <p><strong>Next step:</strong> ${item.nextStep}</p>
+                ${item.exampleRevision ? html`<p><strong>Example improvement:</strong> ${item.exampleRevision}</p>` : nothing}
+              </article>
+            `)}
+          </div>
+        ` : nothing}
+        ${feedback.nextChallenge ? html`
+          <div class="english-practice-next-challenge">
+            <h4>Your next challenge</h4>
+            <p>${feedback.nextChallenge}</p>
+          </div>
+        ` : nothing}
       </section>
     `
   }
@@ -331,7 +405,7 @@ export default class EnglishPractice extends WebComponent {
             <div class="english-practice-attempt-content">
               <h3>Your response</h3>
               <p class="english-practice-attempt-response">${attempt.response}</p>
-              ${this.renderFeedback(attempt.feedback, attempt.response)}
+              ${this.renderFeedback(attempt.feedback)}
               <button type="button" @click=${() => { void this.continueAttempt(attempt) }}>
                 Continue with this response
               </button>
@@ -380,19 +454,47 @@ export default class EnglishPractice extends WebComponent {
               </label>
               <label>
                 Prompt
-                <select .value=${this.selectedPromptId} ?disabled=${this.loading || this.loadingDraft}
-                  @change=${(event: Event) => { void this.changePrompt((event.target as HTMLSelectElement).value) }}>
-                  ${this.prompts.map(item => html`<option value=${item.id}>${item.prompt}</option>`)}
-                </select>
-                <span class="english-practice-prompt-preview">${this.selectedPrompt.prompt}</span>
+                <solid-ui-combobox
+                  class="english-practice-prompt-combobox"
+                  select-only
+                  aria-label="Prompt"
+                  .value=${this.selectedPromptId}
+                  ?disabled=${this.loading || this.loadingDraft}
+                  @change=${(event: Event) => {
+                    void this.changePrompt((event.currentTarget as HTMLElement & { value: string }).value)
+                  }}
+                >
+                  ${this.prompts.map(item => html`<solid-ui-combobox-option value=${item.id}>${item.prompt}</solid-ui-combobox-option>`)}
+                </solid-ui-combobox>
               </label>
+              <div class="english-practice-prompt-generation">
+                <label>
+                  Generate prompts about
+                  <input type="text" placeholder="e.g. life skills" .value=${this.promptTopic}
+                    ?disabled=${this.loading || this.loadingDraft || this.generatingPrompts}
+                    @input=${(event: Event) => { this.promptTopic = (event.target as HTMLInputElement).value }}>
+                </label>
+                <label>
+                  Difficulty
+                  <select .value=${this.promptDifficulty} ?disabled=${this.loading || this.loadingDraft || this.generatingPrompts}
+                    @change=${(event: Event) => { this.promptDifficulty = (event.target as HTMLSelectElement).value as typeof this.promptDifficulty }}>
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                  </select>
+                </label>
+                <button type="button" ?disabled=${this.loading || this.loadingDraft || this.generatingPrompts || !this.promptTopic.trim() || !this.endpoint}
+                  @click=${this.generatePrompts}>
+                  ${this.generatingPrompts ? 'Generating…' : 'Generate a new set of 10'}
+                </button>
+              </div>
               <button type="button" ?disabled=${this.loading || this.loadingDraft || Boolean(this.pendingAttempt) || !this.responseText.trim() || !this.endpoint}
                 @click=${this.assess}>
                 <icon-lucide-sparkles aria-hidden="true"></icon-lucide-sparkles>
                 ${this.loading ? 'Assessing…' : 'Get AI feedback'}
               </button>
             </div>
-            <label class="english-practice-response">${this.practiceType === 'paragraph' ? 'Your paragraph' : 'Your essay'}
+            <label class="english-practice-response" ?aria-busy=${this.loadingDraft}>${this.practiceType === 'paragraph' ? 'Your paragraph' : 'Your essay'}
               <textarea rows="9" placeholder="Write your response here…" .value=${this.responseText}
                 ?disabled=${this.loading || this.loadingDraft}
                 @input=${(event: Event) => {
@@ -425,7 +527,7 @@ export default class EnglishPractice extends WebComponent {
               </button>
             ` : nothing}
             ${this.error ? html`<p class="english-practice-error" role="alert">${this.error}</p>` : nothing}
-            ${this.feedback ? this.renderFeedback(this.feedback, this.responseText) : nothing}
+            ${this.feedback ? this.renderFeedback(this.feedback) : nothing}
           </section>
         `}
       </main>

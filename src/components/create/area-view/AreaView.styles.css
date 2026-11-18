@@ -25,6 +25,32 @@
   overflow: hidden;
 }
 
+.questionaire-pane-create-question-area-view-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 180px;
+  color: var(--solid-ui-color-slate-700, #334155);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.questionaire-pane-create-question-area-view-spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid var(--solid-ui-color-indigo-100, #e0e7ff);
+  border-top-color: var(--solid-ui-color-indigo-500, #6366f1);
+  border-radius: 50%;
+  animation: questionaire-pane-question-loading-spin 0.8s linear infinite;
+}
+
+@keyframes questionaire-pane-question-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 760px) {
   .questionaire-pane-create-question-area-view {
     flex-direction: column;

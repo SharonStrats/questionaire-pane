@@ -8,6 +8,7 @@ import '../../../shared/FormattedTextEditor'
 import { readQuestionValue, readQuestionValues } from '../../../../service/questionAccessors'
 import '../header/Header'
 import '../footer/Footer'
+import '../image-upload/ImageUpload'
 import '~icons/lucide/chevron-down'
 import '~icons/lucide/info'
 import '~icons/lucide/plus'
@@ -25,6 +26,9 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
 
   @state()
   private accessor draftExplanation = ''
+
+  @state()
+  private accessor draftImage = ''
 
   @state()
   private accessor draftPoints = '1'
@@ -69,6 +73,7 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
     this.draftTitle = this.getQuestionTitle()
     this.draftHint = this.getQuestionHint()
     this.draftExplanation = readQuestionValue(this.getStore()!, question, 'explanation')
+    this.draftImage = readQuestionValue(this.getStore()!, question, 'image')
     this.draftLeftItems = this.getLeftItems()
     this.draftRightItems = this.getRightItems()
     const pairCount = this.getPairCount(this.draftLeftItems, this.draftRightItems)
@@ -160,6 +165,7 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
     const title = this.draftTitle.trim()
     const hint = this.draftHint.trim()
     const explanation = this.draftExplanation.trim()
+    const image = this.draftImage.trim()
     const leftItems = this.draftLeftItems.length > 0 ? this.draftLeftItems : ['', '']
     const rightItems = this.draftRightItems.length > 0 ? this.draftRightItems : ['', '']
     const points = this.pointsCustomized
@@ -169,6 +175,7 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
     await logic.updateQuestionText({ question, title })
     await logic.updateQuestionHint({ question, hint })
     await logic.updateQuestionExplanation({ question, explanation })
+    await logic.updateQuestionImage({ question, image })
     await logic.updateQuestionPoints({ question, points: Number.isFinite(points) ? points : 0 })
     await logic.updateQuestionMatchPairs({ question, leftItems, rightItems })
 
@@ -232,6 +239,7 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
     const title = this.draftTitle
     const hint = this.draftHint || this.getQuestionHint()
     const explanation = this.draftExplanation
+    const image = this.draftImage
     const points = this.draftPoints || String(this.getQuestionPoints())
     const leftItems = this.draftLeftItems.length > 0 ? this.draftLeftItems : this.getLeftItems()
     const rightItems = this.draftRightItems.length > 0 ? this.draftRightItems : this.getRightItems()
@@ -263,6 +271,15 @@ export default class QuestionairePaneCreateQuestionMatch extends QuestionairePan
           <label>More details <span>(optional)</span></label>
           <textarea class="questionaire-pane-create-question-match-input" rows="4" placeholder="Shown after an incorrect answer to explain the concept..." .value=${explanation} @input=${(event: Event) => { this.draftExplanation = (event.currentTarget as HTMLTextAreaElement).value }}></textarea>
         </div>
+
+        <questionaire-pane-create-question-image-upload
+          .question=${question}
+          .image=${image}
+          @questionaire-question-image-changed=${(event: CustomEvent<{ image: string }>) => {
+            this.draftImage = event.detail.image
+            this.emitQuestionChanged()
+          }}
+        ></questionaire-pane-create-question-image-upload>
 
         <div class="questionaire-pane-create-question-match-field">
           <label>Question</label>

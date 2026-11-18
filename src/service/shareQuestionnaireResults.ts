@@ -17,6 +17,7 @@ export interface ShareQuestionnaireResultsOptions {
   availablePoints: number
   answers: Record<string, string | string[] | null>
   questionUris: string[]
+  drawingQuestionUris?: string[]
   user?: NamedNode | null
   storage?: NamedNode | null
   shareWithCreator?: boolean
@@ -73,7 +74,14 @@ function resultDocuments (container: NamedNode, user: NamedNode, questionnaire: 
     store.add(response, quiz('questionRef'), sym(questionUri), response.doc())
     store.add(response, quiz('selectedAnswer'), selectedAnswer, response.doc())
     store.add(selectedAnswer, rdf('type'), schema('Answer'), response.doc())
-    store.add(selectedAnswer, schema('text'), literal(answerText(options.answers[questionUri] ?? null)), response.doc())
+    const answer = options.answers[questionUri] ?? null
+    if (options.drawingQuestionUris?.includes(questionUri)) {
+      if (typeof answer === 'string' && answer.trim()) {
+        store.add(response, quiz('drawingData'), literal(answer), response.doc())
+      }
+    } else {
+      store.add(selectedAnswer, schema('text'), literal(answerText(answer)), response.doc())
+    }
   })
 
   return [

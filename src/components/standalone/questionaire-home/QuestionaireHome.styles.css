@@ -49,6 +49,7 @@ button { font: inherit; cursor: pointer; }
 .questionaire-home-header-actions { gap: 8px; }
 .questionaire-home-header-actions solid-ui-provider { display: block; min-width: 34px; }
 .questionaire-home-header-actions solid-ui-account { display: block; }
+.questionaire-home-header-actions solid-ui-signup-button { display: none; }
 .questionaire-home-header-actions solid-ui-provider { display: block; }
 .questionaire-home-header-actions solid-ui-account { display: block; }
 .questionaire-home-main { min-height: calc(100vh - 64px); }
@@ -184,14 +185,18 @@ h1 { margin: 8px 0 10px; font-size: 36px; font-weight: 400; letter-spacing: -0.9
 .questionaire-home-card-title:hover { color: #6c5ce7; }
 .questionaire-home-edit {
   display: inline-flex;
-  width: 32px;
-  height: 32px;
+  box-sizing: border-box;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
   flex: 0 0 auto;
+  padding: 0;
   color: var(--solid-ui-color-gray-400, #99a1af);
 }
 .questionaire-home-edit icon-lucide-square-pen {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
 }
 .questionaire-home-card-description {
   min-height: 40px;
@@ -269,7 +274,6 @@ h1 { margin: 8px 0 10px; font-size: 36px; font-weight: 400; letter-spacing: -0.9
 .questionaire-home-card-title { display: inline; width: auto; margin: 0 5px 0 0; font-size: 9px; }
 .questionaire-home-card-copy .questionaire-home-kind { padding: 2px 5px; font-size: 6px; }
 .questionaire-home-card-description { min-height: 0; margin: 3px 0 0; overflow: hidden; font-size: 7px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
-.questionaire-home-edit { width: 24px; height: 24px; padding: 0; }
 .questionaire-home-card-meta { gap: 8px; margin-top: 7px; font-size: 6px; }
 .questionaire-home-card-location { display: none; }
 .questionaire-home-card-actions { gap: 5px; margin-top: 7px; }
@@ -290,6 +294,7 @@ h1 { margin: 8px 0 10px; font-size: 36px; font-weight: 400; letter-spacing: -0.9
 .questionaire-home-quiz-copy strong { overflow: hidden; color: #1a2235; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .questionaire-home-quiz-copy span { color: #9ca3af; font-size: 6px; }
 .questionaire-home-quiz-actions { display: flex; align-items: center; gap: 6px; }
+.questionaire-home-quiz-actions button { box-sizing: border-box; min-height: 42px; padding: 8px 12px; font-size: 12px; }
 .questionaire-home-store-button,
 .questionaire-home-take-button { padding: 5px 9px; border: 0; border-radius: 5px; font-size: 6px; white-space: nowrap; }
 .questionaire-home-store-button { color: #1a2235; background: #fff; box-shadow: inset 0 0 0 1px #d5d9e2; }
@@ -578,11 +583,11 @@ h1 { margin: 8px 0 10px; font-size: 36px; font-weight: 400; letter-spacing: -0.9
 .questionaire-home-study-deck-actions button { display: grid; width: 50px; height: 50px; place-items: center; border: 1px solid #dfe1e9; border-radius: 15px; color: #6653dd; background: #fff; font-size: 30px; font-weight: 300; }
 .questionaire-home-study-deck-actions button + button { border: 0; color: #fff; background: #6653dd; }
 .questionaire-home-study-deck-actions icon-lucide-users { width: 22px; height: 22px; }
-.questionaire-home-take-actions { display: flex; align-items: center; gap: 5px; }
-.questionaire-home-take-actions button { display: grid; width: 24px; height: 24px; place-items: center; padding: 0; border: 0; border-radius: 7px; color: #6656d1; background: #f0edff; }
+.questionaire-home-take-actions { display: flex; align-items: center; gap: 8px; }
+.questionaire-home-take-actions button { display: grid; box-sizing: border-box; width: 42px; min-width: 42px; height: 42px; min-height: 42px; place-items: center; padding: 0; border: 0; border-radius: 10px; color: #6656d1; background: #f0edff; }
 .questionaire-home-take-actions button + button { color: #fff; background: #6656d1; }
 .questionaire-home-take-actions icon-lucide-play,
-.questionaire-home-take-actions icon-lucide-users { width: 12px; height: 12px; }
+.questionaire-home-take-actions icon-lucide-users { width: 20px; height: 20px; }
 .questionaire-home-friends-backdrop { position: fixed; z-index: 10; inset: 0; display: grid; place-items: center; padding: 20px; background: rgb(31 28 57 / 28%); }
 .questionaire-home-friends-panel { width: min(100%, 430px); max-height: min(80vh, 560px); overflow: auto; box-sizing: border-box; padding: 24px; border: 1px solid #e6e5ef; border-radius: 16px; background: #fff; box-shadow: 0 18px 50px rgb(31 28 57 / 18%); }
 .questionaire-home-inbox-backdrop { position: fixed; z-index: 11; inset: 0; display: grid; place-items: start end; padding: 72px 18px 18px; background: rgb(31 28 57 / 42%); }
@@ -675,6 +680,11 @@ h1 { margin: 8px 0 10px; font-size: 36px; font-weight: 400; letter-spacing: -0.9
 .questionaire-home-friend-list { display: flex; flex-direction: column; gap: 7px; margin-top: 18px; }
 .questionaire-home-friend-row { display: flex; align-items: center; gap: 10px; padding: 9px; border-radius: 9px; color: #302e49; background: #f8f7fc; text-decoration: none; }
 .questionaire-home-friend-row > span { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; color: #fff; background: #6c5ce7; font-size: 8px; }
+.questionaire-home-friend-row--1 > span { background: #d95f59; }
+.questionaire-home-friend-row--2 > span { background: #198f86; }
+.questionaire-home-friend-row--3 > span { background: #bd821e; }
+.questionaire-home-friend-row--4 > span { background: #6656d1; }
+.questionaire-home-friend-row--5 > span { background: #277da1; }
 .questionaire-home-friend-row > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
 .questionaire-home-friend-row strong { font-size: 10px; font-weight: 500; }
 .questionaire-home-friend-row small { color: #77758b; font-size: 8px; }
@@ -689,11 +699,11 @@ h1 { margin: 8px 0 10px; font-size: 36px; font-weight: 400; letter-spacing: -0.9
 .questionaire-home-friend-results { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .questionaire-home-friend-result { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px; border: 1px solid #e6e5ef; border-radius: 8px; }
 .questionaire-home-friend-avatar { position: relative; display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; overflow: hidden; border-radius: 50%; color: #fff; background: #6c5ce7; font-size: 8px; }
-.questionaire-home-friend-avatar--1 { background: #e67871; }
-.questionaire-home-friend-avatar--2 { background: #2d9d97; }
-.questionaire-home-friend-avatar--3 { background: #d29a35; }
-.questionaire-home-friend-avatar--4 { background: #7b6fd0; }
-.questionaire-home-friend-avatar--5 { background: #4a9cc4; }
+.questionaire-home-friend-avatar--1 { background: #d95f59; }
+.questionaire-home-friend-avatar--2 { background: #198f86; }
+.questionaire-home-friend-avatar--3 { background: #bd821e; }
+.questionaire-home-friend-avatar--4 { background: #6656d1; }
+.questionaire-home-friend-avatar--5 { background: #277da1; }
 .questionaire-home-friend-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .questionaire-home-friend-result > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
 .questionaire-home-friend-result strong { color: #302e49; font-size: 10px; font-weight: 500; }

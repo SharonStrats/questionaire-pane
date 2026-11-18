@@ -9,6 +9,7 @@ export type QuestionaireCreateQuestionTypeKey =
   | 'match'
   | 'ordering'
   | 'confidence'
+  | 'diagram-drawing'
   | 'custom'
 
 export interface QuestionaireCreateQuestionTypeDefinition {
@@ -19,6 +20,7 @@ export interface QuestionaireCreateQuestionTypeDefinition {
   accentClass: string
   qtiInteraction: 'choiceInteraction' | 'textEntryInteraction' | 'extendedTextInteraction' | 'gapMatchInteraction' | 'orderInteraction' | 'matchInteraction' | 'associateInteraction' | 'sliderInteraction'
   qtiSelectionMode?: 'single' | 'multiple'
+  availableIn?: Array<'quiz' | 'survey'>
 }
 
 export const questionaireCreateQuestionTypes: QuestionaireCreateQuestionTypeDefinition[] = [
@@ -29,7 +31,8 @@ export const questionaireCreateQuestionTypes: QuestionaireCreateQuestionTypeDefi
     questionTypeUri: quiz('MultipleChoiceQuestion').value,
     accentClass: 'question-type-card--violet',
     qtiInteraction: 'choiceInteraction',
-    qtiSelectionMode: 'single'
+    qtiSelectionMode: 'single',
+    availableIn: ['quiz', 'survey']
   },
   {
     key: 'selection',
@@ -38,7 +41,8 @@ export const questionaireCreateQuestionTypes: QuestionaireCreateQuestionTypeDefi
     questionTypeUri: quiz('SelectionQuestion').value,
     accentClass: 'question-type-card--green',
     qtiInteraction: 'choiceInteraction',
-    qtiSelectionMode: 'multiple'
+    qtiSelectionMode: 'multiple',
+    availableIn: ['quiz', 'survey']
   },
   {
     key: 'true-false',
@@ -47,7 +51,8 @@ export const questionaireCreateQuestionTypes: QuestionaireCreateQuestionTypeDefi
     questionTypeUri: quiz('TrueFalseQuestion').value,
     accentClass: 'question-type-card--blue',
     qtiInteraction: 'choiceInteraction',
-    qtiSelectionMode: 'single'
+    qtiSelectionMode: 'single',
+    availableIn: ['quiz', 'survey']
   },
   {
     key: 'short-answer',
@@ -55,7 +60,8 @@ export const questionaireCreateQuestionTypes: QuestionaireCreateQuestionTypeDefi
     description: 'Free-text response',
     questionTypeUri: quiz('ShortAnswerQuestion').value,
     accentClass: 'question-type-card--sky',
-    qtiInteraction: 'extendedTextInteraction'
+    qtiInteraction: 'extendedTextInteraction',
+    availableIn: ['quiz', 'survey']
   },
   {
     key: 'fill-in-the-blank',
@@ -63,7 +69,8 @@ export const questionaireCreateQuestionTypes: QuestionaireCreateQuestionTypeDefi
     description: 'Complete missing words',
     questionTypeUri: quiz('FillInTheBlankQuestion').value,
     accentClass: 'question-type-card--pink',
-    qtiInteraction: 'textEntryInteraction'
+    qtiInteraction: 'textEntryInteraction',
+    availableIn: ['quiz']
   },
   {
     key: 'match',
@@ -71,7 +78,8 @@ export const questionaireCreateQuestionTypes: QuestionaireCreateQuestionTypeDefi
     description: 'Connect two sets of items',
     questionTypeUri: quiz('MatchQuestion').value,
     accentClass: 'question-type-card--orange',
-    qtiInteraction: 'matchInteraction'
+    qtiInteraction: 'matchInteraction',
+    availableIn: ['quiz']
   },
   {
     key: 'ordering',
@@ -79,7 +87,8 @@ export const questionaireCreateQuestionTypes: QuestionaireCreateQuestionTypeDefi
     description: 'Arrange items in correct order',
     questionTypeUri: quiz('OrderingQuestion').value,
     accentClass: 'question-type-card--lavender',
-    qtiInteraction: 'orderInteraction'
+    qtiInteraction: 'orderInteraction',
+    availableIn: ['quiz']
   },
   {
     key: 'confidence',
@@ -87,7 +96,17 @@ export const questionaireCreateQuestionTypes: QuestionaireCreateQuestionTypeDefi
     description: 'Collect a rating or confidence response',
     questionTypeUri: quiz('ConfidenceQuestion').value,
     accentClass: 'question-type-card--teal',
-    qtiInteraction: 'sliderInteraction'
+    qtiInteraction: 'sliderInteraction',
+    availableIn: ['quiz', 'survey']
+  },
+  {
+    key: 'diagram-drawing',
+    label: 'Diagram Drawing',
+    description: 'Draw on an image',
+    questionTypeUri: quiz('DiagramDrawingQuestion').value,
+    accentClass: 'question-type-card--violet',
+    qtiInteraction: 'extendedTextInteraction',
+    availableIn: ['quiz']
   },
   {
     key: 'custom',
@@ -95,9 +114,16 @@ export const questionaireCreateQuestionTypes: QuestionaireCreateQuestionTypeDefi
     description: 'Define your own format',
     questionTypeUri: quiz('CustomQuestion').value,
     accentClass: 'question-type-card--amber',
-    qtiInteraction: 'choiceInteraction'
+    qtiInteraction: 'choiceInteraction',
+    availableIn: ['quiz']
   },
 ]
+
+export function getQuestionaireCreateQuestionTypesForFormat (format: 'quiz' | 'survey') {
+  return questionaireCreateQuestionTypes.filter((questionType) =>
+    !questionType.availableIn || questionType.availableIn.includes(format)
+  )
+}
 
 export function getQuestionaireCreateQuestionTypeByUri (uri?: string | null) {
   if (!uri) {

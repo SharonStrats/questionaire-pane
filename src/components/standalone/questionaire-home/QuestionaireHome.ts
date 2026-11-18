@@ -902,6 +902,9 @@ export default class QuestionaireHome extends WebComponent {
 
   private renderFriendsPanel () {
     if (!this.friendsOpen) return nothing
+    const availableFriendResults = this.friendSearchResults.filter(result =>
+      !this.friends.some(friend => friend.uri === result.uri)
+    )
     return html`
       <div class="questionaire-home-friends-backdrop" role="presentation"
         @click=${(event: Event) => { if (event.target === event.currentTarget) this.friendsOpen = false }}>
@@ -924,22 +927,21 @@ export default class QuestionaireHome extends WebComponent {
             }} placeholder="Name or WebID" aria-label="Search contacts and friends">
           </div>
           ${this.friendSearchStatus ? html`<p class="questionaire-home-friend-search-status">${this.friendSearchStatus}</p>` : nothing}
-          ${this.friendSearchResults.length ? html`<div class="questionaire-home-friend-results">
-            ${this.friendSearchResults.map((result, index) => html`<div class="questionaire-home-friend-result">
+          ${availableFriendResults.length ? html`<div class="questionaire-home-friend-results">
+            ${availableFriendResults.map((result, index) => html`<div class="questionaire-home-friend-result">
               <span class="questionaire-home-friend-avatar questionaire-home-friend-avatar--${index % 6}">
                 <span>${result.name.slice(0, 2).toUpperCase()}</span>
                 ${result.photo ? html`<img src=${result.photo} alt="" @error=${(event: Event) => { (event.target as HTMLImageElement).style.display = 'none' }}>` : nothing}
               </span>
               <div><strong>${result.name}</strong><code>${result.uri}</code></div>
-              ${this.friends.some(friend => friend.uri === result.uri)
-                ? html`<small>Already connected</small>`
-                : html`<button type="button" @click=${() => this.dispatchAction('questionaire-home-add-friend', result.uri)}>Add</button>`}
+              <button type="button" @click=${() => this.dispatchAction('questionaire-home-add-friend', result.uri)}>Add</button>
             </div>`)}
           </div>` : nothing}
           ${this.friends.length
             ? html`<div class="questionaire-home-friend-list">
-                ${this.friends.map(friend => html`
-                  <a href=${friend.uri} target="_blank" rel="noreferrer" class="questionaire-home-friend-row">
+                ${this.friends.map((friend, index) => html`
+                  <a href=${friend.uri} target="_blank" rel="noreferrer"
+                    class="questionaire-home-friend-row questionaire-home-friend-row--${index % 6}">
                     <span>${friend.name.slice(0, 2).toUpperCase()}</span>
                     <div>
                       <strong>${friend.name}${friend.nickname ? ` (${friend.nickname})` : ''}</strong>
@@ -1033,7 +1035,7 @@ export default class QuestionaireHome extends WebComponent {
                   @click=${() => this.dispatchAction('questionaire-home-open-pod')}>
                   <icon-lucide-folder-open aria-hidden="true"></icon-lucide-folder-open>
                 </button>
-                <solid-ui-provider><solid-ui-account hide-signup></solid-ui-account></solid-ui-provider>
+                <solid-ui-provider><solid-ui-account></solid-ui-account></solid-ui-provider>
               </div>
             </div>
           </header>

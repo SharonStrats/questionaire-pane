@@ -6,7 +6,8 @@ import styles from './StarterView.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
 import { createQuestionaireLogic } from '../../../service/questionaireLogic'
 import { readQuestionValue } from '../../../service/questionAccessors'
-import { questionaireCreateQuestionTypes } from '../question-cards/questionaire-pane-create-question-types'
+import { getQuestionaireCreateQuestionTypesForFormat } from '../question-cards/questionaire-pane-create-question-types'
+import { getQuestionnaireFormat } from '../../../service/questionQueries'
 import '~icons/lucide/square-pen'
 
 @customElement('questionaire-pane-create-starter-view')
@@ -73,6 +74,8 @@ export default class QuestionairePaneCreateStarterView extends WebComponent {
 
     const draft = sym(`${this.getBaseUrl() ?? ''}draft.ttl`)
     const currentIntroduction = readQuestionValue(store, draft, 'description')
+    const format = getQuestionnaireFormat(store, subject)
+    const availableQuestionTypes = getQuestionaireCreateQuestionTypesForFormat(format)
 
     return html`
       <section class="questionaire-pane-create-starter-view">
@@ -96,7 +99,7 @@ export default class QuestionairePaneCreateStarterView extends WebComponent {
         <div class="questionaire-pane-create-starter-view-picker">
           <p class="questionaire-pane-create-starter-view-picker-heading">Choose a question type</p>
           <div class="questionaire-pane-create-starter-view-picker-grid">
-            ${questionaireCreateQuestionTypes.map((questionType) => html`
+            ${availableQuestionTypes.map((questionType) => html`
               <button
                 class="questionaire-pane-create-starter-view-picker-card ${questionType.accentClass}"
                 type="button"

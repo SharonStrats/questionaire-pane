@@ -153,7 +153,11 @@ export interface QuestionaireMutationService {
   updateQuestionGradingCriteria(options: { question: NamedNode, criteria: GradingCriterion[] }): Promise<void>
   updateQuestionPoints(options: { question: NamedNode, points: number }): Promise<void>
   updateQuestionOptions(options: { question: NamedNode, options: string[], correctOption?: string | null, correctOptions?: string[] | null }): Promise<void>
-  updateQuestionAnswers(options: { question: NamedNode, answers: string[] }): Promise<void>
+  updateQuestionAnswers(options: {
+    question: NamedNode
+    answers: string[]
+    responseKinds?: Array<'short-text' | 'long-text'>
+  }): Promise<void>
   updateQuestionItems(options: { question: NamedNode, items: string[] }): Promise<void>
   updateQuestionMatchPairs(options: { question: NamedNode, leftItems: string[], rightItems: string[] }): Promise<void>
   deleteQuestionFromQuestionnaire(options: { baseUrl: string, question: NamedNode }): Promise<void>
@@ -748,7 +752,11 @@ export function createQuestionaireMutations (store: LiveStore): QuestionaireMuta
     })
   }
 
-  async function updateQuestionAnswers (options: { question: NamedNode, answers: string[] }) {
+  async function updateQuestionAnswers (options: {
+    question: NamedNode
+    answers: string[]
+    responseKinds?: Array<'short-text' | 'long-text'>
+  }) {
     const fetcher = store.fetcher
     const updater = store.updater
     if (!fetcher || !updater) {
@@ -767,17 +775,36 @@ export function createQuestionaireMutations (store: LiveStore): QuestionaireMuta
           del.push(...store.statementsMatching(statement.object, undefined, undefined, questionDoc))
         }
       })
-      const ins = options.answers
-        .map((answer) => answer.trim())
-        .filter((answer) => answer.length > 0)
-        .flatMap((answer, index) => {
+      const partCount = Math.max(options.answers.length, options.responseKinds?.length ?? 0)
+      const ins = Array.from({ length: partCount }, (_, index) => {
+          const answer = options.answers[index]?.trim() ?? ''
           const answerResourceNode = answerResource(options.question, 'answer', index)
+          const responseKind = options.responseKinds?.[index] === 'long-text'
+            ? questionairePredicates.question.longTextResponse
+            : questionairePredicates.question.shortTextResponse
+          const responsePart = sym(`${options.question.doc().uri}#response-part-${index + 1}`)
+          const answerStatements = answer.length > 0
+            ? [
+              st(options.question, quizAnswer, answerResourceNode, questionDoc),
+              st(answerResourceNode, ns.rdf('type'), answerClass, questionDoc),
+              st(answerResourceNode, answerText, literal(answer), questionDoc)
+            ]
+            : []
           return [
-            st(options.question, quizAnswer, answerResourceNode, questionDoc),
-            st(answerResourceNode, ns.rdf('type'), answerClass, questionDoc),
-            st(answerResourceNode, answerText, literal(answer), questionDoc)
+            ...answerStatements,
+            st(options.question, questionairePredicates.question.responsePart, responsePart, questionDoc),
+            st(responsePart, questionairePredicates.question.position, literal(String(index + 1)), questionDoc),
+            st(responsePart, questionairePredicates.question.responseKind, responseKind, questionDoc)
           ]
-        })
+        }).flat()
+
+      const currentParts = store.statementsMatching(options.question, questionairePredicates.question.responsePart, undefined, questionDoc)
+      currentParts.forEach((statement) => {
+        del.push(statement)
+        if (statement.object.termType === 'NamedNode') {
+          del.push(...store.statementsMatching(statement.object, undefined, undefined, questionDoc))
+        }
+      })
 
       await updater.update(del, ins)
     })

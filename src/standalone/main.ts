@@ -110,6 +110,11 @@ const app = document.querySelector<HTMLElement>('#app')!
 const loginReturnUrlKey = 'questionaire-pane:login-return-url'
 const authRestoreTimeoutMs = 10_000
 
+app.addEventListener('questionaire-take-review-visibility', (event) => {
+  const { visible } = (event as CustomEvent<{ visible: boolean }>).detail
+  document.querySelector<HTMLElement>('#PageHeader')?.toggleAttribute('hidden', visible)
+})
+
 function getQuizGameEndpoint (): string {
   const configured = import.meta.env.VITE_QUIZ_GAME_ENDPOINT?.trim()
   if (configured) return configured
@@ -1864,7 +1869,7 @@ function ensurePageHeaderProvider (): void {
       <a class="page-header-register" href="${accountRegistrationUrl}" hidden
         target="_blank" rel="noopener noreferrer">Sign up</a>
       <button class="page-header-icon" type="button" aria-label="Bookmarks">♡</button>
-      <solid-ui-provider><solid-ui-account hide-signup></solid-ui-account></solid-ui-provider>
+      <solid-ui-provider><solid-ui-account></solid-ui-account></solid-ui-provider>
     </div>
   `
 }

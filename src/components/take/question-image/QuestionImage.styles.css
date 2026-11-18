@@ -1,0 +1,23 @@
+:host {
+  display: block;
+  margin-bottom: 16px;
+}
+
+.questionaire-pane-question-image {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 320px;
+  margin: 0 auto;
+  border-radius: 12px;
+  object-fit: contain;
+}
+
+.questionaire-pane-question-image-status {
+  padding: 12px;
+  border: 1px solid #e2e5ea;
+  border-radius: 10px;
+  color: #64748b;
+  font-size: 14px;
+  text-align: center;
+}

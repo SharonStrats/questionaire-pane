@@ -13,6 +13,7 @@ import '../ordering/Ordering'
 import '../match/Match'
 import '../rating/Rating'
 import '../true-false/TrueFalse'
+import '../diagram-drawing/DiagramDrawing'
 import { normalizeTextResponseAnswer } from '../../../service/answerFormatting'
 
 @customElement('questionaire-pane-take-question-dispatcher')
@@ -112,6 +113,15 @@ export default class QuestionairePaneTakeQuestionDispatcher extends WebComponent
           .question=${question}
           .answer=${typeof this.answer === 'string' ? this.answer : ''}
         ></questionaire-pane-take-question-rating>
+      `
+    }
+
+    if (typeDefinition?.key === 'diagram-drawing') {
+      return html`
+        <questionaire-pane-take-question-diagram-drawing
+          .question=${question}
+          .answer=${typeof this.answer === 'string' ? this.answer : null}
+        ></questionaire-pane-take-question-diagram-drawing>
       `
     }
 

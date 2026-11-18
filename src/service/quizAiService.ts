@@ -3,6 +3,7 @@ import { strFromU8, unzipSync } from 'fflate'
 import { createContainerIfMissing } from './types'
 import { ShortAnswerSidecarClient, type GradingCriterion, type ShortAnswerSidecarInput } from './shortAnswerSidecarClient'
 import { VisionSidecarClient } from './visionSidecarClient'
+import { DiagramDrawingSidecarClient, type DiagramDrawingEvaluationInput, type DrawingEvaluation } from './diagramDrawingSidecarClient'
 import { QuizImportSidecarClient } from './quizImportSidecarClient'
 
 const sourceDirectoryName = 'source-documents'
@@ -446,6 +447,7 @@ export interface QuizAiService {
     question?: string
     gradingCriteria?: GradingCriterion[]
   }): Promise<ShortAnswerEvaluation>
+  evaluateDiagramDrawing(input: DiagramDrawingEvaluationInput): Promise<DrawingEvaluation>
 }
 
 type PdfTextItem = { str?: string }
@@ -520,6 +522,7 @@ let servicePromise: Promise<QuizAiService> | null = null
 let transformersPromise: Promise<typeof import('@huggingface/transformers')> | null = null
 let configuredSidecarClient: ShortAnswerSidecarClient | null = null
 let configuredVisionClient: VisionSidecarClient | null = null
+let configuredDrawingClient: DiagramDrawingSidecarClient | null = null
 let configuredQuizImportClient: QuizImportSidecarClient | null = null
 
 export interface QuizAiServiceConfiguration {
@@ -527,6 +530,7 @@ export interface QuizAiServiceConfiguration {
   sidecarClient?: ShortAnswerSidecarClient
   visionEndpoint?: string
   visionClient?: VisionSidecarClient
+  drawingClient?: DiagramDrawingSidecarClient
   quizImportEndpoint?: string
   quizImportClient?: QuizImportSidecarClient
 }
@@ -540,6 +544,8 @@ export function configureQuizAiService (configuration: QuizAiServiceConfiguratio
     (configuration.sidecarEndpoint?.trim() ? new ShortAnswerSidecarClient({ endpoint: configuration.sidecarEndpoint }) : null)
   configuredVisionClient = configuration.visionClient ??
     (configuration.visionEndpoint?.trim() ? new VisionSidecarClient({ endpoint: configuration.visionEndpoint }) : null)
+  configuredDrawingClient = configuration.drawingClient ??
+    (configuration.sidecarEndpoint?.trim() ? new DiagramDrawingSidecarClient({ endpoint: configuration.sidecarEndpoint }) : null)
   configuredQuizImportClient = configuration.quizImportClient ??
     (configuration.quizImportEndpoint?.trim() ? new QuizImportSidecarClient({ endpoint: configuration.quizImportEndpoint }) : null)
   servicePromise = null
@@ -765,6 +771,7 @@ export function parseQuestionAnswerPairs (text: string): ImportedQuizQuestion[] 
 async function createService (
   sidecarClient: ShortAnswerSidecarClient | null,
   visionClient: VisionSidecarClient | null,
+  drawingClient: DiagramDrawingSidecarClient | null,
   quizImportClient: QuizImportSidecarClient | null
 ): Promise<QuizAiService> {
   const mammothModule = await import('mammoth')
@@ -1028,17 +1035,25 @@ async function createService (
     }
   }
 
+  async function evaluateDiagramDrawing (input: DiagramDrawingEvaluationInput) {
+    if (!drawingClient) {
+      throw new Error('Diagram drawing AI evaluation is not configured.')
+    }
+    return drawingClient.evaluate(input)
+  }
+
   return {
     importDocuments,
     regenerateQuestion,
     saveAcceptedSourceDocuments,
     saveImportReviewMetadata,
     ensureSemanticModel,
-    evaluateShortAnswer
+    evaluateShortAnswer,
+    evaluateDiagramDrawing
   }
 }
 
 export function loadQuizAiService () {
-  servicePromise ??= createService(configuredSidecarClient, configuredVisionClient, configuredQuizImportClient)
+  servicePromise ??= createService(configuredSidecarClient, configuredVisionClient, configuredDrawingClient, configuredQuizImportClient)
   return servicePromise
 }

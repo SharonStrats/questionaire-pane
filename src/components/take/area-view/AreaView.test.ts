@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { sym, type LiveStore } from 'rdflib'
 import type { QuestionaireContext } from '../../../context'
+import { questionairePredicates } from '../../../service/predicates'
 import type { QuestionaireQuestionSummary } from '../../../service/questionQueries'
 
 const mocks = vi.hoisted(() => ({
@@ -66,7 +67,13 @@ const score = {
   answeredQuestions: 1,
   availablePoints: 1,
   earnedPoints: 1,
-  questionScores: []
+  questionScores: [{
+    questionUri: question.uri,
+    questionTypeUri: questionairePredicates.question.questionType.multipleChoice.value,
+    availablePoints: 1,
+    earnedPoints: 1,
+    correct: true
+  }]
 }
 
 type AreaViewElement = HTMLElement & {
@@ -87,13 +94,22 @@ async function settle (area: AreaViewElement): Promise<void> {
   await finalScreen?.updateComplete
 }
 
-async function startQuiz (): Promise<{ area: AreaViewElement, store: LiveStore, acl: NonNullable<QuestionaireContext['acl']> }> {
+async function startQuiz (): Promise<{
+  area: AreaViewElement
+  store: LiveStore
+  acl: NonNullable<QuestionaireContext['acl']>
+  reviewVisibilityEvents: boolean[]
+}> {
   const store = {} as LiveStore
   const acl: NonNullable<QuestionaireContext['acl']> = {
     planGrantContainerContents: vi.fn(async () => ({})),
     applyPlan: vi.fn(async () => new Response('', { status: 200 }))
   }
   const area = document.createElement('questionaire-pane-take-question-area-view') as AreaViewElement
+  const reviewVisibilityEvents: boolean[] = []
+  area.addEventListener('questionaire-take-review-visibility', (event) => {
+    reviewVisibilityEvents.push((event as CustomEvent<{ visible: boolean }>).detail.visible)
+  })
   area.questionaire = { store, subject, acl }
   document.body.append(area)
   await settle(area)
@@ -113,7 +129,7 @@ async function startQuiz (): Promise<{ area: AreaViewElement, store: LiveStore, 
   expect(finishButton?.textContent).toContain('Finished')
   finishButton?.click()
   await settle(area)
-  return { area, store, acl }
+  return { area, store, acl, reviewVisibilityEvents }
 }
 
 describe('questionnaire taking results', () => {
@@ -184,6 +200,21 @@ describe('questionnaire taking results', () => {
 
     expect(mocks.persistQuestionnaireResults).toHaveBeenCalledTimes(2)
     expect(finalScreen.resultsSaved).toBe(true)
+    area.remove()
+  })
+
+  it('restarts the quiz from its review deck', async () => {
+    const { area, reviewVisibilityEvents } = await startQuiz()
+    expect(reviewVisibilityEvents).toEqual([true])
+    const finalScreen = area.shadowRoot?.querySelector('questionaire-pane-take-final-screen') as FinalScreenElement
+    finalScreen.shadowRoot?.querySelector<HTMLButtonElement>(
+      '.questionaire-pane-take-final-screen-retry'
+    )?.click()
+    await settle(area)
+
+    expect(area.shadowRoot?.querySelector('questionaire-pane-take-final-screen')).toBeNull()
+    expect(area.shadowRoot?.querySelector('questionaire-pane-take-question-dispatcher')).toBeTruthy()
+    expect(reviewVisibilityEvents).toEqual([true, false])
     area.remove()
   })
 })

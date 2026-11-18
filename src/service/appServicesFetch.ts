@@ -6,7 +6,7 @@ export function appServicesFetch (endpoint: string): typeof globalThis.fetch {
     throw new Error('App services require HTTPS (except localhost development).')
   }
   return async (input, init) => {
-    const request = new Request(input, { ...init, redirect: 'error' })
+    const request = new Request(input, { ...init, credentials: 'include', redirect: 'error' })
     const target = new URL(request.url)
     if (target.origin !== base.origin || !target.pathname.startsWith(prefix) || request.method !== 'POST') {
       throw new Error('Refusing to send WebID credentials outside the configured app service.')

@@ -16,6 +16,7 @@ import '../ordering/Ordering'
 import '../confidence/Confidence'
 import '../true-false/TrueFalse'
 import '../match/Match'
+import '../diagram-drawing/DiagramDrawing'
 
 @customElement('questionaire-pane-create-question-dispatcher')
 export default class QuestionairePaneCreateQuestionDispatcher extends WebComponent {
@@ -111,8 +112,17 @@ export default class QuestionairePaneCreateQuestionDispatcher extends WebCompone
       `
     }
 
+    if (typeDefinition?.key === 'diagram-drawing') {
+      return html`
+        <questionaire-pane-create-question-diagram-drawing
+          .question=${question}
+        ></questionaire-pane-create-question-diagram-drawing>
+      `
+    }
+
     return html`
       <questionaire-pane-create-question-base
+        .question=${question}
         .questionTypeLabel=${typeDefinition?.label ?? 'Question'}
         .title=${title}
         .description=${description}

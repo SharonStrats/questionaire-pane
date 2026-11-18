@@ -2,14 +2,6 @@
   display: block;
 }
 
-.questionaire-pane-question-image {
-  display: block;
-  width: 100%;
-  max-height: 320px;
-  border-radius: 16px;
-  object-fit: cover;
-}
-
 .questionaire-pane-take-question-text-response {
   display: flex;
   flex-direction: column;
@@ -32,7 +24,8 @@
 .questionaire-pane-take-question-text-response-title {
   margin: 0;
   color: #1e293b;
-  font-size: 28px;
+  font-family: var(--font-family-ui, "Atkinson Hyperlegible Next", "Inter", sans-serif);
+  font-size: 1rem;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
@@ -62,24 +55,18 @@
   color: #0284c7;
 }
 
-.questionaire-pane-take-question-text-response--fill-in-the-blank .questionaire-pane-take-question-text-response-title {
-  font-size: 24px;
-  line-height: 1.375;
-}
-
 .questionaire-pane-take-question-text-response-question-body {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: block;
   min-height: 124px;
   padding: 20px;
   border: 1px solid #e2e5ea;
   border-radius: 12px;
   background: #f4f5f7;
   color: #1a2235;
-  font-size: 14px;
-  line-height: 2.7;
+  font-family: var(--font-family-ui, "Atkinson Hyperlegible Next", "Inter", sans-serif);
+  font-size: 1rem;
+  line-height: 1.8;
+  white-space: pre-line;
 }
 
 .questionaire-pane-take-question-text-response-blank {
@@ -92,6 +79,16 @@
   background: white;
   color: #1a2235;
   font: inherit;
+  vertical-align: middle;
+}
+
+.questionaire-pane-take-question-text-response-extended-blank {
+  display: block;
+  width: min(100%, 42rem);
+  min-height: 7rem;
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  resize: vertical;
 }
 
 .questionaire-pane-take-question-text-response-formatted-blank {
@@ -128,8 +125,6 @@
 }
 
 @media (max-width: 620px) {
-  .questionaire-pane-take-question-text-response-title { font-size: 23px; }
-  .questionaire-pane-take-question-text-response--fill-in-the-blank .questionaire-pane-take-question-text-response-title { font-size: 21px; }
-  .questionaire-pane-take-question-text-response-question-body { padding: 14px; font-size: 13px; line-height: 2.2; }
+  .questionaire-pane-take-question-text-response-question-body { padding: 14px; line-height: 1.8; }
   .questionaire-pane-take-question-text-response-input { min-height: 48px; padding: 12px; }
 }

@@ -32,6 +32,9 @@ export default class QuestionairePaneTakeFinalScreen extends WebComponent {
   accessor store: LiveStore | null = null
 
   @property({ attribute: false })
+  accessor questionnaireTitle = 'Quiz'
+
+  @property({ attribute: false })
   accessor questionSummaries: QuestionaireQuestionSummary[] = []
 
   @property({ attribute: false })
@@ -54,6 +57,9 @@ export default class QuestionairePaneTakeFinalScreen extends WebComponent {
 
   @state()
   private accessor visibleExplanations = new Set<string>()
+
+  @state()
+  private accessor activeReviewIndex = 0
 
   private getCorrectAnswers (question: NamedNode, score: QuestionaireQuestionScore): string[] {
     if (!this.store) return []
@@ -87,7 +93,212 @@ export default class QuestionairePaneTakeFinalScreen extends WebComponent {
     }
     this.visibleExplanations = visible
   }
+
+  private needsReview (score: QuestionaireQuestionScore): boolean {
+    return !score.correct || Boolean(score.evaluation?.needsReview) || (
+      score.evaluation?.method === 'sidecar' &&
+      score.evaluation.score < score.evaluation.maxScore
+    )
+  }
+
+  private getReviewScores (): QuestionaireQuestionScore[] {
+    if (this.questionSummaries.length === 0) return this.questionScores
+    const scoresByUri = new Map(this.questionScores.map(score => [score.questionUri, score]))
+    return this.questionSummaries
+      .map(summary => scoresByUri.get(summary.question.uri))
+      .filter((score): score is QuestionaireQuestionScore => Boolean(score))
+  }
+
+  private renderReviewDeck () {
+    const scores = this.getReviewScores()
+    const currentIndex = Math.min(this.activeReviewIndex, scores.length - 1)
+    const score = scores[currentIndex]
+    const summary = this.questionSummaries.find(item => item.question.uri === score.questionUri)
+    const correctAnswers = summary ? this.getCorrectAnswers(summary.question, score) : []
+    const explanation = summary && this.store
+      ? readQuestionValue(this.store, summary.question, 'explanation').trim()
+      : ''
+    const percentage = this.availablePoints > 0
+      ? Math.round((this.earnedPoints / this.availablePoints) * 100)
+      : 0
+    const reviewCount = scores.filter(item => this.needsReview(item)).length
+    const correctCount = scores.length - reviewCount
+    const currentNeedsReview = this.needsReview(score)
+    const typeLabels = new Map<string, string>([
+      [questionairePredicates.question.questionType.multipleChoice.value, 'Multiple choice'],
+      [questionairePredicates.question.questionType.selection.value, 'Select all that apply'],
+      [questionairePredicates.question.questionType.trueFalse.value, 'True or false'],
+      [questionairePredicates.question.questionType.fillInBlank.value, 'Fill in the blank'],
+      [questionairePredicates.question.questionType.shortAnswer.value, 'Short answer'],
+      [questionairePredicates.question.questionType.ordering.value, 'Ordering'],
+      [questionairePredicates.question.questionType.match.value, 'Matching'],
+      [questionairePredicates.question.questionType.confidence.value, 'Confidence']
+    ])
+    const questionTypeLabel = typeLabels.get(score.questionTypeUri) ?? 'Question'
+    const answerText = formatReviewAnswer(this.answers[score.questionUri] ?? null, score.questionTypeUri)
+
+    return html`
+      <section class="questionaire-pane-take-final-screen questionaire-pane-take-final-screen--review">
+        <header class="questionaire-pane-take-final-screen-topbar">
+          <div class="questionaire-pane-take-final-screen-brand">
+            <span class="questionaire-pane-take-final-screen-brand-mark" aria-hidden="true">✦</span>
+            <span>
+              <strong>${this.questionnaireTitle || 'Quiz'}</strong>
+              <small>Quiz review</small>
+            </span>
+          </div>
+          <div class="questionaire-pane-take-final-screen-top-score">
+            <span>Your score</span>
+            <strong>${this.earnedPoints} / ${this.availablePoints}</strong>
+          </div>
+        </header>
+
+        <div class="questionaire-pane-take-final-screen-review-layout">
+          <aside class="questionaire-pane-take-final-screen-sidebar" aria-label="Quiz summary">
+            <p class="questionaire-pane-take-final-screen-sidebar-kicker">Quiz complete</p>
+            <div
+              class="questionaire-pane-take-final-screen-score-ring"
+              style="--score-angle: ${percentage * 3.6}deg"
+              role="img"
+              aria-label="${percentage}% correct"
+            >
+              <span><strong>${percentage}%</strong><small>correct</small></span>
+            </div>
+            <h1>${percentage === 100 ? 'Excellent work!' : 'Good first try!'}</h1>
+            <p class="questionaire-pane-take-final-screen-sidebar-copy">
+              Go through the cards one at a time and learn from every answer.
+            </p>
+
+            <div class="questionaire-pane-take-final-screen-stats" aria-label="Quiz results">
+              <div><strong>${correctCount}</strong><span>Correct</span></div>
+              <div><strong>${reviewCount}</strong><span>Review</span></div>
+              <div><strong>${this.answeredQuestions}</strong><span>Answered</span></div>
+            </div>
+
+            <div class="questionaire-pane-take-final-screen-deck">
+              <p>Review deck</p>
+              <nav aria-label="Choose a question to review">
+                ${scores.map((item, index) => html`
+                  <button
+                    type="button"
+                    class="questionaire-pane-take-final-screen-deck-item ${this.needsReview(item) ? 'is-review' : 'is-correct'}"
+                    aria-label="Question ${index + 1}, ${this.needsReview(item) ? 'needs review' : 'correct'}"
+                    aria-current=${index === currentIndex ? 'step' : nothing}
+                    @click=${() => { this.activeReviewIndex = index }}
+                  >${index + 1}</button>
+                `)}
+              </nav>
+            </div>
+
+            <button
+              type="button"
+              class="questionaire-pane-take-final-screen-retry"
+              ?disabled=${this.resultStatus === 'saving' || this.resultStatus === 'sharing'}
+              @click=${() => this.dispatchEvent(new CustomEvent('questionaire-take-retry', { bubbles: true, composed: true }))}
+            >↻ <span>Try the quiz again</span></button>
+
+            <section class="questionaire-pane-take-final-screen-result-actions" aria-label="Save or share results">
+              <p>${this.resultsSaved
+                ? 'Your result is saved privately.'
+                : this.resultStatus === 'saving'
+                  ? 'Saving your result privately…'
+                  : 'Save your result privately or share it with the creator.'}</p>
+              <div class="questionaire-pane-take-final-screen-result-buttons">
+                <button
+                  type="button"
+                  class="questionaire-pane-take-final-screen-private"
+                  ?disabled=${this.resultStatus === 'saving' || this.resultStatus === 'sharing' || this.resultsSaved}
+                  @click=${() => this.dispatchEvent(new CustomEvent('questionaire-take-save-results', { bubbles: true, composed: true }))}
+                >${this.resultStatus === 'saving' ? 'Saving…' : this.resultsSaved ? 'Results saved' : this.resultStatus === 'error' ? 'Retry save' : 'Save results'}</button>
+                <button
+                  type="button"
+                  class="questionaire-pane-take-final-screen-share-button"
+                  ?disabled=${this.resultStatus === 'saving' || this.resultStatus === 'sharing' || this.resultStatus === 'shared'}
+                  @click=${() => this.dispatchEvent(new CustomEvent('questionaire-take-share-results', { bubbles: true, composed: true }))}
+                >${this.resultStatus === 'sharing' ? 'Sharing…' : this.resultStatus === 'shared' ? 'Results shared' : 'Share results'}</button>
+              </div>
+              ${this.shareError ? html`<p role="alert" class="questionaire-pane-take-final-screen-share-error">${this.shareError}</p>` : nothing}
+              ${this.resultStatus === 'saved' ? html`<p role="status" class="questionaire-pane-take-final-screen-share-success">Your result is available to you.</p>` : nothing}
+              ${this.resultStatus === 'shared' ? html`<p role="status" class="questionaire-pane-take-final-screen-share-success">The creator can now read your results.</p>` : nothing}
+              <button
+                type="button"
+                class="questionaire-pane-take-final-screen-exit"
+                ?disabled=${this.resultStatus === 'saving' || this.resultStatus === 'sharing'}
+                @click=${() => this.dispatchEvent(new CustomEvent('questionaire-take-cancel', { bubbles: true, composed: true }))}
+              >Exit review</button>
+            </section>
+          </aside>
+
+          <div class="questionaire-pane-take-final-screen-review-main" role="region" aria-label="Question review">
+            <div class="questionaire-pane-take-final-screen-progress">
+              <div>
+                <span class="questionaire-pane-take-final-screen-progress-label">${currentNeedsReview ? 'Review this' : 'Correct answer'}</span>
+                <span class="questionaire-pane-take-final-screen-progress-count">Card ${currentIndex + 1} of ${scores.length}</span>
+              </div>
+              <div class="questionaire-pane-take-final-screen-progress-track" aria-hidden="true">
+                <span style="width: ${((currentIndex + 1) / scores.length) * 100}%"></span>
+              </div>
+            </div>
+
+            <article class="questionaire-pane-take-final-screen-review-card">
+              <span class="questionaire-pane-take-final-screen-question-type">${questionTypeLabel}</span>
+              <h2>${summary?.title || 'Question'}</h2>
+              <div class="questionaire-pane-take-final-screen-answer-comparison">
+                <div>
+                  <span>Your answer</span>
+                  <p>${answerText}</p>
+                </div>
+                <div class="questionaire-pane-take-final-screen-correct-answer">
+                  <span>Correct answer</span>
+                  <p>${correctAnswers.length ? correctAnswers.join(' · ') : 'See the question instructions.'}</p>
+                </div>
+              </div>
+              ${score.evaluation?.feedback
+                ? html`<p class="questionaire-pane-take-final-screen-feedback"><strong>Grading feedback</strong>${score.evaluation.feedback}</p>`
+                : nothing}
+              ${score.evaluation?.method === 'sidecar'
+                ? html`<p class="questionaire-pane-take-final-screen-confidence">
+                    ${score.evaluation.needsReview ? 'Needs review · ' : ''}
+                    AI score ${score.evaluation.score} of ${score.evaluation.maxScore}
+                  </p>`
+                : nothing}
+              ${explanation
+                ? html`
+                    <section class="questionaire-pane-take-final-screen-why">
+                      <span class="questionaire-pane-take-final-screen-why-icon" aria-hidden="true">✧</span>
+                      <div>
+                        <strong>Why this matters</strong>
+                        <p>${explanation}</p>
+                      </div>
+                    </section>
+                  `
+                : nothing}
+            </article>
+
+            <div class="questionaire-pane-take-final-screen-review-navigation">
+              <button
+                type="button"
+                ?disabled=${currentIndex === 0}
+                @click=${() => { this.activeReviewIndex = Math.max(0, currentIndex - 1) }}
+              >← <span>Previous card</span></button>
+              <span>${currentIndex + 1} / ${scores.length}</span>
+              <button
+                type="button"
+                ?disabled=${currentIndex >= scores.length - 1}
+                @click=${() => { this.activeReviewIndex = Math.min(scores.length - 1, currentIndex + 1) }}
+              ><span>Next card</span> →</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    `
+  }
+
   render() {
+    if (!this.isSurvey && this.getReviewScores().length > 0) {
+      return this.renderReviewDeck()
+    }
+
     const percentage = this.availablePoints > 0
       ? Math.round((this.earnedPoints / this.availablePoints) * 100)
       : 0

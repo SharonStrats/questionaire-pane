@@ -1,12 +1,14 @@
 import { html } from 'lit'
 import { property } from 'lit/decorators.js'
-import { customElement, WebComponent } from 'solid-ui'
+import { customElement } from 'solid-ui'
 import styles from './Base.styles.css'
 import '../footer/Footer'
 import { renderFormattedText } from '../../../shared/formatting'
+import QuestionairePaneCreateQuestionCardBase from '../card-base/CardBase'
+import '../header/Header'
 
 @customElement('questionaire-pane-create-question-base')
-export default class QuestionairePaneCreateQuestionBase extends WebComponent {
+export default class QuestionairePaneCreateQuestionBase extends QuestionairePaneCreateQuestionCardBase {
   static styles = styles
 
   @property({ type: String })
@@ -30,9 +32,13 @@ export default class QuestionairePaneCreateQuestionBase extends WebComponent {
   render() {
     return html`
       <section class="questionaire-pane-create-question-base">
+        <questionaire-pane-create-question-header
+          .questionNumber=${this.getQuestionNumber()}
+          .questionTypeLabel=${this.questionTypeLabel}
+          @questionaire-question-header-delete=${() => { void this.deleteQuestion() }}
+        ></questionaire-pane-create-question-header>
         <div class="questionaire-pane-create-question-base-header">
           <div>
-            <p class="questionaire-pane-create-question-base-type">${this.questionTypeLabel}</p>
             <h2 class="questionaire-pane-create-question-base-title">${renderFormattedText(this.title)}</h2>
           </div>
         </div>

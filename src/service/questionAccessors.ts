@@ -57,6 +57,7 @@ export function readQuestionValues (
         .map((pair) => store.any(pair, pairPredicate, undefined, question.doc())?.value ?? '')
         .filter((value) => value.length > 0)
     }
+
   }
 
   if (field === 'item') {
@@ -152,6 +153,41 @@ export function readQuestionValues (
         question.doc()
       )?.value ?? ''
     })
+}
+
+export function readQuestionResponseKinds (store: LiveStore, question: NamedNode): Array<'short-text' | 'long-text'> {
+  const parts = store.statementsMatching(
+    question,
+    questionairePredicates.question.responsePart,
+    undefined,
+    question.doc()
+  )
+    .map((statement) => statement.object)
+    .filter((object): object is NamedNode => object.termType === 'NamedNode')
+    .map((part) => ({
+      position: Number(store.any(part, questionairePredicates.question.position, undefined, question.doc())?.value ?? 0),
+      kind: store.any(part, questionairePredicates.question.responseKind, undefined, question.doc())?.equals(questionairePredicates.question.longTextResponse)
+        ? 'long-text' as const
+        : 'short-text' as const
+    }))
+    .sort((left, right) => left.position - right.position)
+
+  return parts.map((part) => part.kind)
+}
+
+export function readQuestionAnswerValuesByPosition (store: LiveStore, question: NamedNode): string[] {
+  return store.statementsMatching(question, questionairePredicates.question.answer, undefined, question.doc())
+    .map(statement => statement.object)
+    .filter((object): object is NamedNode => object.termType === 'NamedNode')
+    .map(answer => ({
+      position: Number(answer.value.match(/answer-(\d+)$/)?.[1] ?? 0),
+      value: store.any(answer, questionairePredicates.question.answerText, undefined, question.doc())?.value ?? ''
+    }))
+    .sort((left, right) => left.position - right.position)
+    .reduce<string[]>((values, item) => {
+      values[item.position - 1] = item.value
+      return values
+    }, [])
 }
 
 export function readQuestionGradingCriteria (

@@ -43,12 +43,6 @@ export default class QuestionairePaneTakeQuestionTrueFalse extends WebComponent 
     return readQuestionValue(store, question, 'title')
   }
 
-  private getQuestionImage () {
-    const store = this.getStore()
-    const question = this.question
-    return store && question ? readQuestionValue(store, question, 'image') : ''
-  }
-
   protected willUpdate () {
     const question = this.question
     if (!question || this.loadedQuestionUri === question.uri) {
@@ -75,13 +69,11 @@ export default class QuestionairePaneTakeQuestionTrueFalse extends WebComponent 
 
   render() {
     const title = this.getQuestionTitle()
-    const image = this.getQuestionImage()
     const selected = this.draftAnswer
 
     return html`
       <section class="questionaire-pane-take-question-true-false">
         <div class="questionaire-pane-take-question-true-false-type">True / False</div>
-        ${image ? html`<img class="questionaire-pane-question-image" src=${image} alt="" />` : ''}
         <h2 class="questionaire-pane-take-question-true-false-title">${renderFormattedText(title || 'Untitled question')}</h2>
         <div class="questionaire-pane-take-question-true-false-options">
           <button

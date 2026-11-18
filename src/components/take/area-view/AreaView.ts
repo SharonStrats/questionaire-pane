@@ -22,6 +22,7 @@ import { shuffleDifferent } from '../../../service/shuffle'
 import { showPokemonLevelUp } from '../../standalone/pokemon-level-up/PokemonLevelUpDialog'
 import '../dispatcher/Dispatcher'
 import '../final-screen/FinalScreen'
+import '../question-image/QuestionImage'
 
 type AnswerValue = string | string[] | null
 
@@ -163,6 +164,10 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
   private goNext (questions: QuestionaireQuestionSummary[]) {
     if (this.completed) return
     if (this.activeQuestionIndex >= questions.length - 1) {
+      const { store, subject } = this.questionaire ?? { store: null, subject: null }
+      if (store && subject && getQuestionnaireFormat(store, subject) === 'quiz') {
+        this.setReviewVisibility(true)
+      }
       this.completed = true
       void this.saveResults(false)
       return
@@ -203,6 +208,9 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
         availablePoints: score.availablePoints,
         answers: this.answersByQuestionUri,
         questionUris: this.questions.map((question) => question.question.uri),
+        drawingQuestionUris: this.questions
+          .filter((question) => question.typeUri === questionairePredicates.question.questionType.diagramDrawing.value)
+          .map((question) => question.question.uri),
         shareWithCreator
       })
       this.savedResultContainer = saved.resultContainer
@@ -233,7 +241,29 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
   }
 
   private cancelTaking () {
+    this.setReviewVisibility(false)
     this.dispatchEvent(new CustomEvent('questionaire-take-cancel', { bubbles: true, composed: true }))
+  }
+
+  private setReviewVisibility (visible: boolean) {
+    this.dispatchEvent(new CustomEvent('questionaire-take-review-visibility', {
+      detail: { visible },
+      bubbles: true,
+      composed: true
+    }))
+  }
+
+  private restartTaking () {
+    if (this.shareStatus === 'saving' || this.shareStatus === 'sharing') return
+    this.setReviewVisibility(false)
+    this.activeQuestionIndex = 0
+    this.answersByQuestionUri = {}
+    this.semanticAnswerResults = {}
+    this.answerEvaluations = {}
+    this.completed = false
+    this.shareStatus = 'idle'
+    this.shareError = ''
+    this.savedResultContainer = undefined
   }
 
   render() {
@@ -253,8 +283,9 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
     if (this.questionsLoading && questions.length === 0) {
       return html`
         <section class="questionaire-pane-take-question-area-view">
-          <div class="questionaire-pane-take-question-area-view-empty">
-            Loading questions...
+          <div class="questionaire-pane-take-question-area-view-empty questionaire-pane-take-question-area-view-loading" role="status">
+            <span class="questionaire-pane-take-question-area-view-spinner" aria-hidden="true"></span>
+            <span>Loading questions…</span>
           </div>
         </section>
       `
@@ -262,8 +293,7 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
 
     if (this.completed) {
       return html`
-        <section class="questionaire-pane-take-question-area-view">
-          <div class="questionaire-pane-take-question-area-view-card">
+        <section class="questionaire-pane-take-question-area-view questionaire-pane-take-question-area-view--completed">
             <questionaire-pane-take-final-screen
               .totalQuestions=${score.totalQuestions}
               .answeredQuestions=${score.answeredQuestions}
@@ -271,6 +301,7 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
               .earnedPoints=${score.earnedPoints}
               .isSurvey=${isSurvey}
               .store=${store}
+              .questionnaireTitle=${readQuestionValue(store, subject, 'title') || 'Quiz'}
               .questionSummaries=${questions}
               .questionScores=${score.questionScores}
               .answers=${this.answersByQuestionUri}
@@ -280,9 +311,9 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
               .resultsSaved=${Boolean(this.savedResultContainer)}
               @questionaire-take-save-results=${() => { void this.saveResults(false) }}
               @questionaire-take-share-results=${() => { void this.saveResults(true) }}
+              @questionaire-take-retry=${() => this.restartTaking()}
               @questionaire-take-cancel=${() => this.cancelTaking()}
             ></questionaire-pane-take-final-screen>
-          </div>
         </section>
       `
     }
@@ -302,6 +333,7 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
     const isLastQuestion = this.activeQuestionIndex >= questions.length - 1
     const answerComplete = this.hasCurrentAnswer(activeQuestion)
     const hint = readQuestionValue(store, activeQuestion.question, 'hint')
+    const image = readQuestionValue(store, activeQuestion.question, 'image')
 
     return html`
       <section class="questionaire-pane-take-question-area-view">
@@ -309,6 +341,14 @@ export default class QuestionairePaneTakeQuestionAreaView extends WebComponent {
           <div class="questionaire-pane-take-question-area-view-progress">
             Question ${this.activeQuestionIndex + 1} of ${questions.length}
           </div>
+          ${image
+            ? html`
+                <questionaire-pane-take-question-image
+                  .src=${image}
+                  .fetcher=${store.fetcher ?? null}
+                ></questionaire-pane-take-question-image>
+              `
+            : ''}
           <questionaire-pane-take-question-dispatcher
             .question=${activeQuestion.question}
             .answer=${currentAnswer}

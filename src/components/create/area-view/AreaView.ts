@@ -5,7 +5,7 @@ import { customElement, WebComponent } from 'solid-ui'
 import styles from './AreaView.styles.css'
 import { questionaireContext, type QuestionaireContext } from '../../../context'
 import { createQuestionaireLogic } from '../../../service/questionaireLogic'
-import { loadQuestionaireQuestionSummaries, type QuestionaireQuestionSummary } from '../../../service/questionQueries'
+import { loadQuestionaireQuestionSummaries, getQuestionnaireFormat, type QuestionaireQuestionSummary } from '../../../service/questionQueries'
 import '../sidebar/Sidebar'
 import '../question-cards/dispatcher/Dispatcher'
 import { questionaireCreateQuestionTypes } from '../question-cards/questionaire-pane-create-question-types'
@@ -199,11 +199,15 @@ export default class QuestionairePaneCreateQuestionAreaView extends WebComponent
     const activeQuestion = this.editorDismissed
       ? null
       : (questions.find((question) => question.question.uri === this.activeQuestionUri) ?? questions[0] ?? null)
+    const format = this.questionaire?.store && this.questionaire.subject
+      ? getQuestionnaireFormat(this.questionaire.store, this.questionaire.subject)
+      : 'quiz'
 
     return html`
       <div class="questionaire-pane-create-question-area-view">
         <questionaire-pane-create-sidebar
           .questions=${questions}
+          .format=${format}
           .selectedQuestionUri=${activeQuestion?.question.uri ?? null}
           @questionaire-question-selected=${this.handleSidebarSelection}
           @questionaire-add-question=${(event: CustomEvent<{ questionTypeUri?: string }>) => { void this.handleSidebarAddQuestion(event) }}
@@ -211,7 +215,12 @@ export default class QuestionairePaneCreateQuestionAreaView extends WebComponent
         <div class="questionaire-pane-create-question-area-view-editor">
           <div class="questionaire-pane-create-question-area-view-editor-card">
             ${this.questionsLoading && questions.length === 0
-              ? html`<div class="questionaire-pane-create-question-area-view-loading">Loading questions…</div>`
+              ? html`
+                  <div class="questionaire-pane-create-question-area-view-loading" role="status">
+                    <span class="questionaire-pane-create-question-area-view-spinner" aria-hidden="true"></span>
+                    <span>Loading questions…</span>
+                  </div>
+                `
               : activeQuestion
               ? html`
                   <questionaire-pane-create-question-dispatcher

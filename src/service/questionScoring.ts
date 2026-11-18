@@ -2,7 +2,9 @@ import { sym, type LiveStore, type NamedNode } from 'rdflib'
 import { questionairePredicates } from './predicates'
 import {
   readQuestionTypeUri as readQuestionTypeUriFromStore,
-  readQuestionValues
+  readQuestionValues,
+  readQuestionResponseKinds,
+  readQuestionAnswerValuesByPosition
 } from './questionAccessors'
 import { getQuestionnaireFormat } from './questionQueries'
 import type { ShortAnswerEvaluation } from './quizAiService'
@@ -102,6 +104,17 @@ function countFillInBlankSlots (title: string) {
   return Math.max(1, title.match(/\[_{2,}\]|_{3,}/g)?.length ?? 0)
 }
 
+function responseEvaluationForFillInTheBlank (
+  evaluation: ShortAnswerEvaluation | undefined,
+  explanationSlotCount: number
+) {
+  if (!evaluation || explanationSlotCount === 0) {
+    return 0
+  }
+
+  return Math.max(0, Math.min(explanationSlotCount, evaluation.score / Math.max(1, evaluation.maxScore) * explanationSlotCount))
+}
+
 export function evaluateQuestionAnswer (
   store: LiveStore,
   question: NamedNode,
@@ -131,7 +144,7 @@ export function evaluateQuestionAnswer (
   }
 
   const correctOptionValues = readQuestionValueList(store, question, questionairePredicates.question.correctOption)
-  const answerValues = readQuestionValueList(store, question, questionairePredicates.question.answer)
+  const answerValues = readQuestionAnswerValuesByPosition(store, question)
   // Ordering questions store their values under schema:hasPart/itemListElement,
   // rather than as direct schema:item triples on the question.
   const itemValues = readQuestionValues(store, question, 'item')
@@ -146,16 +159,30 @@ export function evaluateQuestionAnswer (
   } else if (questionTypeUri === questionairePredicates.question.questionType.fillInBlank.value) {
     const title = store.any(question, questionairePredicates.question.title, undefined, question.doc())?.value ?? ''
     const slotCount = Math.max(countFillInBlankSlots(title), expected.length)
-    const correctAnswerCount = Array.from({ length: slotCount }, (_, index) =>
-      normalizeTextAnswer(expected[index] ?? '') === normalizeTextAnswer(normalizedAnswer[index] ?? '') &&
+    const responseKinds = readQuestionResponseKinds(store, question)
+    const rawAnswers = Array.isArray(answer) ? answer : answer ? [answer] : []
+    const automaticallyScoredSlots = Array.from({ length: slotCount }, (_, index) => responseKinds[index] !== 'long-text')
+    const correctAnswerCount = automaticallyScoredSlots.filter((isAutomatic, index) =>
+      isAutomatic &&
+      normalizeTextAnswer(expected[index] ?? '') === normalizeTextAnswer(rawAnswers[index] ?? '') &&
       normalizeTextAnswer(expected[index] ?? '').length > 0
-    ).filter(Boolean).length
-    correct = slotCount > 0 && correctAnswerCount === slotCount
+    ).length
+    const hasUnreviewedExplanation = responseKinds
+      .slice(0, slotCount)
+      .some((kind, index) => kind === 'long-text' &&
+        normalizeTextAnswer(rawAnswers[index] ?? '').length > 0 &&
+        (!answerEvaluation || answerEvaluation.needsReview))
+    const automaticSlotCount = automaticallyScoredSlots.filter(Boolean).length
+    const aiScore = responseEvaluationForFillInTheBlank(answerEvaluation, slotCount - automaticSlotCount)
+    correct = slotCount > 0 && !hasUnreviewedExplanation &&
+      correctAnswerCount === automaticSlotCount &&
+      (!answerEvaluation || (answerEvaluation.correct && !answerEvaluation.needsReview))
     return {
       questionUri: question.uri,
       questionTypeUri,
       availablePoints,
-      earnedPoints: slotCount > 0 ? availablePoints * correctAnswerCount / slotCount : 0,
+      earnedPoints: slotCount > 0 ? availablePoints * (correctAnswerCount + aiScore) / slotCount : 0,
+      ...(answerEvaluation ? { evaluation: answerEvaluation } : {}),
       correct
     }
   } else if (questionTypeUri === questionairePredicates.question.questionType.shortAnswer.value) {

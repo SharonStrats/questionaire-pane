@@ -55,6 +55,10 @@ export const questionairePredicates = {
     sourceItem: quiz('sourceItem'),
     targetItem: quiz('targetItem'),
     matchPair: quiz('matchPair'),
+    responsePart: quiz('responsePart'),
+    responseKind: quiz('responseKind'),
+    shortTextResponse: quiz('ShortTextResponse'),
+    longTextResponse: quiz('LongTextResponse'),
     // DCMI Terms: resource creation, identity, composition, and containment.
     created: dct('created'),
     modified: dct('modified'),
@@ -73,7 +77,8 @@ export const questionairePredicates = {
       shortAnswer: quiz('ShortAnswerQuestion'),
       ordering: quiz('OrderingQuestion'),
       match: quiz('MatchQuestion'),
-      confidence: quiz('ConfidenceQuestion')
+      confidence: quiz('ConfidenceQuestion'),
+      diagramDrawing: quiz('DiagramDrawingQuestion')
     }
   }
 } as const

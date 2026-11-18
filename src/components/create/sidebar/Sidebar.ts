@@ -7,7 +7,7 @@ import 'solid-ui/components/menu'
 import 'solid-ui/components/menu-item'
 import styles from './Sidebar.styles.css'
 import {
-  questionaireCreateQuestionTypes,
+  getQuestionaireCreateQuestionTypesForFormat,
   getQuestionaireCreateQuestionTypeByUri,
   type QuestionaireCreateQuestionTypeDefinition
 } from '../question-cards/questionaire-pane-create-question-types'
@@ -27,6 +27,9 @@ export default class QuestionairePaneCreateSidebar extends WebComponent {
 
   @property({ type: String, attribute: 'selected-question-uri' })
   accessor selectedQuestionUri: string | null = null
+
+  @property({ type: String })
+  accessor format: 'quiz' | 'survey' = 'quiz'
 
   private selectQuestion (questionUri: string) {
     this.dispatchEvent(new CustomEvent('questionaire-question-selected', {
@@ -105,7 +108,7 @@ export default class QuestionairePaneCreateSidebar extends WebComponent {
             <span>+</span>
             <span>Add question</span>
           </solid-ui-button>
-          ${questionaireCreateQuestionTypes.map((questionType) => html`
+          ${getQuestionaireCreateQuestionTypesForFormat(this.format).map((questionType) => html`
             <solid-ui-menu-item @solid-ui-select=${() => this.addQuestion(questionType.questionTypeUri)}>
               <span class="questionaire-pane-create-sidebar-menu-item-title">${questionType.label}</span>
               <span class="questionaire-pane-create-sidebar-menu-item-description">${questionType.description}</span>

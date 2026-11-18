@@ -64,7 +64,7 @@
 .english-practice-form {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(128px, auto);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: end;
   gap: 12px;
   margin-top: 8px;
@@ -74,7 +74,7 @@
   min-width: 0;
   gap: 6px;
   color: #52616b;
-  font-size: 11px;
+  font-size: var(--solid-ui-font-size-sm, 0.875rem);
 }
 .english-practice-form input,
 .english-practice-form select {
@@ -88,9 +88,15 @@
   color: #9ca3af;
   background: #f8f9fb;
   font: inherit;
+  font-size: var(--solid-ui-font-size-md, 1rem);
 }
-.english-practice-prompt-preview { display: block; color: #344054; font-size: 11px; font-weight: 400; line-height: 1.4; overflow-wrap: anywhere; }
+.english-practice-prompt-combobox {
+  width: 100%;
+  font-size: var(--solid-ui-font-size-md, 1rem);
+}
 .english-practice-form button {
+  grid-column: 1 / -1;
+  justify-self: start;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -109,8 +115,8 @@
 .english-practice-form icon-lucide-sparkles { width: 14px; height: 14px; }
 .english-practice-note { grid-column: 1 / -1; margin-bottom: 0 !important; font-size: 10px !important; }
 .english-practice-save-status { grid-column: 1 / -1; min-height: 16px; margin: 0 !important; color: #667085; font-size: 10px !important; }
-.english-practice-response { display: grid; grid-column: 1 / -1; gap: 7px; color: #667085; font-size: 11px; font-weight: 700; }
-.english-practice-response textarea { min-height: 150px; padding: 11px; border: 1px solid #c8cedb; border-radius: 8px; color: #344054; background: #fff; font: inherit; line-height: 1.5; resize: vertical; }
+.english-practice-response { display: grid; grid-column: 1 / -1; gap: 7px; color: #667085; font-size: var(--solid-ui-font-size-sm, 0.875rem); font-weight: 700; }
+.english-practice-response textarea { min-height: 150px; padding: 11px; border: 1px solid #c8cedb; border-radius: 8px; color: #344054; background: #fff; font: inherit; font-size: var(--solid-ui-font-size-md, 1rem); line-height: 1.5; resize: vertical; }
 .english-practice-error { grid-column: 1 / -1; color: #a33 !important; }
 .english-peel-guide { grid-column: 1 / -1; padding: 16px; border: 1px solid #dfe3ea; border-radius: 10px; color: #344054; background: #f8f7ff; }
 .english-peel-guide-heading { display: flex; justify-content: space-between; gap: 12px; }
@@ -126,7 +132,15 @@
 .english-practice-feedback h4 { margin: 16px 0 6px; color: #667085; font-size: 11px; text-transform: uppercase; }
 .english-practice-feedback ul { margin: 0; padding-left: 20px; color: #344054; font-size: 12px; line-height: 1.5; }
 .english-practice-feedback article { margin-top: 12px; padding-top: 12px; border-top: 1px solid #eaecf0; color: #344054; font-size: 12px; }
+.english-practice-rubric-feedback article { margin-top: 10px; padding: 10px; border: 1px solid #eaecf0; border-radius: 8px; }
+.english-practice-rubric-feedback h5 { margin: 0 0 6px; color: #344054; font-size: 12px; }
+.english-practice-rubric-feedback h5 span { margin-left: 6px; color: #667085; font-weight: normal; }
 .english-practice-feedback article p { margin: 5px 0; }
+.english-practice-next-challenge { margin-top: 16px; padding: 12px; border-radius: 8px; background: #f2f4f7; color: #344054; }
+.english-practice-next-challenge h4 { margin-top: 0; }
+.english-practice-prompt-generation { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: end; gap: 10px; padding: 10px; border: 1px solid #eaecf0; border-radius: 8px; background: #f9fafb; }
+.english-practice-prompt-generation label { flex: 1 1 180px; }
+.english-practice-prompt-generation button { flex: 0 0 auto; }
 .english-practice-feedback article small { color: #667085; }
 .english-practice-history { grid-template-columns: 1fr; }
 .english-practice-history-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }

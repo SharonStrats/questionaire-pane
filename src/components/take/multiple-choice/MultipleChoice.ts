@@ -58,12 +58,6 @@ export default class QuestionairePaneTakeQuestionMultipleChoice extends WebCompo
     return readQuestionValue(store, question, 'title')
   }
 
-  private getQuestionImage () {
-    const store = this.getStore()
-    const question = this.question
-    return store && question ? readQuestionValue(store, question, 'image') : ''
-  }
-
   private getQuestionOptions () {
     const store = this.getStore()
     const question = this.question
@@ -144,13 +138,11 @@ export default class QuestionairePaneTakeQuestionMultipleChoice extends WebCompo
 
   render() {
     const title = this.getQuestionTitle()
-    const image = this.getQuestionImage()
     const options = this.getDisplayedOptions()
 
     return html`
       <section class="questionaire-pane-take-question-multiple-choice">
         <div class="questionaire-pane-take-question-multiple-choice-type">${this.questionTypeLabel}</div>
-        ${image ? html`<img class="questionaire-pane-question-image" src=${image} alt="" />` : ''}
         <h2 class="questionaire-pane-take-question-multiple-choice-title">${renderFormattedText(title || 'Untitled question')}</h2>
         <div class="questionaire-pane-take-question-multiple-choice-options">
           ${options.map((option) => html`

@@ -5,7 +5,7 @@ import styles from './FillInTheBlank.styles.css'
 import QuestionairePaneCreateQuestionCardBase from '../card-base/CardBase'
 import '../../../shared/FormattingToolbar'
 import '../../../shared/FormattedTextEditor'
-import { readQuestionValue, readQuestionValues } from '../../../../service/questionAccessors'
+import { readQuestionResponseKinds, readQuestionValue, readQuestionValues } from '../../../../service/questionAccessors'
 import '../header/Header'
 import '../footer/Footer'
 import '../image-upload/ImageUpload'
@@ -38,6 +38,9 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
   private accessor draftAnswers: string[] = []
 
   @state()
+  private accessor draftResponseKinds: Array<'short-text' | 'long-text'> = []
+
+  @state()
   private accessor loadedQuestionUri: string | null = null
 
   protected willUpdate () {
@@ -55,6 +58,7 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
     this.draftPoints = String(storedPoints)
     this.pointsCustomized = storedPoints !== this.getBlankCount(title)
     this.draftAnswers = this.getQuestionAnswers()
+    this.draftResponseKinds = readQuestionResponseKinds(this.getStore()!, question)
     this.loadedQuestionUri = question.uri
   }
 
@@ -129,7 +133,11 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
     await logic.updateQuestionExplanation({ question, explanation })
     await logic.updateQuestionImage({ question, image })
     await logic.updateQuestionPoints({ question, points: Number.isFinite(points) ? points : 0 })
-    await logic.updateQuestionAnswers({ question, answers: answers.filter((answer) => answer.length > 0) })
+    await logic.updateQuestionAnswers({
+      question,
+      answers,
+      responseKinds: this.draftResponseKinds
+    })
 
     this.emitQuestionChanged()
     this.emitQuestionSaved()
@@ -147,8 +155,16 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
     while (answers.length <= index) {
       answers.push('')
     }
+
     answers[index] = value
     this.draftAnswers = answers
+  }
+
+  private updateResponseKind (index: number, kind: 'short-text' | 'long-text') {
+    const kinds = this.draftResponseKinds.slice()
+    while (kinds.length <= index) kinds.push('short-text')
+    kinds[index] = kind
+    this.draftResponseKinds = kinds
   }
 
   private updateQuestionDraftTitle (value: string) {
@@ -172,6 +188,9 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
     const blankCount = this.getBlankCount(title)
     const answers = this.draftAnswers.concat(
       Array.from({ length: Math.max(0, blankCount - this.draftAnswers.length) }, () => '')
+    )
+    const responseKinds = this.draftResponseKinds.concat(
+      Array.from({ length: Math.max(0, blankCount - this.draftResponseKinds.length) }, () => 'short-text' as const)
     )
     const questionNumber = this.getQuestionNumber()
 
@@ -254,12 +273,22 @@ export default class QuestionairePaneCreateQuestionFillInTheBlank extends Questi
           <label>CORRECT ANSWER(S)</label>
           ${answers.slice(0, blankCount).map((answer, index) => html`
             <div class="questionaire-pane-create-question-fill-in-the-blank-answer-row">
-              <div class="questionaire-pane-create-question-fill-in-the-blank-answer-badge">Blank ${index + 1}</div>
+              <div class="questionaire-pane-create-question-fill-in-the-blank-answer-badge">
+                <span>Blank ${index + 1}</span>
+                <select
+                  aria-label=${`Blank ${index + 1} response type`}
+                  .value=${responseKinds[index]}
+                  @change=${(event: Event) => this.updateResponseKind(index, (event.currentTarget as HTMLSelectElement).value as 'short-text' | 'long-text')}
+                >
+                  <option value="short-text">Short answer</option>
+                  <option value="long-text">Explanation</option>
+                </select>
+              </div>
             <div class="questionaire-pane-create-question-fill-in-the-blank-answer-editor">
               <questionaire-pane-formatted-text-editor
                 class="questionaire-pane-create-question-fill-in-the-blank-answer-input"
                 single-line
-                placeholder="Answer"
+                placeholder=${responseKinds[index] === 'long-text' ? 'Optional grading guidance' : 'Answer'}
                 .value=${answer}
                 @questionaire-formatted-text-input=${(event: CustomEvent<{ value: string }>) => {
                   this.updateAnswer(index, event.detail.value)
